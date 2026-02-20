@@ -1,0 +1,30 @@
+services:
+  dev:
+    build: .
+    image: tenzo-dev:latest
+    volumes:
+      - .:/app  # Монтуємо поточну папку в /app
+      - ccache_data:/root/.ccache  # CCache storage
+    working_dir: /app/cmake-build-debug
+    tty: true   # Щоб контейнер не падав одразу
+    stdin_open: true  # For interactive mode
+    # GPU access for Intel integrated graphics
+    devices:
+      - /dev/dri:/dev/dri  # Intel GPU (render nodes)
+    group_add:
+      - video  # Access to GPU devices
+    environment:
+      - VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/intel_icd.x86_64.json
+      - CCACHE_DIR=/root/.ccache
+      - CCACHE_MAXSIZE=2G
+    # For hardware acceleration
+    security_opt:
+      - seccomp:unconfined
+    # CPU affinity for P-cores only (Alder Lake: cores 0,1,2,3 are P-cores with HT)
+    cpuset: "0-3"
+    # Disable CPU throttling
+    cpu_shares: 1024
+
+volumes:
+  ccache_data:
+

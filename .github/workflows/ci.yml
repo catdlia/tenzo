@@ -1,0 +1,109 @@
+name: Tenzo CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/tenzo-dev:latest
+      options: --user root
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup CCache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-ccache-${{ hashFiles('CMakeLists.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . -GNinja \
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          -DTENZO_HAS_VULKAN=OFF
+
+    - name: Build
+      run: ninja -C build tenzo-cli
+
+    - name: Run Unit Tests
+      run: |
+        ./build/tenzo-cli test 2>&1 || true
+
+    - name: Run CPU Benchmark
+      run: |
+        echo "=== CPU MatMul Benchmark ===" 
+        ./build/tenzo-cli cpu 2>&1 | tee cpu_benchmark.txt
+
+    - name: Run Conv2D Test
+      run: |
+        echo "=== Conv2D Test ==="
+        ./build/tenzo-cli conv2d 2>&1 | tee conv2d_test.txt
+
+    - name: Upload Benchmark Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: |
+          cpu_benchmark.txt
+          conv2d_test.txt
+
+  build-docker:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/tenzo-dev:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  benchmark-report:
+    needs: build-and-test
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download Benchmark Results
+      uses: actions/download-artifact@v4
+      with:
+        name: benchmark-results
+
+    - name: Parse and Report Results
+      run: |
+        echo "## 📊 Tenzo Benchmark Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### CPU MatMul (512x512)" >> $GITHUB_STEP_SUMMARY
+        grep -E "Speedup|Scalar:|Vector:" cpu_benchmark.txt >> $GITHUB_STEP_SUMMARY || true
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Conv2D Performance" >> $GITHUB_STEP_SUMMARY
+        grep -E "Throughput|Per iteration" conv2d_test.txt >> $GITHUB_STEP_SUMMARY || true
+

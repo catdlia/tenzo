@@ -1,0 +1,28 @@
+{
+  "cpu": {
+    "model": "12th Gen Intel(R) Core(TM) i3-1215U",
+    "physical_cores": 6,
+    "logical_cores": 8,
+    "p_cores": 2,
+    "e_cores": 4,
+    "base_freq_ghz": 1.2,
+    "turbo_freq_ghz": 4.4,
+    "avx2": true,
+    "avx512": false,
+    "fma": true,
+    "vnni": true
+  },
+  "theoretical_peak_gflops": 352.0,
+  "optimal_tiles": [
+    8,
+    16,
+    4
+  ],
+  "benchmark": {
+    "matrix_size": 512,
+    "gflops_scalar": 2.3283498655564228,
+    "gflops_vector": 17.77718251655629,
+    "speedup": 7.635099,
+    "efficiency_percent": 5.050335942203492
+  }
+}

@@ -1,0 +1,69 @@
+# =========================
+# Tenzo Compiler .gitignore
+# =========================
+
+# Build directories and CMake files
+build/
+build_*/
+cmake-build-*/
+out/
+bin/
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+.cmake/
+
+# Object files, assembly, and MLIR LLVM IR outputs
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.ll
+*.bc
+*.asm
+*.s
+*.mlir.tmp
+
+# SPIR-V and GPU binaries
+*.spv
+
+# Logs and test outputs (Vibecoding traces)
+*.log
+*.txt
+!CMakeLists.txt
+!TargetDirectories.txt
+
+# Python (Benchmark scripts cache)
+__pycache__/
+*.py
+*$py.class
+.pytest_cache/
+.venv/
+venv/
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# CCache
+.ccache/
+ccache_data/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Generated TableGen files (if they are generated in source tree, usually they are in build/)
+*.inc
