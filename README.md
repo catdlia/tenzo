@@ -1,6 +1,6 @@
 # ⚡ Tenzo Compiler
 
-> **Heterogeneous AI Compiler built on MLIR/LLVM** - Write once, vectorize everywhere, dispatch anywhere.(https://github.com/YOUR_USERNAME/tenzo/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/tenzo/actions/workflows/ci.yml)(https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+> **Heterogeneous AI Compiler built on MLIR/LLVM** - Write once, vectorize everywhere, dispatch anywhere.(https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## 🎯 Overview
 
@@ -17,21 +17,22 @@ Unlike standard interpreters, Tenzo actively transforms compute graphs into high
 
 ## 📊 Performance (MatMul 512x512)
 
-Tested on Intel Alder Lake (i3-1215U / i5-1235U).
+Tested on Intel Alder Lake (i3-1215U) under ideal thermal conditions.
 
 | Approach | Environment | Throughput | Note |
 |----------|-------------|------------|------|
 | **LLVM -O3 (Scalar)** | Single-core | ~2.3 GFLOPS | Standard loop compilation |
-| **OpenBLAS (Numpy)** | Single-core | ~37.1 GFLOPS | Highly optimized assembly |
-| **Tenzo (MLIR)** | Single-core | **~39.8 GFLOPS** | Auto-generated AVX2 micro-kernel |
-| **Tenzo (Isolated)** | L1 Cache | **124.4 GFLOPS** | Peak micro-kernel efficiency (207% of base target) |
-| **Tenzo Parallel** | 8 Instances | **~149 GFLOPS** | Thread-bound parallel scaling |
+| **OpenBLAS (Numpy)** | Single-core | ~45.7 GFLOPS | Highly optimized assembly |
+| **Tenzo (MLIR E2E)** | Single-core | **~60.3 GFLOPS** | Auto-generated AVX2 micro-kernel + Cache Blocking |
+| **Tenzo (Isolated)** | L1 Cache | **124.4 GFLOPS** | Peak micro-kernel efficiency |
+| **Tenzo Parallel** | 8 Instances | **~225.2 GFLOPS** | Thread-bound parallel scaling |
 
-*Note: Tenzo matches and occasionally outperforms OpenBLAS in single-threaded scenarios by exploiting perfect register allocation and exact L1/L2 tile sizing.*
+*Note: Tenzo outperforms OpenBLAS (+31.9% in single-threaded) by exploiting perfect register allocation, zero-overhead packing, and exact L1/L2 tile sizing.*
 
 ## 🏗️ Architecture Stack
 
-```text   tenzo.matmul, tenzo.conv2d, tenzo.add
+```text
+   tenzo.matmul, tenzo.conv2d, tenzo.add
         │
         ▼   Fusion Pass (e.g., MatMul + ReLU -> FusedMatMulRelu)
         │
@@ -46,7 +47,7 @@ Tested on Intel Alder Lake (i3-1215U / i5-1235U).
     │                                  │
     ▼                                  ▼
 LLVM JIT Engine                   Vulkan Compute Pipeline
-
+```
 
 ## 🚀 Quick Start
 
@@ -65,7 +66,7 @@ cd tenzo
 docker compose run --rm -it -v $(pwd):/app -w /app dev bash
 
 # 3. Build the compiler inside the container
-mkdir -p build && cd build
+mkdir -p build_e2e && cd build_e2e
 cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
 ninja tenzo-cli
 
@@ -86,10 +87,10 @@ ninja tenzo-cli
 
 - `src/dialect/`: Definition of the `tenzo` MLIR dialect (ODS/TableGen).
 - `src/passes/`: Core compiler optimizations.
-    - `PackingKernels.cpp`: Memory layout transformations (Row-major to Block-panel).
-    - `MacroKernelPass.cpp`: Cache-blocking loop nest generation.
-    - `ExplicitMicroKernelPass.cpp`: AVX2 FMA instruction generation.
-    - `gpu/GPULowering.cpp`: SPIR-V conversion pipeline.
+  - `PackingKernels.cpp`: Memory layout transformations (Row-major to Block-panel).
+  - `MacroKernelPass.cpp`: Cache-blocking loop nest generation.
+  - `ExplicitMicroKernelPass.cpp`: AVX2 FMA instruction generation.
+  - `gpu/GPULowering.cpp`: SPIR-V conversion pipeline.
 - `src/runtime/`: Minimal Vulkan compute wrapper.
 - `src/tests/`: Benchmarks and E2E validation.
 
@@ -97,14 +98,11 @@ ninja tenzo-cli
 
 - End-to-End Linalg to LLVM pipeline.
 - GotoBLAS micro-kernel architecture & packing.
-- AVX2 explicit vectorization.
-- SPIR-V dialect generation.
+- AVX2 explicit vectorization (124 GFLOPS peak).
+- Intra-operation Multithreading (OpenMP parallelization of macro-kernel).
+- Conv2D optimization via `im2col` + GEMM.
 - Complete Vulkan Runtime integration for MatMul.
-- Transform Dialect migration (replacing hardcoded C++ passes).
 - Quantization (INT8) using AVX-VNNI.
 
 ## 📜 License
 MIT License
-```
-
----
