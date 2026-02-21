@@ -44,4 +44,10 @@ namespace tenzo {
 
     // Linear Layer Inference benchmark (Etap 3 Day 3 - Real NN inference)
     void runLinearLayerBenchmark();
+
+    // A/B Benchmark for Hybrid Affinity
+    void runHybridAffinityBenchmark(mlir::MLIRContext &context, int N = 1024);
+
+    // Final Fusion Benchmark (MatMul vs MatMul+ReLU vs MatMul+GELU)
+    void runFusionBenchmark(mlir::MLIRContext &context);
 }

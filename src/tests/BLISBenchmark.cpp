@@ -123,6 +123,7 @@ void runBLISBenchmark(mlir::MLIRContext &context) {
     // JIT Setup
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
+    tenzo::registerAllTenzoDialectTranslations(context);
     mlir::registerLLVMDialectTranslation(context);
     mlir::registerBuiltinDialectTranslation(context);
 

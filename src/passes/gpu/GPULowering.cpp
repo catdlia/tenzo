@@ -102,7 +102,7 @@ struct SetSPIRVABIPass
             if (funcOp.isKernel()) {
                 // Default workgroup size [1, 1, 1]
                 auto workgroupSize = mlir::DenseI32ArrayAttr::get(ctx, {1, 1, 1});
-                auto abiAttr = mlir::spirv::EntryPointABIAttr::get(ctx, workgroupSize, std::nullopt);
+                auto abiAttr = mlir::spirv::EntryPointABIAttr::get(ctx, workgroupSize, std::nullopt, std::nullopt);
                 funcOp->setAttr("spirv.entry_point_abi", abiAttr);
                 llvm::errs() << "[SetSPIRVABI] Set spirv.entry_point_abi attribute\n";
             }
@@ -304,7 +304,8 @@ struct GPUToSPIRVConversionPass
         // Setup conversion target - use ConversionTarget with SPIRV legal dialect
         mlir::ConversionTarget target(*ctx);
         target.addLegalDialect<mlir::spirv::SPIRVDialect>();
-        target.addLegalOp<mlir::gpu::GPUModuleOp, mlir::gpu::ModuleEndOp>();
+        target.addLegalOp<mlir::gpu::GPUModuleOp>();
+        target.addLegalOp<mlir::gpu::TerminatorOp>();
 
         // Collect all conversion patterns
         mlir::RewritePatternSet patterns(ctx);
@@ -358,10 +359,10 @@ void addLinalgToGPUPasses(mlir::OpPassManager &pm) {
     pm.addNestedPass<mlir::func::FuncOp>(mlir::createGpuMapParallelLoopsPass());
 
     // PHASE 4: Convert annotated scf.parallel -> gpu.launch
-    pm.addPass(mlir::createParallelLoopToGpuPass());
+    pm.addPass(mlir::createConvertParallelLoopToGpuPass());
 
     // PHASE 5: Outline GPU kernels into gpu.module
-    pm.addPass(mlir::createGpuLauchSinkIndexComputationsPass());
+    pm.addPass(mlir::createGpuLaunchSinkIndexComputationsPass());
     pm.addPass(mlir::createGpuKernelOutliningPass());
 
     // PHASE 6: Cleanup

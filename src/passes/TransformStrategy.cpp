@@ -70,7 +70,7 @@ struct TransformStrategyPass
         for (auto matmul : matmulOps) {
             // Check if this is on tensors and large enough to tile
             if (matmul.hasPureTensorSemantics()) {
-                auto resultType = matmul.getResult(0).getType().dyn_cast<ShapedType>();
+                auto resultType = mlir::dyn_cast<ShapedType>(matmul.getResult(0).getType());
                 if (!resultType || !resultType.hasStaticShape()) continue;
 
                 auto shape = resultType.getShape();
@@ -95,7 +95,7 @@ struct TransformStrategyPass
 
                 // Tile the operation
                 FailureOr<scf::SCFTilingResult> tilingResult =
-                    scf::tileUsingSCFForOp(rewriter,
+                    scf::tileUsingSCF(rewriter,
                         cast<TilingInterface>(matmul.getOperation()),
                         tilingOptions);
 
@@ -114,7 +114,7 @@ struct TransformStrategyPass
         // Vectorize original matmuls (must be small enough - up to 64x64)
         SmallVector<linalg::MatmulOp> toVectorize;
         func.walk([&](linalg::MatmulOp op) {
-            auto resultType = op.getResult(0).getType().dyn_cast<ShapedType>();
+            auto resultType = mlir::dyn_cast<ShapedType>(op.getResult(0).getType());
             if (resultType && resultType.hasStaticShape()) {
                 int64_t totalElements = resultType.getNumElements();
                 // Only vectorize matrices up to 64x64 (4096 elements)
@@ -141,9 +141,8 @@ struct TransformStrategyPass
             RewritePatternSet patterns(ctx);
 
             // Lower vector.contract to OuterProduct (FMA)
-            vector::VectorTransformsOptions vectorOpts;
-            vectorOpts.setVectorTransformsOptions(vector::VectorContractLowering::OuterProduct);
-            vector::populateVectorContractLoweringPatterns(patterns, vectorOpts);
+            vector::populateVectorContractLoweringPatterns(patterns, 
+                vector::VectorContractLowering::OuterProduct);
 
             // Lower reductions
             vector::populateVectorMultiReductionLoweringPatterns(
@@ -153,7 +152,7 @@ struct TransformStrategyPass
             vector::populateVectorToVectorCanonicalizationPatterns(patterns);
             vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
 
-            (void)applyPatternsAndFoldGreedily(func, std::move(patterns));
+            (void)applyPatternsGreedily(func, std::move(patterns));
         }
 
         // Check results

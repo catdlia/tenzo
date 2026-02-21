@@ -141,6 +141,8 @@ add_executable(tenzo-cli
         # GPU/SPIR-V
         src/passes/gpu/GPULowering.cpp
         src/runtime/VulkanRuntime.cpp
+        src/runtime/ThreadPool.cpp
+        src/context/AutoTuner.cpp
         src/tests/GPUTests.cpp
 )
 
@@ -245,6 +247,16 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(tenzo-cli PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
+# Link OpenBLAS for GEMM comparison benchmarks (optional)
+find_library(OPENBLAS_LIB openblas)
+if(OPENBLAS_LIB)
+    target_compile_definitions(tenzo-cli PRIVATE TENZO_HAS_OPENBLAS)
+    target_link_libraries(tenzo-cli PRIVATE ${OPENBLAS_LIB})
+    message(STATUS "OpenBLAS found: ${OPENBLAS_LIB}")
+else()
+    message(STATUS "OpenBLAS not found — comparison benchmarks disabled")
+endif()
+
 # ============================================================
 # 🔬 MICRO-KERNEL ISOLATED BENCHMARK
 # ============================================================
@@ -284,9 +296,9 @@ if(USE_MLIR_KERNEL)
             PROPERTIES EXTERNAL_OBJECT TRUE GENERATED FALSE)
     else()
         # Try to compile from MLIR source
-        find_program(MLIR_OPT mlir-opt HINTS /usr/lib/llvm-18/bin)
-        find_program(MLIR_TRANSLATE mlir-translate HINTS /usr/lib/llvm-18/bin)
-        find_program(LLC_PROGRAM llc-18 llc HINTS /usr/lib/llvm-18/bin)
+        find_program(MLIR_OPT mlir-opt HINTS /usr/lib/llvm-21/bin)
+        find_program(MLIR_TRANSLATE mlir-translate HINTS /usr/lib/llvm-21/bin)
+        find_program(LLC_PROGRAM llc-21 llc HINTS /usr/lib/llvm-21/bin)
 
         if(MLIR_OPT AND MLIR_TRANSLATE AND LLC_PROGRAM)
             message(STATUS "🔧 Found MLIR tools, will compile from source")

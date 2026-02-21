@@ -16,13 +16,14 @@ void tenzo::addTenzoBufferizationPasses(mlir::OpPassManager &pm) {
     // 1. Підготовка: empty -> alloc_tensor
     pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
     // 2. OneShot Bufferization
-    mlir::bufferization::OneShotBufferizationOptions options;
+    mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;
     options.copyBeforeWrite = true;
-    options.allowUnknownOps = true;
+    // Options allowUnknownOps no longer exists / is true by default
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
+
     // 3. Конвертуємо bufferization ops -> memref ops
-    pm.addPass(mlir::createBufferizationToMemRefPass());
+    pm.addPass(mlir::createConvertBufferizationToMemRefPass());
     // 4. Очищення
     pm.addPass(mlir::createCanonicalizerPass());
     pm.addPass(mlir::createCSEPass());

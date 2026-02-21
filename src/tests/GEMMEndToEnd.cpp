@@ -35,6 +35,11 @@
 #include <thread>
 #include <vector>
 #include <atomic>
+#include <pthread.h>    // Thread pinning (pthread_setaffinity_np)
+
+#ifdef TENZO_HAS_OPENBLAS
+#include <cblas.h>
+#endif
 
 namespace {
 
@@ -509,6 +514,300 @@ void gemmWithPacking(const float* A, const float* B, float* C,
 
     free(blockA);
     free(blockB);
+}
+
+//===----------------------------------------------------------------------===//
+// ADAPTIVE Macro-kernel - Uses topology-computed KC/MC/NC from cache sizes
+// Instead of hardcoded KC=256/MC=96/NC=256, computes from actual L1/L2/L3
+//===----------------------------------------------------------------------===//
+void gemmAdaptive(const float* A, const float* B, float* C,
+                  int M, int N, int K, int lda, int ldb, int ldc,
+                  int aKC, int aMC, int aNC) {
+
+    float* blockA = aligned_alloc_floats(aMC * aKC);
+    float* blockB = aligned_alloc_floats(aKC * aNC);
+
+    for (int jc = 0; jc < N; jc += aNC) {
+        int ncActual = std::min(aNC, N - jc);
+        int ncPadded = roundUp(ncActual, NR);
+
+        for (int pc = 0; pc < K; pc += aKC) {
+            int kcActual = std::min(aKC, K - pc);
+
+            packB(B + pc * ldb + jc, blockB, kcActual, ncActual, ldb);
+
+            for (int ic = 0; ic < M; ic += aMC) {
+                int mcActual = std::min(aMC, M - ic);
+                int mcPadded = roundUp(mcActual, MR);
+
+                packA(A + ic * lda + pc, blockA, mcActual, kcActual, lda);
+
+                int numMicroJ = ncPadded / NR;
+                int numMicroI = mcPadded / MR;
+
+                for (int jr = 0; jr < numMicroJ; jr++) {
+                    for (int ir = 0; ir < numMicroI; ir++) {
+                        int cRow = ic + ir * MR;
+                        int cCol = jc + jr * NR;
+                        if (cRow >= M || cCol >= N) continue;
+
+                        const float* aPtr = blockA + ir * kcActual * MR;
+                        const float* bPtr = blockB + jr * kcActual * NR;
+
+                        int rowsToWrite = std::min(MR, M - cRow);
+                        int colsToWrite = std::min(NR, N - cCol);
+
+                        if (rowsToWrite == MR && colsToWrite == NR) {
+                            microKernel6x16(aPtr, bPtr, C + cRow * ldc + cCol, ldc, kcActual);
+                        } else {
+                            alignas(32) float tempC[MR * NR] = {0};
+                            for (int i = 0; i < rowsToWrite; i++)
+                                for (int j = 0; j < colsToWrite; j++)
+                                    tempC[i * NR + j] = C[(cRow + i) * ldc + (cCol + j)];
+
+                            microKernel6x16(aPtr, bPtr, tempC, NR, kcActual);
+
+                            for (int i = 0; i < rowsToWrite; i++)
+                                for (int j = 0; j < colsToWrite; j++)
+                                    C[(cRow + i) * ldc + (cCol + j)] = tempC[i * NR + j];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    free(blockA);
+    free(blockB);
+}
+
+//===----------------------------------------------------------------------===//
+// PER-CORE INDEPENDENT GEMM — Zero-sync parallelism
+//
+// Philosophy: Instead of splitting one GEMM across threads (which creates
+// synchronization, false sharing, and redundant packing), we split the M
+// dimension into INDEPENDENT sub-problems. Each physical core runs its own
+// COMPLETE GotoBLAS GEMM pipeline on its rows — no barriers, no shared data.
+//
+// Each core:
+//   1. Gets pinned to its physical CPU (pthread_setaffinity_np)
+//   2. Allocates its OWN packing buffers (no false sharing)
+//   3. Runs a complete 5-loop GEMM on its assigned rows
+//   4. Writes to its own non-overlapping C region
+//
+// This mirrors how real production BLAS libraries work (e.g. BLIS).
+//===----------------------------------------------------------------------===//
+void gemmPerCoreIndependent(const float* A, const float* B, float* C,
+                            int M, int N, int K, int lda, int ldb, int ldc,
+                            const tenzo::TopologyInfo& topo,
+                            int aKC, int aMC, int aNC) {
+
+    // Build work assignments using topology
+    auto split = tenzo::HeterogeneousWorkSplit::compute(M, topo);
+    int numWorkers = (int)split.assignments.size();
+
+    if (numWorkers <= 1) {
+        gemmAdaptive(A, B, C, M, N, K, lda, ldb, ldc, aKC, aMC, aNC);
+        return;
+    }
+
+    std::vector<std::thread> workers;
+    workers.reserve(numWorkers);
+
+    for (auto& tw : split.assignments) {
+        workers.emplace_back([&, tw, aKC, aMC, aNC]() {
+            // Pin to specific CPU core
+            #ifdef __linux__
+            if (tw.cpuId >= 0) {
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(tw.cpuId, &cpuset);
+                pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+            }
+            #endif
+
+            int mStart = tw.rowStart;
+            int mEnd = tw.rowEnd;
+            if (mStart >= mEnd) return;
+            int localM = mEnd - mStart;
+
+            // Each core has its OWN packing buffers — no false sharing
+            float* myBlockA = aligned_alloc_floats(aMC * aKC);
+            float* myBlockB = aligned_alloc_floats(aKC * aNC);
+
+            // Run a COMPLETE, INDEPENDENT 5-loop GEMM on my rows
+            for (int jc = 0; jc < N; jc += aNC) {
+                int ncActual = std::min(aNC, N - jc);
+                int ncPadded = roundUp(ncActual, NR);
+
+                for (int pc = 0; pc < K; pc += aKC) {
+                    int kcActual = std::min(aKC, K - pc);
+
+                    // Each core packs its own B — this IS redundant across cores,
+                    // but avoids synchronization entirely. For large K and N,
+                    // the B panel lives in L3 anyway.
+                    packB(B + pc * ldb + jc, myBlockB, kcActual, ncActual, ldb);
+
+                    for (int icRel = 0; icRel < localM; icRel += aMC) {
+                        int ic = mStart + icRel;
+                        int mcActual = std::min(aMC, mEnd - ic);
+                        int mcPadded = roundUp(mcActual, MR);
+
+                        packA(A + ic * lda + pc, myBlockA, mcActual, kcActual, lda);
+
+                        int numMicroJ = ncPadded / NR;
+                        int numMicroI = mcPadded / MR;
+
+                        for (int jr = 0; jr < numMicroJ; jr++) {
+                            for (int ir = 0; ir < numMicroI; ir++) {
+                                int cRow = ic + ir * MR;
+                                int cCol = jc + jr * NR;
+                                if (cRow >= mEnd || cCol >= N) continue;
+
+                                const float* aPtr = myBlockA + ir * kcActual * MR;
+                                const float* bPtr = myBlockB + jr * kcActual * NR;
+
+                                int rowsToWrite = std::min(MR, mEnd - cRow);
+                                int colsToWrite = std::min(NR, N - cCol);
+
+                                if (rowsToWrite == MR && colsToWrite == NR) {
+                                    microKernel6x16(aPtr, bPtr,
+                                        C + cRow * ldc + cCol, ldc, kcActual);
+                                } else {
+                                    alignas(32) float tempC[MR * NR] = {0};
+                                    for (int i = 0; i < rowsToWrite; i++)
+                                        for (int j = 0; j < colsToWrite; j++)
+                                            tempC[i * NR + j] = C[(cRow + i) * ldc + (cCol + j)];
+
+                                    microKernel6x16(aPtr, bPtr, tempC, NR, kcActual);
+
+                                    for (int i = 0; i < rowsToWrite; i++)
+                                        for (int j = 0; j < colsToWrite; j++)
+                                            C[(cRow + i) * ldc + (cCol + j)] = tempC[i * NR + j];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            free(myBlockA);
+            free(myBlockB);
+        });
+    }
+
+    for (auto& w : workers) w.join();
+}
+
+// Per-core-type blocking: each core type gets its own KC/MC/NC based on its cache
+void gemmPerCoreIndependentPerType(const float* A, const float* B, float* C,
+                                    int M, int N, int K, int lda, int ldb, int ldc,
+                                    const tenzo::HardwareInfo& hwInfo) {
+
+    auto split = tenzo::HeterogeneousWorkSplit::compute(M, hwInfo.topology);
+    int numWorkers = (int)split.assignments.size();
+
+    if (numWorkers <= 1) {
+        auto p = hwInfo.getOptimalMicroKernelParams();
+        gemmAdaptive(A, B, C, M, N, K, lda, ldb, ldc, p.KC, p.MC, p.NC);
+        return;
+    }
+
+    // Pre-compute blocking params for each core type
+    auto pParams = hwInfo.getOptimalMicroKernelParamsForCoreType(tenzo::CoreType::P_CORE);
+    auto eParams = hwInfo.getOptimalMicroKernelParamsForCoreType(tenzo::CoreType::E_CORE);
+
+    std::vector<std::thread> workers;
+    workers.reserve(numWorkers);
+
+    for (auto& tw : split.assignments) {
+        workers.emplace_back([&, tw, pParams, eParams]() {
+            // Pin to specific CPU core
+            #ifdef __linux__
+            if (tw.cpuId >= 0) {
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(tw.cpuId, &cpuset);
+                pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+            }
+            #endif
+
+            // Select blocking params for THIS core's type
+            int myKC, myMC, myNC;
+            if (tw.coreType == tenzo::CoreType::P_CORE) {
+                myKC = pParams.KC; myMC = pParams.MC; myNC = pParams.NC;
+            } else if (tw.coreType == tenzo::CoreType::E_CORE) {
+                myKC = eParams.KC; myMC = eParams.MC; myNC = eParams.NC;
+            } else {
+                myKC = pParams.KC; myMC = pParams.MC; myNC = pParams.NC;
+            }
+
+            int mStart = tw.rowStart;
+            int mEnd = tw.rowEnd;
+            if (mStart >= mEnd) return;
+            int localM = mEnd - mStart;
+
+            float* myBlockA = aligned_alloc_floats(myMC * myKC);
+            float* myBlockB = aligned_alloc_floats(myKC * myNC);
+
+            for (int jc = 0; jc < N; jc += myNC) {
+                int ncActual = std::min(myNC, N - jc);
+                int ncPadded = roundUp(ncActual, NR);
+
+                for (int pc = 0; pc < K; pc += myKC) {
+                    int kcActual = std::min(myKC, K - pc);
+
+                    packB(B + pc * ldb + jc, myBlockB, kcActual, ncActual, ldb);
+
+                    for (int icRel = 0; icRel < localM; icRel += myMC) {
+                        int ic = mStart + icRel;
+                        int mcActual = std::min(myMC, mEnd - ic);
+                        int mcPadded = roundUp(mcActual, MR);
+
+                        packA(A + ic * lda + pc, myBlockA, mcActual, kcActual, lda);
+
+                        int numMicroJ = ncPadded / NR;
+                        int numMicroI = mcPadded / MR;
+
+                        for (int jr = 0; jr < numMicroJ; jr++) {
+                            for (int ir = 0; ir < numMicroI; ir++) {
+                                int cRow = ic + ir * MR;
+                                int cCol = jc + jr * NR;
+                                if (cRow >= mEnd || cCol >= N) continue;
+
+                                const float* aPtr = myBlockA + ir * kcActual * MR;
+                                const float* bPtr = myBlockB + jr * kcActual * NR;
+
+                                int rowsToWrite = std::min(MR, mEnd - cRow);
+                                int colsToWrite = std::min(NR, N - cCol);
+
+                                if (rowsToWrite == MR && colsToWrite == NR) {
+                                    microKernel6x16(aPtr, bPtr,
+                                        C + cRow * ldc + cCol, ldc, kcActual);
+                                } else {
+                                    alignas(32) float tempC[MR * NR] = {0};
+                                    for (int i = 0; i < rowsToWrite; i++)
+                                        for (int j = 0; j < colsToWrite; j++)
+                                            tempC[i * NR + j] = C[(cRow + i) * ldc + (cCol + j)];
+
+                                    microKernel6x16(aPtr, bPtr, tempC, NR, kcActual);
+
+                                    for (int i = 0; i < rowsToWrite; i++)
+                                        for (int j = 0; j < colsToWrite; j++)
+                                            C[(cRow + i) * ldc + (cCol + j)] = tempC[i * NR + j];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            free(myBlockA);
+            free(myBlockB);
+        });
+    }
+
+    for (auto& w : workers) w.join();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1198,17 +1497,290 @@ void runGEMMEndToEndBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "╚══════════════╩═══════════════════╩═══════════════════╩════════════╝\n";
     llvm::outs().flush();
 
-    llvm::outs() << "📊 Analysis:\n";
-    llvm::outs() << "   - Packing transforms strided memory access to sequential\n";
-    llvm::outs() << "   - Micro-kernel achieves ~90%+ FMA utilization\n";
-    llvm::outs() << "   - BiasReLU fusion: 3 operations for price of ~1!\n";
-    llvm::outs() << "   - Parallel scaling depends on matrix size and cache effects\n\n";
+    // ═══════════════════════════════════════════════════════════════════════
+    // PART 7: Per-Core Independent GEMM (Zero-Sync Parallelism)
+    // ═══════════════════════════════════════════════════════════════════════
+    auto mkp = hwInfo.getOptimalMicroKernelParams();
 
-    // Peak theoretical
-    double peakGflops = hwInfo.physicalCores * hwInfo.baseFreqGHz * 32.0; // 32 FLOPS/cycle with AVX2 FMA
-    llvm::outs() << "🎯 Theoretical Peak: " << peakGflops << " GFLOPS\n";
-    llvm::outs() << "   (Based on " << hwInfo.physicalCores << " cores x "
-                 << hwInfo.baseFreqGHz << " GHz x 32 FLOPS/cycle)\n\n";
+    llvm::outs() << "\n🏗️  [Per-Core Independent] Zero-Sync Parallelism:\n";
+    llvm::outs() << "   Philosophy: Each core runs its OWN complete GEMM — no barriers, no shared data\n";
+
+    if (hwInfo.topology.isHybrid()) {
+        auto pParams = hwInfo.getOptimalMicroKernelParamsForCoreType(CoreType::P_CORE);
+        auto eParams = hwInfo.getOptimalMicroKernelParamsForCoreType(CoreType::E_CORE);
+        auto split = HeterogeneousWorkSplit::compute(1024, hwInfo.topology);
+        llvm::outs() << "   Detected: " << hwInfo.topology.numPCores << " P-cores ("
+                     << hwInfo.topology.threadsPerPCore << " threads/core, "
+                     << hwInfo.topology.pCoreMaxFreqKHz / 1000 << " MHz) + "
+                     << hwInfo.topology.numECores << " E-cores ("
+                     << hwInfo.topology.threadsPerECore << " thread/core, "
+                     << hwInfo.topology.eCoreMaxFreqKHz / 1000 << " MHz)\n";
+        llvm::outs() << "   Per-type blocking:\n";
+        llvm::outs() << "     P-core: L1d=" << hwInfo.topology.pCoreCache.l1dKB
+                     << "KB → KC=" << pParams.KC << " MC=" << pParams.MC << " NC=" << pParams.NC << "\n";
+        llvm::outs() << "     E-core: L1d=" << hwInfo.topology.eCoreCache.l1dKB
+                     << "KB → KC=" << eParams.KC << " MC=" << eParams.MC << " NC=" << eParams.NC << "\n";
+
+        llvm::outs() << "   Work split (weighted by freq):\n";
+        for (auto& tw : split.assignments) {
+            const char* typeStr = tw.coreType == CoreType::P_CORE ? "P" : "E";
+            llvm::outs() << "     Core " << tw.threadId
+                         << " [" << typeStr << ", cpu" << tw.cpuId << "]: "
+                         << (tw.rowEnd - tw.rowStart) << " rows\n";
+        }
+    } else {
+        llvm::outs() << "   Homogeneous architecture\n";
+    }
+
+    llvm::outs() << "\n╔══════════════╦═══════════════╦═══════════════╦═══════════════╦═══════════════╗\n";
+    llvm::outs() << "║   Size       ║  1T Hardcoded ║  N-Core HC    ║  N-Core Adapt ║  N-Core PerTy ║\n";
+    llvm::outs() << "╠══════════════╬═══════════════╬═══════════════╬═══════════════╬═══════════════╣\n";
+
+    for (const auto& test : tests) {
+        double g1 = runGemmBenchmark(gemmWithPacking, test.M, test.N, test.K, 5, 30);
+
+        float* A = aligned_alloc_floats(test.M * test.K);
+        float* B = aligned_alloc_floats(test.K * test.N);
+        float* C = aligned_alloc_floats(test.M * test.N);
+        for (int i = 0; i < test.M * test.K; i++) A[i] = 0.5f;
+        for (int i = 0; i < test.K * test.N; i++) B[i] = 0.5f;
+
+        // N-Core Hardcoded
+        for (int w = 0; w < 3; w++) {
+            memset(C, 0, test.M * test.N * sizeof(float));
+            gemmPerCoreIndependent(A, B, C, test.M, test.N, test.K,
+                                   test.K, test.N, test.N, hwInfo.topology,
+                                   KC, MC, NC);
+        }
+        auto s = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 30; i++)
+            gemmPerCoreIndependent(A, B, C, test.M, test.N, test.K,
+                                   test.K, test.N, test.N, hwInfo.topology,
+                                   KC, MC, NC);
+        auto e = std::chrono::high_resolution_clock::now();
+        double g2 = (2.0 * test.M * test.N * test.K /
+                    (std::chrono::duration<double>(e - s).count() / 30)) / 1e9;
+
+        // N-Core Adaptive (uniform, from cpu0 cache)
+        for (int w = 0; w < 3; w++) {
+            memset(C, 0, test.M * test.N * sizeof(float));
+            gemmPerCoreIndependent(A, B, C, test.M, test.N, test.K,
+                                   test.K, test.N, test.N, hwInfo.topology,
+                                   mkp.KC, mkp.MC, mkp.NC);
+        }
+        s = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 30; i++)
+            gemmPerCoreIndependent(A, B, C, test.M, test.N, test.K,
+                                   test.K, test.N, test.N, hwInfo.topology,
+                                   mkp.KC, mkp.MC, mkp.NC);
+        e = std::chrono::high_resolution_clock::now();
+        double g3 = (2.0 * test.M * test.N * test.K /
+                    (std::chrono::duration<double>(e - s).count() / 30)) / 1e9;
+
+        // N-Core Per-Type (each core uses its own cache-tuned params)
+        for (int w = 0; w < 3; w++) {
+            memset(C, 0, test.M * test.N * sizeof(float));
+            gemmPerCoreIndependentPerType(A, B, C, test.M, test.N, test.K,
+                                          test.K, test.N, test.N, hwInfo);
+        }
+        s = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 30; i++)
+            gemmPerCoreIndependentPerType(A, B, C, test.M, test.N, test.K,
+                                          test.K, test.N, test.N, hwInfo);
+        e = std::chrono::high_resolution_clock::now();
+        double g4 = (2.0 * test.M * test.N * test.K /
+                    (std::chrono::duration<double>(e - s).count() / 30)) / 1e9;
+
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+                "║ %4dx%4dx%4d ║    %6.1f     ║    %6.1f     ║    %6.1f     ║    %6.1f     ║\n",
+                test.M, test.N, test.K, g1, g2, g3, g4);
+        llvm::outs() << buf;
+        llvm::outs().flush();
+
+        free(A); free(B); free(C);
+    }
+
+    llvm::outs() << "╚══════════════╩═══════════════╩═══════════════╩═══════════════╩═══════════════╝\n\n";
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PART 8: Fair OpenBLAS Comparison (single-thread AND multi-thread)
+    // ═══════════════════════════════════════════════════════════════════════
+#ifdef TENZO_HAS_OPENBLAS
+    llvm::outs() << "🔬 [OpenBLAS] Fair Comparison (1T + MT):\n\n";
+
+    llvm::outs() << "╔══════════════╦═══════════════════╦═══════════════════╦═══════════════════╦════════════╗\n";
+    llvm::outs() << "║   Size       ║  BLAS 1T (GFLOPS) ║  BLAS MT (GFLOPS) ║  Tenzo Best       ║   vs 1T    ║\n";
+    llvm::outs() << "╠══════════════╬═══════════════════╬═══════════════════╬═══════════════════╬════════════╣\n";
+
+    for (const auto& test : tests) {
+        float* A = aligned_alloc_floats(test.M * test.K);
+        float* B = aligned_alloc_floats(test.K * test.N);
+        float* C = aligned_alloc_floats(test.M * test.N);
+        for (int i = 0; i < test.M * test.K; i++) A[i] = 0.5f;
+        for (int i = 0; i < test.K * test.N; i++) B[i] = 0.5f;
+
+        // OpenBLAS single-thread
+        openblas_set_num_threads(1);
+        for (int w = 0; w < 5; w++) {
+            memset(C, 0, test.M * test.N * sizeof(float));
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                        test.M, test.N, test.K, 1.0f,
+                        A, test.K, B, test.N, 0.0f, C, test.N);
+        }
+        auto s1 = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 30; i++)
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                        test.M, test.N, test.K, 1.0f,
+                        A, test.K, B, test.N, 0.0f, C, test.N);
+        auto e1 = std::chrono::high_resolution_clock::now();
+        double gflops1T = (2.0 * test.M * test.N * test.K /
+                          (std::chrono::duration<double>(e1 - s1).count() / 30)) / 1e9;
+
+        // OpenBLAS multi-thread
+        openblas_set_num_threads(hwInfo.topology.totalLogicalCpus());
+        for (int w = 0; w < 5; w++) {
+            memset(C, 0, test.M * test.N * sizeof(float));
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                        test.M, test.N, test.K, 1.0f,
+                        A, test.K, B, test.N, 0.0f, C, test.N);
+        }
+        auto sM = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 30; i++)
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                        test.M, test.N, test.K, 1.0f,
+                        A, test.K, B, test.N, 0.0f, C, test.N);
+        auto eM = std::chrono::high_resolution_clock::now();
+        double gflopsMT = (2.0 * test.M * test.N * test.K /
+                          (std::chrono::duration<double>(eM - sM).count() / 30)) / 1e9;
+
+        // Tenzo per-core independent with adaptive blocking
+        for (int w = 0; w < 3; w++) {
+            memset(C, 0, test.M * test.N * sizeof(float));
+            gemmPerCoreIndependent(A, B, C, test.M, test.N, test.K,
+                                   test.K, test.N, test.N, hwInfo.topology,
+                                   mkp.KC, mkp.MC, mkp.NC);
+        }
+        auto sT = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 30; i++)
+            gemmPerCoreIndependent(A, B, C, test.M, test.N, test.K,
+                                   test.K, test.N, test.N, hwInfo.topology,
+                                   mkp.KC, mkp.MC, mkp.NC);
+        auto eT = std::chrono::high_resolution_clock::now();
+        double gflopsBest = (2.0 * test.M * test.N * test.K /
+                            (std::chrono::duration<double>(eT - sT).count() / 30)) / 1e9;
+
+        double vs1T = gflopsBest / gflops1T;
+
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+                "║ %4dx%4dx%4d ║      %6.1f       ║      %6.1f       ║      %6.1f       ║    %5.2fx   ║\n",
+                test.M, test.N, test.K, gflops1T, gflopsMT, gflopsBest, vs1T);
+        llvm::outs() << buf;
+        llvm::outs().flush();
+
+        free(A); free(B); free(C);
+    }
+
+    llvm::outs() << "╚══════════════╩═══════════════════╩═══════════════════╩═══════════════════╩════════════╝\n\n";
+#else
+    llvm::outs() << "ℹ️  OpenBLAS not available (build with -DTENZO_HAS_OPENBLAS and link -lopenblas)\n\n";
+#endif
+
+    llvm::outs() << "📊 Analysis:\n";
+    llvm::outs() << "   - Per-core independent: each core runs full GEMM pipeline, zero sync\n";
+    llvm::outs() << "   - Adaptive blocking: KC=" << mkp.KC << " MC=" << mkp.MC
+                 << " NC=" << mkp.NC << " (from actual cache sizes)\n";
+    llvm::outs() << "   - Hardcoded blocking: KC=" << KC << " MC=" << MC << " NC=" << NC << "\n";
+
+    float peakGflops = hwInfo.getTheoreticalPeakGFLOPS();
+    llvm::outs() << "   - Theoretical Peak: " << peakGflops << " GFLOPS\n\n";
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PART 9: Runtime Parameter Sweep (find best KC/MC/NC experimentally)
+    // ═══════════════════════════════════════════════════════════════════════
+    llvm::outs() << "🔬 [Parameter Sweep] Finding optimal KC/MC/NC for 512×512:\n\n";
+
+    struct BlockingConfig {
+        int kc, mc, nc;
+        const char* label;
+    };
+
+    BlockingConfig configs[] = {
+        {256,  96,  256,  "HC (256/96/256)   "},
+        {256, 144,  256,  "MC+  (256/144/256) "},
+        {256, 192,  512,  "NC+  (256/192/512) "},
+        {128,  72,  128,  "Small(128/72/128)  "},
+        {512, 192,  512,  "Large(512/192/512) "},
+        {mkp.KC, mkp.MC, mkp.NC, "Adapt (computed)   "},
+        {256, 192,  256,  "Wide (256/192/256) "},
+        {384, 192,  384,  "Med  (384/192/384) "},
+    };
+
+    int sweepM = 512, sweepN = 512, sweepK = 512;
+    double bestGflops = 0;
+    int bestIdx = 0;
+
+    llvm::outs() << "╔══════════════════════════╦═══════════════╦═══════════════╗\n";
+    llvm::outs() << "║  Config                  ║  1T (GFLOPS)  ║  N-Core Total ║\n";
+    llvm::outs() << "╠══════════════════════════╬═══════════════╬═══════════════╣\n";
+
+    for (int ci = 0; ci < 8; ci++) {
+        auto& cfg = configs[ci];
+        float* A = aligned_alloc_floats(sweepM * sweepK);
+        float* B = aligned_alloc_floats(sweepK * sweepN);
+        float* C = aligned_alloc_floats(sweepM * sweepN);
+        for (int i = 0; i < sweepM * sweepK; i++) A[i] = 0.5f;
+        for (int i = 0; i < sweepK * sweepN; i++) B[i] = 0.5f;
+
+        // 1T benchmark
+        for (int w = 0; w < 3; w++) {
+            memset(C, 0, sweepM * sweepN * sizeof(float));
+            gemmAdaptive(A, B, C, sweepM, sweepN, sweepK,
+                        sweepK, sweepN, sweepN, cfg.kc, cfg.mc, cfg.nc);
+        }
+        auto s = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 20; i++)
+            gemmAdaptive(A, B, C, sweepM, sweepN, sweepK,
+                        sweepK, sweepN, sweepN, cfg.kc, cfg.mc, cfg.nc);
+        auto e = std::chrono::high_resolution_clock::now();
+        double g1t = (2.0 * sweepM * sweepN * sweepK /
+                     (std::chrono::duration<double>(e - s).count() / 20)) / 1e9;
+
+        // N-Core benchmark
+        for (int w = 0; w < 2; w++) {
+            memset(C, 0, sweepM * sweepN * sizeof(float));
+            gemmPerCoreIndependent(A, B, C, sweepM, sweepN, sweepK,
+                                   sweepK, sweepN, sweepN, hwInfo.topology,
+                                   cfg.kc, cfg.mc, cfg.nc);
+        }
+        s = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 20; i++)
+            gemmPerCoreIndependent(A, B, C, sweepM, sweepN, sweepK,
+                                   sweepK, sweepN, sweepN, hwInfo.topology,
+                                   cfg.kc, cfg.mc, cfg.nc);
+        e = std::chrono::high_resolution_clock::now();
+        double gNc = (2.0 * sweepM * sweepN * sweepK /
+                     (std::chrono::duration<double>(e - s).count() / 20)) / 1e9;
+
+        if (gNc > bestGflops) {
+            bestGflops = gNc;
+            bestIdx = ci;
+        }
+
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+                "║  %s ║    %6.1f     ║    %6.1f     ║\n",
+                cfg.label, g1t, gNc);
+        llvm::outs() << buf;
+        llvm::outs().flush();
+
+        free(A); free(B); free(C);
+    }
+
+    llvm::outs() << "╚══════════════════════════╩═══════════════╩═══════════════╝\n";
+    llvm::outs() << "   🏆 Best: " << configs[bestIdx].label
+                 << " → " << bestGflops << " GFLOPS\n\n";
 
     llvm::outs() << "✅ BENCHMARK COMPLETE!\n";
 }

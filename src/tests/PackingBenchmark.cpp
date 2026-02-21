@@ -115,7 +115,8 @@ void runPackingBenchmark(mlir::MLIRContext &context) {
 
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
-    registerLLVMDialectTranslation(context);
+    tenzo::registerAllTenzoDialectTranslations(context);
+    mlir::registerLLVMDialectTranslation(context);
     registerBuiltinDialectTranslation(context);
 
     ExecutionEngineOptions engineOptions;

@@ -1,5 +1,6 @@
 #include "TenzoContext.h"
 #include "dialect/TenzoDialect.h"
+#include "passes/Passes.h"
 
 // --- Dialect Headers ---
 #include "mlir/InitAllDialects.h"
@@ -101,26 +102,43 @@ void tenzo::registerAllDialects(mlir::MLIRContext &context) {
     context.appendDialectRegistry(registry);
 
     // 3. Реєструємо паси
-
-    // Core transforms
     mlir::registerTransformsPasses();
-
-    // Global Registration
     mlir::registerLinalgPasses();
     mlir::registerSCFPasses();
-
-    // Nested Registration
     mlir::affine::registerAffinePasses();
     mlir::vector::registerVectorPasses();
     mlir::bufferization::registerBufferizationPasses();
     mlir::memref::registerMemRefPasses();
     mlir::func::registerFuncPasses();
     mlir::arith::registerArithPasses();
-
-    // GPU/SPIR-V passes
     mlir::registerGPUPasses();
     mlir::spirv::registerSPIRVPasses();
+}
 
-    // ВИДАЛЕНО: mlir::registerConvertVectorToLLVMPass();
-    // Ми будемо додавати цей пас напряму через create...()
+void tenzo::addHardwareAwareGEMMPipeline(mlir::OpPassManager &pm, 
+                                          const HardwareInfo &hwInfo) {
+    auto mkParams = hwInfo.getOptimalMicroKernelParams();
+    
+    // Convert HardwareInfo::MicroKernelParams to tenzo::MicroKernelParams
+    tenzo::MicroKernelParams params;
+    params.MR = mkParams.MR;
+    params.NR = mkParams.NR;
+    params.KC = mkParams.KC;
+    params.MC = mkParams.MC;
+    params.NC = mkParams.NC;
+    params.VEC_SIZE = hwInfo.hasAVX512 ? 16 : 8;
+
+    llvm::outs() << "[TenzoContext] Initializing hardware-aware pipeline:\n";
+    llvm::outs() << "  Target ISA: " << (hwInfo.hasAVX512 ? "AVX-512" : "AVX2") << "\n";
+    llvm::outs() << "  Micro-kernel: " << params.MR << "x" << params.NR << "\n";
+    llvm::outs() << "  Cache blocking: KC=" << params.KC << ", MC=" << params.MC << ", NC=" << params.NC << "\n";
+
+    // 1. Packing
+    addPackingPass(pm, params);
+
+    // 2. Macro-Kernel Generation (5-loop nest)
+    pm.addPass(createGenerateMacroKernelPass(params));
+
+    // 3. Explicit Micro-Kernel Generation (vectorized FMAs)
+    addExplicitMicroKernelPass(pm, params);
 }

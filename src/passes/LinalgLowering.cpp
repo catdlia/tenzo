@@ -17,7 +17,7 @@ struct FusedLoweringToLinalg : public OpConversionPattern<tenzo::FusedAddReluOp>
     LogicalResult matchAndRewrite(tenzo::FusedAddReluOp op, OpAdaptor adaptor,
                                 ConversionPatternRewriter &rewriter) const override {
         auto loc = op.getLoc();
-        auto resultType = op.getResult().getType().cast<RankedTensorType>();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
         auto elemType = resultType.getElementType();
 
         SmallVector<AffineMap, 3> indexingMaps(
@@ -53,7 +53,7 @@ struct MatMulLoweringToLinalg : public OpConversionPattern<tenzo::MatMulOp> {
     LogicalResult matchAndRewrite(tenzo::MatMulOp op, OpAdaptor adaptor,
                                 ConversionPatternRewriter &rewriter) const override {
         auto loc = op.getLoc();
-        auto resultType = op.getResult().getType().cast<RankedTensorType>();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
         auto elemType = resultType.getElementType();
 
         // Create zero-initialized output tensor
@@ -84,7 +84,7 @@ struct Conv2DLoweringToLinalg : public OpConversionPattern<tenzo::Conv2DOp> {
     LogicalResult matchAndRewrite(tenzo::Conv2DOp op, OpAdaptor adaptor,
                                 ConversionPatternRewriter &rewriter) const override {
         auto loc = op.getLoc();
-        auto resultType = op.getResult().getType().cast<RankedTensorType>();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
         auto elemType = resultType.getElementType();
 
         // Create output tensor initialized to zero

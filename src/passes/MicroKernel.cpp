@@ -54,11 +54,11 @@ struct GotoBLASMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
         Value C = op.getOutputs()[0]; // [M, N]
 
         // Get shapes
-        auto aType = A.getType().cast<MemRefType>();
-        auto bType = B.getType().cast<MemRefType>();
-        auto cType = C.getType().cast<MemRefType>();
+        auto aType = mlir::dyn_cast<MemRefType>(A.getType());
+        auto bType = mlir::dyn_cast<MemRefType>(B.getType());
+        auto cType = mlir::dyn_cast<MemRefType>(C.getType());
 
-        if (!aType.hasStaticShape() || !bType.hasStaticShape())
+        if (!aType || !bType || !cType || !aType.hasStaticShape() || !bType.hasStaticShape())
             return failure();
 
         int64_t M = aType.getShape()[0];
@@ -194,9 +194,11 @@ struct TenzoMicroKernelPass
         func.walk([&](linalg::MatmulOp op) {
             if (op.hasPureBufferSemantics()) {
                 matmulCount++;
-                auto aType = op.getInputs()[0].getType().cast<MemRefType>();
-                llvm::outs() << "[MicroKernel] Found bufferized matmul: "
-                             << aType.getShape()[0] << "x" << aType.getShape()[1] << "\n";
+                auto aType = mlir::dyn_cast<MemRefType>(op.getInputs()[0].getType());
+                if (aType) {
+                    llvm::outs() << "[MicroKernel] Found bufferized matmul: "
+                                 << aType.getShape()[0] << "x" << aType.getShape()[1] << "\n";
+                }
             }
         });
 
@@ -210,9 +212,9 @@ struct TenzoMicroKernelPass
         patterns.add<GotoBLASMicroKernelPattern>(ctx);
 
         GreedyRewriteConfig config;
-        config.maxIterations = 10;
+        config.setMaxIterations(10);
 
-        if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns), config))) {
+        if (failed(applyPatternsGreedily(func, std::move(patterns), config))) {
             llvm::outs() << "[MicroKernel] ⚠️ Pattern application had failures\n";
         }
 

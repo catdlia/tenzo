@@ -38,28 +38,17 @@ using namespace mlir;
 
 namespace {
 
-// Cache blocking sizes (tuned for typical CPU hierarchy)
-constexpr int64_t MR = 6;    // Micro-kernel height
-constexpr int64_t NR = 16;   // Micro-kernel width
-constexpr int64_t KC = 256;  // Panel depth (fits in L1 with micro-kernel)
-constexpr int64_t MC = 96;   // Rows block (MC×KC fits in L2: 96×256×4 = 96KB)
-constexpr int64_t NC = 256;  // Cols block (KC×NC fits in L3: 256×256×4 = 256KB)
-
 // Forward declaration
 void generateInlineMicroKernel(OpBuilder &b, Location loc,
                                Value packedA, Value packedB, Value C,
-                               int64_t kSize);
+                               int64_t kSize, const tenzo::MicroKernelParams &params);
 
 //===----------------------------------------------------------------------===//
 // Generate Macro-Kernel Function
 //===----------------------------------------------------------------------===//
-// This generates the complete 5-loop GEMM structure with inline packing.
-// Instead of calling external pack functions, we inline the packing loops
-// for better optimization opportunities.
-//
-// Key insight: Packed data is accessed LINEARLY by micro-kernel!
-//
-func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, MLIRContext *ctx) {
+func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, 
+                                         MLIRContext *ctx, 
+                                         const tenzo::MicroKernelParams &params) {
     auto f32Type = builder.getF32Type();
     auto indexType = builder.getIndexType();
 
@@ -85,33 +74,30 @@ func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, MLIRC
     Value N = entryBlock.getArgument(4);
     Value K = entryBlock.getArgument(5);
 
-    // Constants
+    // Constants from params
     auto c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
     auto c1 = builder.create<arith::ConstantIndexOp>(loc, 1);
-    auto cMR = builder.create<arith::ConstantIndexOp>(loc, MR);
-    auto cNR = builder.create<arith::ConstantIndexOp>(loc, NR);
-    auto cKC = builder.create<arith::ConstantIndexOp>(loc, KC);
-    auto cMC = builder.create<arith::ConstantIndexOp>(loc, MC);
-    auto cNC = builder.create<arith::ConstantIndexOp>(loc, NC);
+    auto cMR = builder.create<arith::ConstantIndexOp>(loc, params.MR);
+    auto cNR = builder.create<arith::ConstantIndexOp>(loc, params.NR);
+    auto cKC = builder.create<arith::ConstantIndexOp>(loc, params.KC);
+    auto cMC = builder.create<arith::ConstantIndexOp>(loc, params.MC);
+    auto cNC = builder.create<arith::ConstantIndexOp>(loc, params.NC);
 
-    // Allocate packed buffers as 1D memrefs (linear layout)
-    // blockA: MC * KC floats (packed in column-major panels of MR=6)
-    auto blockAType = MemRefType::get({MC * KC}, f32Type);
+    // Allocate packed buffers
+    auto blockAType = MemRefType::get({params.MC * params.KC}, f32Type);
     Value blockA = builder.create<memref::AllocOp>(loc, blockAType);
 
-    // blockB: KC * NC floats (packed in row-major panels of NR=16)
-    auto blockBType = MemRefType::get({KC * NC}, f32Type);
+    auto blockBType = MemRefType::get({params.KC * params.NC}, f32Type);
     Value blockB = builder.create<memref::AllocOp>(loc, blockBType);
 
-    llvm::outs() << "[MacroKernel] Allocated packed buffers:\n";
-    llvm::outs() << "  blockA: " << MC << " * " << KC << " = " << (MC*KC*4/1024) << " KB (L2)\n";
-    llvm::outs() << "  blockB: " << KC << " * " << NC << " = " << (KC*NC*4/1024) << " KB (L3)\n\n";
+    llvm::outs() << "[MacroKernel] Generating macro-kernel with sizes: "
+                 << "MC=" << params.MC << ", KC=" << params.KC << ", NC=" << params.NC 
+                 << ", MR=" << params.MR << ", NR=" << params.NR << "\n";
 
     // ========== LOOP 1: jc (partition N for L3) ==========
     builder.create<scf::ForOp>(
         loc, c0, N, cNC, ValueRange{},
         [&](OpBuilder &b1, Location loc, Value jc, ValueRange) {
-            // Calculate actual block width: min(NC, N-jc)
             auto ncRemaining = b1.create<arith::SubIOp>(loc, N, jc);
             auto ncActual = b1.create<arith::MinSIOp>(loc, ncRemaining, cNC);
 
@@ -122,27 +108,16 @@ func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, MLIRC
                     auto kcRemaining = b2.create<arith::SubIOp>(loc, K, pc);
                     auto kcActual = b2.create<arith::MinSIOp>(loc, kcRemaining, cKC);
 
-                    // ╔════════════════════════════════════════════════╗
-                    // ║  📦 PACK B: B[pc:pc+KC, jc:jc+NC] → blockB     ║
-                    // ║  Layout: For each panel j, sequential K*16     ║
-                    // ╚════════════════════════════════════════════════╝
-
-                    // Number of panels in current block: ncActual / NR
+                    // PACK B
                     auto numBPanels = b2.create<arith::DivSIOp>(loc, ncActual, cNR);
-
-                    // Pack B: for each panel j in [0, numBPanels)
                     b2.create<scf::ForOp>(
                         loc, c0, numBPanels, c1, ValueRange{},
                         [&](OpBuilder &bPack, Location loc, Value bPanelIdx, ValueRange) {
-                            // Source column: jc + bPanelIdx * NR
                             auto jSrc = bPack.create<arith::MulIOp>(loc, bPanelIdx, cNR);
                             auto jStart = bPack.create<arith::AddIOp>(loc, jc, jSrc);
-
-                            // Destination base: bPanelIdx * KC * NR
                             auto kcTimesNR = bPack.create<arith::MulIOp>(loc, cKC, cNR);
                             auto bDstBase = bPack.create<arith::MulIOp>(loc, bPanelIdx, kcTimesNR);
 
-                            // Copy each row k
                             bPack.create<scf::ForOp>(
                                 loc, c0, kcActual, c1, ValueRange{},
                                 [&](OpBuilder &bPackInner, Location loc, Value kLocal, ValueRange) {
@@ -150,27 +125,15 @@ func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, MLIRC
                                     auto kTimesNR = bPackInner.create<arith::MulIOp>(loc, kLocal, cNR);
                                     auto bDstOffset = bPackInner.create<arith::AddIOp>(loc, bDstBase, kTimesNR);
 
-                                    // Copy 16 elements using vector ops
-                                    auto vecType = VectorType::get({8}, f32Type);
-                                    auto zeroF = bPackInner.create<arith::ConstantOp>(loc, f32Type,
-                                        bPackInner.getF32FloatAttr(0.0f));
-                                    auto c8 = bPackInner.create<arith::ConstantIndexOp>(loc, 8);
-
-                                    // Vector 0: B[kSrc, jStart:jStart+8]
-                                    auto v0 = bPackInner.create<vector::TransferReadOp>(
-                                        loc, vecType, B, ValueRange{kSrc, jStart}, zeroF);
-                                    bPackInner.create<vector::TransferWriteOp>(loc, v0, blockB, ValueRange{bDstOffset});
-
-                                    // Vector 1: B[kSrc, jStart+8:jStart+16]
-                                    auto jStart8 = bPackInner.create<arith::AddIOp>(loc, jStart, c8);
-                                    auto bDstOffset8 = bPackInner.create<arith::AddIOp>(loc, bDstOffset, c8);
-                                    auto v1 = bPackInner.create<vector::TransferReadOp>(
-                                        loc, vecType, B, ValueRange{kSrc, jStart8}, zeroF);
-                                    bPackInner.create<vector::TransferWriteOp>(loc, v1, blockB, ValueRange{bDstOffset8});
-
+                                    for (int64_t j = 0; j < params.NR; j++) {
+                                        auto cj = bPackInner.create<arith::ConstantIndexOp>(loc, j);
+                                        auto jSrcCol = bPackInner.create<arith::AddIOp>(loc, jStart, cj);
+                                        auto val = bPackInner.create<memref::LoadOp>(loc, B, ValueRange{kSrc, jSrcCol});
+                                        auto bDstIdx = bPackInner.create<arith::AddIOp>(loc, bDstOffset, cj);
+                                        bPackInner.create<memref::StoreOp>(loc, val, blockB, ValueRange{bDstIdx});
+                                    }
                                     bPackInner.create<scf::YieldOp>(loc);
                                 });
-
                             bPack.create<scf::YieldOp>(loc);
                         });
 
@@ -181,25 +144,16 @@ func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, MLIRC
                             auto mcRemaining = b3.create<arith::SubIOp>(loc, M, ic);
                             auto mcActual = b3.create<arith::MinSIOp>(loc, mcRemaining, cMC);
 
-                            // ╔════════════════════════════════════════════════╗
-                            // ║  📦 PACK A: A[ic:ic+MC, pc:pc+KC] → blockA     ║
-                            // ║  Layout: Column-major within MR=6 panels       ║
-                            // ╚════════════════════════════════════════════════╝
-
+                            // PACK A
                             auto numAPanels = b3.create<arith::DivSIOp>(loc, mcActual, cMR);
-
                             b3.create<scf::ForOp>(
                                 loc, c0, numAPanels, c1, ValueRange{},
                                 [&](OpBuilder &aPack, Location loc, Value aPanelIdx, ValueRange) {
-                                    // Source row: ic + aPanelIdx * MR
                                     auto iSrc = aPack.create<arith::MulIOp>(loc, aPanelIdx, cMR);
                                     auto iStart = aPack.create<arith::AddIOp>(loc, ic, iSrc);
-
-                                    // Destination base: aPanelIdx * KC * MR
                                     auto kcTimesMR = aPack.create<arith::MulIOp>(loc, cKC, cMR);
                                     auto aDstBase = aPack.create<arith::MulIOp>(loc, aPanelIdx, kcTimesMR);
 
-                                    // Copy column-major within panel
                                     aPack.create<scf::ForOp>(
                                         loc, c0, kcActual, c1, ValueRange{},
                                         [&](OpBuilder &aPackK, Location loc, Value kLocal, ValueRange) {
@@ -207,8 +161,7 @@ func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, MLIRC
                                             auto kTimesMR = aPackK.create<arith::MulIOp>(loc, kLocal, cMR);
                                             auto aDstOffset = aPackK.create<arith::AddIOp>(loc, aDstBase, kTimesMR);
 
-                                            // Copy MR=6 elements (scalar)
-                                            for (int64_t i = 0; i < MR; i++) {
+                                            for (int64_t i = 0; i < params.MR; i++) {
                                                 auto ci = aPackK.create<arith::ConstantIndexOp>(loc, i);
                                                 auto iSrcRow = aPackK.create<arith::AddIOp>(loc, iStart, ci);
                                                 auto val = aPackK.create<memref::LoadOp>(loc, A, ValueRange{iSrcRow, kSrc});
@@ -217,230 +170,147 @@ func::FuncOp generateMacroKernelFunction(OpBuilder &builder, Location loc, MLIRC
                                             }
                                             aPackK.create<scf::YieldOp>(loc);
                                         });
-
                                     aPack.create<scf::YieldOp>(loc);
                                 });
 
-                            // ========== LOOP 4 & 5: Micro-kernel invocations ==========
-                            // Now iterate over micro-kernels using PACKED data
-
+                            // LOOP 4 & 5: Micro-kernel
                             auto numMicroJ = b3.create<arith::DivSIOp>(loc, ncActual, cNR);
                             auto numMicroI = b3.create<arith::DivSIOp>(loc, mcActual, cMR);
 
-                            // Loop 4: jr (micro-kernels along N)
                             b3.create<scf::ForOp>(
                                 loc, c0, numMicroJ, c1, ValueRange{},
                                 [&](OpBuilder &b4, Location loc, Value jr, ValueRange) {
-
-                                    // Loop 5: ir (micro-kernels along M)
                                     b4.create<scf::ForOp>(
                                         loc, c0, numMicroI, c1, ValueRange{},
                                         [&](OpBuilder &b5, Location loc, Value ir, ValueRange) {
-
-                                            // 🔥 MICRO-KERNEL (6×16 over KC iterations)
-                                            // Access packed data LINEARLY!
-
-                                            // A_packed offset: ir * KC * MR
-                                            auto aOffset = b5.create<arith::MulIOp>(loc, ir,
+                                            auto aOffset = b5.create<arith::MulIOp>(loc, ir, 
                                                 b5.create<arith::MulIOp>(loc, cKC, cMR));
-
-                                            // B_packed offset: jr * KC * NR
-                                            auto bOffset = b5.create<arith::MulIOp>(loc, jr,
+                                            auto bOffset = b5.create<arith::MulIOp>(loc, jr, 
                                                 b5.create<arith::MulIOp>(loc, cKC, cNR));
 
-                                            // C offset: (ic + ir*MR) * N + (jc + jr*NR)
                                             auto irTimesMR = b5.create<arith::MulIOp>(loc, ir, cMR);
                                             auto cRowStart = b5.create<arith::AddIOp>(loc, ic, irTimesMR);
                                             auto jrTimesNR = b5.create<arith::MulIOp>(loc, jr, cNR);
                                             auto cColStart = b5.create<arith::AddIOp>(loc, jc, jrTimesNR);
 
-                                            // Create subviews for micro-kernel
-                                            // A_micro: 1D view [KC * MR]
-                                            SmallVector<OpFoldResult> aOffsets = {OpFoldResult(aOffset)};
-                                            SmallVector<OpFoldResult> aSizes = {b5.getIndexAttr(KC * MR)};
-                                            SmallVector<OpFoldResult> aStrides = {b5.getIndexAttr(1)};
-                                            auto aSubview = b5.create<memref::SubViewOp>(
-                                                loc, blockA, aOffsets, aSizes, aStrides);
+                                            // Subviews
+                                            SmallVector<OpFoldResult> aOff = {OpFoldResult(aOffset)};
+                                            SmallVector<OpFoldResult> aSz = {b5.getIndexAttr(params.KC * params.MR)};
+                                            SmallVector<OpFoldResult> aStride = {b5.getIndexAttr(1)};
+                                            auto aSubview = b5.create<memref::SubViewOp>(loc, blockA, aOff, aSz, aStride);
 
-                                            // B_micro: 1D view [KC * NR]
-                                            SmallVector<OpFoldResult> bOffsets = {OpFoldResult(bOffset)};
-                                            SmallVector<OpFoldResult> bSizes = {b5.getIndexAttr(KC * NR)};
-                                            SmallVector<OpFoldResult> bStrides = {b5.getIndexAttr(1)};
-                                            auto bSubview = b5.create<memref::SubViewOp>(
-                                                loc, blockB, bOffsets, bSizes, bStrides);
+                                            SmallVector<OpFoldResult> bOff = {OpFoldResult(bOffset)};
+                                            SmallVector<OpFoldResult> bSz = {b5.getIndexAttr(params.KC * params.NR)};
+                                            SmallVector<OpFoldResult> bStride = {b5.getIndexAttr(1)};
+                                            auto bSubview = b5.create<memref::SubViewOp>(loc, blockB, bOff, bSz, bStride);
 
-                                            // C_micro: 2D view [MR × NR]
-                                            SmallVector<OpFoldResult> cOffsets = {
-                                                OpFoldResult(cRowStart), OpFoldResult(cColStart)};
-                                            SmallVector<OpFoldResult> cSizes = {
-                                                b5.getIndexAttr(MR), b5.getIndexAttr(NR)};
-                                            SmallVector<OpFoldResult> cStrides = {
-                                                b5.getIndexAttr(1), b5.getIndexAttr(1)};
-                                            auto cSubview = b5.create<memref::SubViewOp>(
-                                                loc, C, cOffsets, cSizes, cStrides);
+                                            SmallVector<OpFoldResult> cOff = {OpFoldResult(cRowStart), OpFoldResult(cColStart)};
+                                            SmallVector<OpFoldResult> cSz = {b5.getIndexAttr(params.MR), b5.getIndexAttr(params.NR)};
+                                            SmallVector<OpFoldResult> cStride = {b5.getIndexAttr(1), b5.getIndexAttr(1)};
+                                            auto cSubview = b5.create<memref::SubViewOp>(loc, C, cOff, cSz, cStride);
 
-                                            // Reshape packed buffers to 2D for linalg.matmul
-                                            // A: [KC * MR] → [MR, KC] (transposed!)
-                                            // B: [KC * NR] → [KC, NR]
-                                            auto aReshape = MemRefType::get({MR, KC}, f32Type);
-                                            auto bReshape = MemRefType::get({KC, NR}, f32Type);
-                                            auto cMicroType = MemRefType::get({MR, NR}, f32Type);
+                                            auto aCast = b5.create<memref::CastOp>(loc, MemRefType::get({params.KC * params.MR}, f32Type), aSubview);
+                                            auto bCast = b5.create<memref::CastOp>(loc, MemRefType::get({params.KC * params.NR}, f32Type), bSubview);
+                                            auto cCast = b5.create<memref::CastOp>(loc, MemRefType::get({params.MR, params.NR}, f32Type), cSubview);
 
-                                            // Note: We need proper reshaping here
-                                            // For now, use a workaround with static memrefs
-                                            auto aCast = b5.create<memref::CastOp>(loc,
-                                                MemRefType::get({KC * MR}, f32Type), aSubview);
-                                            auto bCast = b5.create<memref::CastOp>(loc,
-                                                MemRefType::get({KC * NR}, f32Type), bSubview);
-                                            auto cCast = b5.create<memref::CastOp>(loc, cMicroType, cSubview);
-
-                                            // Generate inline micro-kernel loop
-                                            // This will be further optimized by ExplicitMicroKernelPass
-                                            generateInlineMicroKernel(b5, loc, aCast, bCast, cCast, KC);
-
+                                            generateInlineMicroKernel(b5, loc, aCast, bCast, cCast, params.KC, params);
                                             b5.create<scf::YieldOp>(loc);
                                         });
-
                                     b4.create<scf::YieldOp>(loc);
                                 });
-
                             b3.create<scf::YieldOp>(loc);
                         });
-
                     b2.create<scf::YieldOp>(loc);
                 });
-
             b1.create<scf::YieldOp>(loc);
         });
 
-    // Deallocate buffers
     builder.create<memref::DeallocOp>(loc, blockA);
     builder.create<memref::DeallocOp>(loc, blockB);
-
     builder.create<func::ReturnOp>(loc);
-
     return func;
 }
 
-//===----------------------------------------------------------------------===//
-// Generate Inline Micro-Kernel (6×16 FMA loop)
-//===----------------------------------------------------------------------===//
 void generateInlineMicroKernel(OpBuilder &b, Location loc,
                                Value packedA, Value packedB, Value C,
-                               int64_t kSize) {
+                               int64_t kSize, const tenzo::MicroKernelParams &params) {
     auto f32Type = b.getF32Type();
-    auto vecType = VectorType::get({8}, f32Type);
+    auto vecType = VectorType::get({params.VEC_SIZE}, f32Type);
     auto zeroF32 = b.create<arith::ConstantOp>(loc, f32Type, b.getF32FloatAttr(0.0f));
 
     auto c0 = b.create<arith::ConstantIndexOp>(loc, 0);
-    auto c1 = b.create<arith::ConstantIndexOp>(loc, 1);
-    auto c8 = b.create<arith::ConstantIndexOp>(loc, 8);
-    auto cMR = b.create<arith::ConstantIndexOp>(loc, MR);
-    auto cNR = b.create<arith::ConstantIndexOp>(loc, NR);
     auto cK = b.create<arith::ConstantIndexOp>(loc, kSize);
+    auto cMR = b.create<arith::ConstantIndexOp>(loc, params.MR);
+    auto cNR = b.create<arith::ConstantIndexOp>(loc, params.NR);
 
-    // Load initial C accumulators (12 vectors: 6 rows × 2 vectors)
+    int64_t numVecsPerNR = params.NR / params.VEC_SIZE;
+
+    // Load initial C
     SmallVector<Value> accums;
-    for (int64_t i = 0; i < MR; i++) {
+    for (int64_t i = 0; i < params.MR; i++) {
         auto iIdx = b.create<arith::ConstantIndexOp>(loc, i);
-        // C[i, 0:8]
-        auto c0Vec = b.create<vector::TransferReadOp>(loc, vecType, C, ValueRange{iIdx, c0}, zeroF32);
-        accums.push_back(c0Vec);
-        // C[i, 8:16]
-        auto c1Vec = b.create<vector::TransferReadOp>(loc, vecType, C, ValueRange{iIdx, c8}, zeroF32);
-        accums.push_back(c1Vec);
+        for (int64_t j = 0; j < numVecsPerNR; j++) {
+            auto jOffset = b.create<arith::ConstantIndexOp>(loc, j * params.VEC_SIZE);
+            auto cVec = b.create<vector::TransferReadOp>(loc, vecType, C, ValueRange{iIdx, jOffset}, zeroF32);
+            accums.push_back(cVec);
+        }
     }
 
-    // K-loop with accumulator threading
     auto forOp = b.create<scf::ForOp>(
-        loc, c0, cK, c1, accums,
+        loc, c0, cK, b.create<arith::ConstantIndexOp>(loc, 1), accums,
         [&](OpBuilder &kb, Location loc, Value k, ValueRange iterArgs) {
             SmallVector<Value> newAccums(iterArgs.begin(), iterArgs.end());
-
-            // Calculate packed buffer offsets
-            // A_packed[k * MR + 0..5] contains A[0..5, k]
-            // B_packed[k * NR + 0..15] contains B[k, 0..15]
             auto kTimesMR = kb.create<arith::MulIOp>(loc, k, cMR);
             auto kTimesNR = kb.create<arith::MulIOp>(loc, k, cNR);
 
-            // Load B vectors (sequential!)
-            auto bVec0 = kb.create<vector::TransferReadOp>(
-                loc, vecType, packedB, ValueRange{kTimesNR}, zeroF32);
-            auto kTimesNRplus8 = kb.create<arith::AddIOp>(loc, kTimesNR, c8);
-            auto bVec1 = kb.create<vector::TransferReadOp>(
-                loc, vecType, packedB, ValueRange{kTimesNRplus8}, zeroF32);
+            SmallVector<Value> bVecs;
+            for (int64_t j = 0; j < numVecsPerNR; j++) {
+                auto jOffset = kb.create<arith::ConstantIndexOp>(loc, j * params.VEC_SIZE);
+                auto bIdx = kb.create<arith::AddIOp>(loc, kTimesNR, jOffset);
+                auto bv = kb.create<vector::TransferReadOp>(loc, vecType, packedB, ValueRange{bIdx}, zeroF32);
+                bVecs.push_back(bv);
+            }
 
-            // FMA for each row
-            for (int64_t i = 0; i < MR; i++) {
-                // Load A[i, k] from packed buffer (sequential access!)
+            for (int64_t i = 0; i < params.MR; i++) {
                 auto ci = kb.create<arith::ConstantIndexOp>(loc, i);
                 auto aIdx = kb.create<arith::AddIOp>(loc, kTimesMR, ci);
                 auto aScalar = kb.create<memref::LoadOp>(loc, packedA, ValueRange{aIdx});
                 auto aVec = kb.create<vector::BroadcastOp>(loc, vecType, aScalar);
 
-                // FMA: acc = acc + a * b
-                newAccums[i * 2] = kb.create<vector::FMAOp>(loc, aVec, bVec0, newAccums[i * 2]);
-                newAccums[i * 2 + 1] = kb.create<vector::FMAOp>(loc, aVec, bVec1, newAccums[i * 2 + 1]);
+                for (int64_t j = 0; j < numVecsPerNR; j++) {
+                    newAccums[i * numVecsPerNR + j] = kb.create<vector::FMAOp>(
+                        loc, aVec, bVecs[j], newAccums[i * numVecsPerNR + j]);
+                }
             }
-
             kb.create<scf::YieldOp>(loc, newAccums);
         });
 
-    // Store results back to C
     auto results = forOp.getResults();
-    for (int64_t i = 0; i < MR; i++) {
+    for (int64_t i = 0; i < params.MR; i++) {
         auto iIdx = b.create<arith::ConstantIndexOp>(loc, i);
-        b.create<vector::TransferWriteOp>(loc, results[i * 2], C, ValueRange{iIdx, c0});
-        b.create<vector::TransferWriteOp>(loc, results[i * 2 + 1], C, ValueRange{iIdx, c8});
+        for (int64_t j = 0; j < numVecsPerNR; j++) {
+            auto jOffset = b.create<arith::ConstantIndexOp>(loc, j * params.VEC_SIZE);
+            b.create<vector::TransferWriteOp>(loc, results[i * numVecsPerNR + j], C, ValueRange{iIdx, jOffset});
+        }
     }
 }
 
 //===----------------------------------------------------------------------===//
-// Pass: Generate Macro-Kernel with 5-Loop Nest
+// Pass
 //===----------------------------------------------------------------------===//
 struct GenerateMacroKernelPass
     : public PassWrapper<GenerateMacroKernelPass, OperationPass<ModuleOp>> {
     MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(GenerateMacroKernelPass)
 
+    tenzo::MicroKernelParams params;
+    GenerateMacroKernelPass(const tenzo::MicroKernelParams &p) : params(p) {}
+
     void runOnOperation() override {
         auto module = getOperation();
-        auto *ctx = &getContext();
-
-        llvm::outs() << "\n";
-        llvm::outs() << "╔════════════════════════════════════════════════════════╗\n";
-        llvm::outs() << "║  🏗️  MACRO-KERNEL GENERATION (GotoBLAS 5-Loop)        ║\n";
-        llvm::outs() << "╚════════════════════════════════════════════════════════╝\n\n";
-
-        llvm::outs() << "📊 Cache Blocking Strategy:\n";
-        llvm::outs() << "   Loop 1 (jc): N blocks = " << NC << " (L3 cache)\n";
-        llvm::outs() << "   Loop 2 (pc): K panels = " << KC << " (panel depth)\n";
-        llvm::outs() << "   Loop 3 (ic): M blocks = " << MC << " (L2 cache)\n";
-        llvm::outs() << "   Loop 4 (jr): Micro-kernels width = " << NR << "\n";
-        llvm::outs() << "   Loop 5 (ir): Micro-kernels height = " << MR << "\n\n";
-
-        llvm::outs() << "📦 Buffer Sizes:\n";
-        llvm::outs() << "   Packed A: " << MC << " × " << KC << " = " << (MC*KC*4/1024) << " KB (L2)\n";
-        llvm::outs() << "   Packed B: " << KC << " × " << NC << " = " << (KC*NC*4/1024) << " KB (L3)\n";
-        llvm::outs() << "   Micro-kernel data: ~18 KB (L1)\n\n";
-
-        OpBuilder builder(ctx);
+        OpBuilder builder(&getContext());
         builder.setInsertionPointToStart(module.getBody());
-
-        llvm::outs() << "🔨 Generating gemm_macro_kernel function...\n";
-        auto macroFunc = generateMacroKernelFunction(builder, module.getLoc(), ctx);
+        auto macroFunc = generateMacroKernelFunction(builder, module.getLoc(), &getContext(), params);
         module.push_back(macroFunc);
-
-        llvm::outs() << "\n✅ Macro-kernel generated successfully!\n";
-        llvm::outs() << "📝 Structure:\n";
-        llvm::outs() << "   - 5 nested loops (jc → pc → ic → jr → ir)\n";
-        llvm::outs() << "   - Calls to pack_matrix_B and pack_matrix_A (TODO)\n";
-        llvm::outs() << "   - Micro-kernel invocations (linalg.matmul → 123.7 GFLOPS)\n\n";
-
-        llvm::outs() << "🎯 Expected Performance:\n";
-        llvm::outs() << "   512×512: 60-80 GFLOPS\n";
-        llvm::outs() << "   1024×1024: 80-100 GFLOPS\n\n";
-
-        llvm::outs() << "╚════════════════════════════════════════════════════════╝\n";
     }
 };
 
@@ -448,8 +318,8 @@ struct GenerateMacroKernelPass
 
 namespace tenzo {
 
-std::unique_ptr<mlir::Pass> createGenerateMacroKernelPass() {
-    return std::make_unique<GenerateMacroKernelPass>();
+std::unique_ptr<mlir::Pass> createGenerateMacroKernelPass(const MicroKernelParams &params) {
+    return std::make_unique<GenerateMacroKernelPass>(params);
 }
 
 } // namespace tenzo

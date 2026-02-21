@@ -11,6 +11,8 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/IndexToLLVM/IndexToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
+#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Conversion/OpenMPToLLVM/ConvertOpenMPToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 
 // Async Dialect for Multithreading
@@ -175,7 +177,7 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm,
 
             // Step 3: Parallelize the OUTER tile loops
             // After first tiling, outer loops iterate over 64x64 blocks - these can be parallel
-            pm.addNestedPass<func::FuncOp>(mlir::affine::createAffineParallelizePass());
+            pm.addNestedPass<func::FuncOp>(mlir::affine::createAffineParallelize());
 
             // Step 4: Second-level tiling for L1 cache (32x32 inside each thread)
             uint64_t l1TileBytes = MB * KB * sizeof(float);
@@ -283,13 +285,16 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm,
     pm.addPass(mlir::createConvertVectorToSCFPass());
 
     // SCF -> Control Flow
-    pm.addPass(mlir::createConvertSCFToCFPass());
+    pm.addPass(mlir::createSCFToControlFlowPass());
 
     // MemRef metadata expansion
     pm.addPass(mlir::memref::createExpandStridedMetadataPass());
 
     // Index -> LLVM
     pm.addPass(mlir::createConvertIndexToLLVMPass());
+
+    // Note: Math ops (e.g. math.tanh for GELU) will be lowered via 
+    // polynomial approximation in ExplicitMicroKernelPass, not through this pipeline
 
     // Arith -> LLVM
     pm.addPass(mlir::createArithToLLVMConversionPass());
@@ -310,6 +315,18 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm,
 
     // Final type reconciliation
     pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+}
+
+void registerAllTenzoDialectTranslations(mlir::MLIRContext &context) {
+    mlir::DialectRegistry registry;
+    mlir::arith::registerConvertArithToLLVMInterface(registry);
+    mlir::cf::registerConvertControlFlowToLLVMInterface(registry);
+    mlir::registerConvertFuncToLLVMInterface(registry);
+    mlir::index::registerConvertIndexToLLVMInterface(registry);
+    mlir::registerConvertMemRefToLLVMInterface(registry);
+    mlir::vector::registerConvertVectorToLLVMInterface(registry);
+    mlir::registerConvertOpenMPToLLVMInterface(registry);
+    context.appendDialectRegistry(registry);
 }
 
 } // namespace tenzo

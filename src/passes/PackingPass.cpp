@@ -24,92 +24,50 @@ using namespace mlir;
 
 namespace {
 
-// Micro-kernel dimensions (must match register allocation strategy)
-constexpr int64_t MR = 6;   // Panel height for A
-constexpr int64_t NR = 16;  // Panel width for B
-
-//===----------------------------------------------------------------------===//
-// Pattern: Pack Matrix A into panels
-//===----------------------------------------------------------------------===//
-struct PackMatrixAPattern : public OpRewritePattern<linalg::FillOp> {
-    using OpRewritePattern<linalg::FillOp>::OpRewritePattern;
-
-    LogicalResult matchAndRewrite(linalg::FillOp op, PatternRewriter &rewriter) const override {
-        auto outputType = op.getOutputs()[0].getType().dyn_cast<RankedTensorType>();
-        if (!outputType || outputType.getRank() != 2)
-            return failure();
-
-        // Only pack if this looks like matrix A (M x K where K is reduction dim)
-        // We identify this heuristically by checking usage
-        // TODO: Better pattern matching
-
-        return failure(); // Skip for now - will implement after testing B packing
-    }
-};
-
 //===----------------------------------------------------------------------===//
 // Pattern: Pack Matrix B into panels for optimal column access
 //===----------------------------------------------------------------------===//
 struct PackMatrixBPattern : public OpRewritePattern<linalg::MatmulOp> {
-    using OpRewritePattern<linalg::MatmulOp>::OpRewritePattern;
+    tenzo::MicroKernelParams params;
+    PackMatrixBPattern(MLIRContext *ctx, const tenzo::MicroKernelParams &p) 
+        : OpRewritePattern<linalg::MatmulOp>(ctx), params(p) {}
 
     LogicalResult matchAndRewrite(linalg::MatmulOp op, PatternRewriter &rewriter) const override {
         auto loc = op.getLoc();
 
-        // Get operands
-        Value A = op.getInputs()[0];
         Value B = op.getInputs()[1];
-        Value C = op.getOutputs()[0];
-
-        auto bType = B.getType().dyn_cast<RankedTensorType>();
+        auto bType = mlir::dyn_cast<RankedTensorType>(B.getType());
         if (!bType || !bType.hasStaticShape())
             return failure();
 
         int64_t K = bType.getShape()[0];
         int64_t N = bType.getShape()[1];
 
-        // Support ANY N - we'll pad to the nearest multiple of NR
-        int64_t paddedN = ((N + NR - 1) / NR) * NR;
+        // Support ANY N - pad to multiple of NR
+        int64_t paddedN = ((N + params.NR - 1) / params.NR) * params.NR;
 
-        llvm::outs() << "[Packing] Packing matrix B: [" << K << "x" << N << "]";
-        if (N != paddedN) {
-            llvm::outs() << " (padded to " << paddedN << " cols)";
-        }
-        llvm::outs() << " -> [" << K << "x" << (paddedN/NR) << "x" << NR << "]\n";
+        llvm::outs() << "[Packing] Packing matrix B: [" << K << "x" << N << "] -> [" 
+                     << K << "x" << (paddedN / params.NR) << "x" << params.NR << "]\n";
 
-        // Create packed shape: [K, paddedN/Nr, Nr]
-        SmallVector<int64_t> packedShape = {K, paddedN / NR, NR};
+        SmallVector<int64_t> packedShape = {K, paddedN / params.NR, params.NR};
         auto packedType = RankedTensorType::get(packedShape, bType.getElementType());
 
-        // Create empty tensor for packed output
         auto emptyPacked = rewriter.create<tensor::EmptyOp>(
             loc, packedType.getShape(), bType.getElementType());
 
-        // Use tensor.pack to transform layout with PADDING
-        // MLIR 18 API: pack(source, dest, inner_dims_pos, inner_tiles, outer_dims_perm, padding_value)
-        SmallVector<int64_t> innerDimsPos = {1}; // Pack dimension 1 (N)
-        SmallVector<OpFoldResult> innerTiles = {rewriter.getIndexAttr(NR)};
-        SmallVector<int64_t> outerDimsPerm = {}; // Keep natural order
+        SmallVector<int64_t> innerDimsPos = {1}; 
+        SmallVector<OpFoldResult> innerTiles = {rewriter.getIndexAttr(params.NR)};
 
-        // Create zero padding value for incomplete tiles
         Value zeroPadding = rewriter.create<arith::ConstantOp>(
             loc, bType.getElementType(),
             rewriter.getFloatAttr(bType.getElementType(), 0.0));
 
-        auto packOp = rewriter.create<tensor::PackOp>(
+        auto packOp = rewriter.create<linalg::PackOp>(
             loc, B, emptyPacked,
             innerDimsPos, innerTiles,
-            /*padding_value=*/zeroPadding,
-            outerDimsPerm);
+            /*padding_value=*/zeroPadding);
 
-        // Now we need to create a new matmul that works with packed B
-        // For now, just mark that packing happened
-        llvm::outs() << "[Packing] ✅ Created packed B layout with zero-padding\n";
-
-        // Don't replace yet - we need to also handle the matmul differently
-        // This will be done in ExplicitMicroKernelPass
         op->setAttr("packed_b", rewriter.getUnitAttr());
-
         return success();
     }
 };
@@ -120,46 +78,22 @@ struct PackMatrixBPattern : public OpRewritePattern<linalg::MatmulOp> {
 struct PackingPass : public PassWrapper<PackingPass, OperationPass<func::FuncOp>> {
     MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PackingPass)
 
+    tenzo::MicroKernelParams params;
+    PackingPass(const tenzo::MicroKernelParams &p) : params(p) {}
+
     void runOnOperation() override {
         auto func = getOperation();
         auto *ctx = &getContext();
 
         llvm::outs() << "[Packing] ====== Data Layout Transformation ======\n";
-        llvm::outs() << "[Packing] Target: Panel layout for BLIS-style micro-kernel\n";
-        llvm::outs() << "[Packing] Mr=" << MR << " (rows), Nr=" << NR << " (cols)\n\n";
+        llvm::outs() << "[Packing] Target: MR=" << params.MR << ", NR=" << params.NR << "\n";
 
-        // Count matmul operations
-        int matmulCount = 0;
-        func.walk([&](linalg::MatmulOp) { matmulCount++; });
-
-        if (matmulCount == 0) {
-            llvm::outs() << "[Packing] No matmul ops found\n";
-            return;
-        }
-
-        llvm::outs() << "[Packing] Found " << matmulCount << " matmul op(s)\n";
-
-        // Apply packing patterns
         RewritePatternSet patterns(ctx);
-        patterns.add<PackMatrixBPattern>(ctx);
+        patterns.add<PackMatrixBPattern>(ctx, params);
 
-        if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
             llvm::outs() << "[Packing] ⚠️  Pattern application failed\n";
         }
-
-        // Check results
-        int packedCount = 0;
-        func.walk([&](linalg::MatmulOp op) {
-            if (op->hasAttr("packed_b")) packedCount++;
-        });
-
-        if (packedCount > 0) {
-            llvm::outs() << "[Packing] ✅ Successfully marked " << packedCount << " matmul(s) for packing\n";
-        } else {
-            llvm::outs() << "[Packing] ⚠️  No operations were packed (constraints not met?)\n";
-        }
-
-        llvm::outs() << "[Packing] ======================================\n";
     }
 };
 
@@ -167,8 +101,8 @@ struct PackingPass : public PassWrapper<PackingPass, OperationPass<func::FuncOp>
 
 namespace tenzo {
 
-void addPackingPass(mlir::OpPassManager &pm) {
-    pm.addNestedPass<func::FuncOp>(std::make_unique<PackingPass>());
+void addPackingPass(mlir::OpPassManager &pm, const MicroKernelParams &params) {
+    pm.addNestedPass<func::FuncOp>(std::make_unique<PackingPass>(params));
 }
 
 } // namespace tenzo

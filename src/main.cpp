@@ -23,6 +23,7 @@ void printUsage() {
     llvm::outs() << "  conv2d    Run Conv2D benchmark\n";
     llvm::outs() << "  gpu       Run GPU pipeline test\n";
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
+    llvm::outs() << "  hybrid-bench Run A/B benchmark for Hybrid Affinity and Heterogeneous Split\n";
     llvm::outs() << "  test      Run quick validation tests\n";
     llvm::outs() << "  all       Run all tests\n";
     llvm::outs() << "  version   Show version info\n";
@@ -34,7 +35,7 @@ void printVersion() {
     llvm::outs() << "║  Heterogeneous AI Compiler             ║\n";
     llvm::outs() << "╠════════════════════════════════════════╣\n";
     llvm::outs() << "║  Targets: CPU (AVX2), GPU (Vulkan)     ║\n";
-    llvm::outs() << "║  Backend: MLIR/LLVM 18                 ║\n";
+    llvm::outs() << "║  Backend: MLIR/LLVM 21                 ║\n";
     llvm::outs() << "╚════════════════════════════════════════╝\n";
 }
 
@@ -93,6 +94,12 @@ int main(int argc, char* argv[]) {
         tenzo::gpu::runGPUPipelineTest(context);
     } else if (strcmp(mode, "gpu-bench") == 0) {
         tenzo::gpu::runGPUBenchmark(context);
+    } else if (strcmp(mode, "hybrid-bench") == 0) {
+        llvm::outs() << "--- Running Hybrid Affinity A/B Benchmark ---\n";
+        tenzo::runHybridAffinityBenchmark(context);
+    } else if (strcmp(mode, "fusion-bench") == 0) {
+        llvm::outs() << "--- Running Final Operator Fusion Benchmark ---\n";
+        tenzo::runFusionBenchmark(context);
     } else if (strcmp(mode, "test") == 0) {
         // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";

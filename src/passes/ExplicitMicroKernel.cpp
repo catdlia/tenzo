@@ -52,9 +52,9 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
         Value C = op.getOutputs()[0]; // [M, N]
 
         // Get shapes
-        auto aType = A.getType().cast<MemRefType>();
-        auto bType = B.getType().cast<MemRefType>();
-        auto cType = C.getType().cast<MemRefType>();
+        auto aType = A.getType()mlir::cast<MemRefType>();
+        auto bType = B.getType()mlir::cast<MemRefType>();
+        auto cType = C.getType()mlir::cast<MemRefType>();
 
         if (!aType.hasStaticShape() || !bType.hasStaticShape() || !cType.hasStaticShape())
             return failure();
@@ -204,11 +204,11 @@ struct ExplicitMicroKernelPass
         func.walk([&](linalg::MatmulOp op) {
             if (op.hasPureBufferSemantics()) {
                 matmulCount++;
-                auto aType = op.getInputs()[0].getType().cast<MemRefType>();
+                auto aType = op.getInputs()[0].getType()mlir::cast<MemRefType>();
                 auto shape = aType.getShape();
                 llvm::outs() << "[ExplicitKernel] Found bufferized matmul: "
                              << shape[0] << "x" << shape[1] << " x "
-                             << op.getInputs()[1].getType().cast<MemRefType>().getShape()[1] << "\n";
+                             << op.getInputs()[1].getType()mlir::cast<MemRefType>().getShape()[1] << "\n";
             }
         });
 

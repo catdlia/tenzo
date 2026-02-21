@@ -51,8 +51,8 @@ LLVM JIT Engine                   Vulkan Compute Pipeline
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose (Highly recommended for reproducible LLVM 18 environments)
-- *Optional:* Native LLVM/MLIR 18 and Vulkan SDK.
+- Docker & Docker Compose (Highly recommended for reproducible LLVM 21 environments)
+- *Optional:* Native LLVM/MLIR 21 and Vulkan SDK.
 
 ### Build & Run via Docker
 

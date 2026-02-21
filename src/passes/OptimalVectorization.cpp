@@ -49,9 +49,9 @@ struct OptimalMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
         Value B = op.getInputs()[1];
         Value C = op.getOutputs()[0];
 
-        auto aType = A.getType().dyn_cast<MemRefType>();
-        auto bType = B.getType().dyn_cast<MemRefType>();
-        auto cType = C.getType().dyn_cast<MemRefType>();
+        auto aType = mlir::dyn_cast<MemRefType>(A.getType());
+        auto bType = mlir::dyn_cast<MemRefType>(B.getType());
+        auto cType = mlir::dyn_cast<MemRefType>(C.getType());
 
         if (!aType || !bType || !cType || !aType.hasStaticShape())
             return failure();
@@ -162,7 +162,7 @@ struct OptimalVectorizationPass
         int count = 0;
         func.walk([&](linalg::MatmulOp op) {
             if (op.hasPureBufferSemantics()) {
-                auto aType = op.getInputs()[0].getType().dyn_cast<MemRefType>();
+                auto aType = mlir::dyn_cast<MemRefType>(op.getInputs()[0].getType());
                 if (aType && aType.hasStaticShape()) {
                     auto shape = aType.getShape();
                     llvm::outs() << "  Found: " << shape[0] << "x" << shape[1] << "\n";
@@ -182,7 +182,7 @@ struct OptimalVectorizationPass
         RewritePatternSet patterns(ctx);
         patterns.add<OptimalMicroKernelPattern>(ctx);
 
-        if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
+        if (failed(applyPatternsGreedily(func, std::move(patterns)))) {
             llvm::outs() << "[OptimalVectorization] Some patterns failed\n";
         }
 

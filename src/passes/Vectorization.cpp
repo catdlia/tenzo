@@ -38,7 +38,7 @@ struct VectorizeMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
 
     LogicalResult matchAndRewrite(linalg::MatmulOp op, PatternRewriter &rewriter) const override {
         // Get result shape
-        auto resultType = op.getResult(0).getType().dyn_cast<ShapedType>();
+        auto resultType = mlir::dyn_cast<ShapedType>(op.getResult(0).getType());
         if (!resultType || !resultType.hasStaticShape())
             return failure();
 
@@ -47,7 +47,7 @@ struct VectorizeMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
         int64_t n = shape[1];
 
         // Get K from input A: [M, K]
-        auto inputType = op.getInputs()[0].getType().dyn_cast<ShapedType>();
+        auto inputType = mlir::dyn_cast<ShapedType>(op.getInputs()[0].getType());
         if (!inputType || !inputType.hasStaticShape())
             return failure();
         int64_t k = inputType.getShape()[1];
@@ -122,9 +122,9 @@ struct TenzoExplicitVectorizePass
             patterns.add<TileMacroKernelPattern>(ctx, tiles.M, tiles.N, tiles.K);
 
             GreedyRewriteConfig config;
-            config.maxIterations = 100; // Allow many iterations for nested tiling
+            config.setMaxIterations(100);
 
-            (void)applyPatternsAndFoldGreedily(func, std::move(patterns), config);
+            (void)applyPatternsGreedily(func, std::move(patterns), config);
         }
 
         // ===== PHASE 2: VECTORIZATION =====
@@ -136,9 +136,9 @@ struct TenzoExplicitVectorizePass
             patterns.add<VectorizeMicroKernelPattern>(ctx);
 
             GreedyRewriteConfig config;
-            config.maxIterations = 50;
+            config.setMaxIterations(50);
 
-            (void)applyPatternsAndFoldGreedily(func, std::move(patterns), config);
+            (void)applyPatternsGreedily(func, std::move(patterns), config);
         }
 
         // ===== PHASE 3: VECTOR OPTIMIZATIONS =====
@@ -151,7 +151,7 @@ struct TenzoExplicitVectorizePass
             vector::populateVectorToVectorCanonicalizationPatterns(patterns);
             vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
 
-            (void)applyPatternsAndFoldGreedily(func, std::move(patterns));
+            (void)applyPatternsGreedily(func, std::move(patterns));
         }
 
         // Check what we generated

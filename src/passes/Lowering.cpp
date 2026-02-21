@@ -24,7 +24,7 @@ struct ReluLowering : public OpConversionPattern<tenzo::ReluOp> {
 
     LogicalResult matchAndRewrite(tenzo::ReluOp op, OpAdaptor adaptor,
                                 ConversionPatternRewriter &rewriter) const override {
-        auto type = op.getResult().getType().cast<RankedTensorType>();
+        auto type = mlir::cast<RankedTensorType>(op.getResult().getType());
         auto zeroAttr = rewriter.getFloatAttr(type.getElementType(), 0.0);
         auto zero = rewriter.create<arith::ConstantOp>(op.getLoc(), zeroAttr);
 
@@ -40,7 +40,7 @@ struct FusedAddReluLowering : public OpConversionPattern<tenzo::FusedAddReluOp> 
     LogicalResult matchAndRewrite(tenzo::FusedAddReluOp op, OpAdaptor adaptor,
                                 ConversionPatternRewriter &rewriter) const override {
         auto loc = op.getLoc();
-        auto type = op.getResult().getType().cast<RankedTensorType>();
+        auto type = mlir::cast<RankedTensorType>(op.getResult().getType());
 
         // Спершу робимо додавання
         auto add = rewriter.create<arith::AddFOp>(loc, adaptor.getLhs(), adaptor.getRhs());
