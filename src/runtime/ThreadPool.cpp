@@ -53,8 +53,7 @@ ThreadPool::~ThreadPool() {
     }
 }
 
-// ... existing workerLoop call should be updated in header or implementation ...
-// Actually, let me fix the workerLoop signature as well
+// Worker loop: pins thread to CPU and processes tasks from queue
 void ThreadPool::workerLoop(int threadId, int cpuId, bool useAffinity) {
     if (useAffinity && cpuId >= 0) {
         setThreadAffinity(cpuId);
@@ -97,4 +96,54 @@ void ThreadPool::executeSplit(const HeterogeneousWorkSplit& split,
     }
 }
 
+void ThreadPool::parallelFor(int start, int end, int grainSize,
+                              std::function<void(int, int)> body) {
+    if (start >= end) return;
+    
+    int totalWork = end - start;
+    int numThreads = (int)workers.size();
+    
+    // Single-chunk fast path
+    if (numThreads <= 1 || totalWork <= grainSize) {
+        body(start, end);
+        return;
+    }
+    
+    // Calculate chunk size aligned to grainSize
+    int rawChunkSize = totalWork / numThreads;
+    int chunkSize = (rawChunkSize / grainSize) * grainSize;
+    if (chunkSize < grainSize) chunkSize = grainSize;
+    
+    std::vector<std::future<void>> futures;
+    int offset = start;
+    
+    while (offset < end) {
+        int chunkEnd = offset + chunkSize;
+        if (chunkEnd > end || (end - chunkEnd) < grainSize) {
+            // Give remainder to the last chunk to avoid tiny tail chunks
+            chunkEnd = end;
+        }
+        
+        int capturedStart = offset;
+        int capturedEnd = chunkEnd;
+        
+        if (chunkEnd == end) {
+            // Last chunk: run inline on calling thread to avoid queue overhead
+            body(capturedStart, capturedEnd);
+        } else {
+            futures.push_back(enqueue(-1, [body, capturedStart, capturedEnd]() {
+                body(capturedStart, capturedEnd);
+            }));
+        }
+        
+        offset = chunkEnd;
+    }
+    
+    // Wait for all worker chunks to complete
+    for (auto& f : futures) {
+        f.get();
+    }
+}
+
 } // namespace tenzo
+

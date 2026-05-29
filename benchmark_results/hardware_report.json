@@ -20,9 +20,9 @@
   ],
   "benchmark": {
     "matrix_size": 512,
-    "gflops_scalar": 2.3283498655564228,
-    "gflops_vector": 17.77718251655629,
-    "speedup": 7.635099,
-    "efficiency_percent": 5.050335942203492
+    "gflops_scalar": 2.4438770575382374,
+    "gflops_vector": 23.021908747855917,
+    "speedup": 9.42024,
+    "efficiency_percent": 6.540314985186341
   }
 }

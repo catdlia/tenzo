@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "passes/Passes.h"
-#include "context/HardwareInfo.h"
+#include "context/HardwareProfile.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -186,7 +186,7 @@ struct TransformStrategyPass
 namespace tenzo {
 
 void addTransformStrategyPass(mlir::OpPassManager &pm,
-                               HardwareInfo::TileSizes tiles) {
+                               tenzo::TileSizes tiles) {
     pm.addNestedPass<func::FuncOp>(
         std::make_unique<TransformStrategyPass>(tiles.M, tiles.N, tiles.K));
 }

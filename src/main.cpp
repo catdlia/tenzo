@@ -1,6 +1,7 @@
 #include "context/TenzoContext.h"
 #include "tests/PipelineTests.h"
 #include "tests/GPUTests.h"
+#include "tests/DynamicInferenceTest.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 
@@ -21,6 +22,7 @@ void printUsage() {
     llvm::outs() << "  linear    Run Linear Layer inference benchmark (Etap 3 Day 3 - Real NN)\n";
     llvm::outs() << "  transform Run Transform Dialect test (64x64)\n";
     llvm::outs() << "  conv2d    Run Conv2D benchmark\n";
+    llvm::outs() << "  dynamic   Run Dynamic Shape Inference test\n";
     llvm::outs() << "  gpu       Run GPU pipeline test\n";
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
     llvm::outs() << "  hybrid-bench Run A/B benchmark for Hybrid Affinity and Heterogeneous Split\n";
@@ -100,6 +102,8 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(mode, "fusion-bench") == 0) {
         llvm::outs() << "--- Running Final Operator Fusion Benchmark ---\n";
         tenzo::runFusionBenchmark(context);
+    } else if (strcmp(mode, "dynamic") == 0) {
+        tenzo::runDynamicInferenceTest(context);
     } else if (strcmp(mode, "test") == 0) {
         // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";

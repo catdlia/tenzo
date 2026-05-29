@@ -1,11 +1,11 @@
 #include "PipelineTests.h"
-#include "passes/Passes.h"
-#include "dialect/TenzoDialect.h"
-#include "context/HardwareInfo.h"
-#include "context/TenzoContext.h"
 #include "context/AutoTuner.h"
-#include "runtime/ThreadPool.h"
+#include "context/HardwareProfile.h"
+#include "context/TenzoContext.h"
+#include "dialect/TenzoDialect.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
+#include "passes/Passes.h"
+#include "runtime/ThreadPool.h"
 // ... (інші інклуди)
 
 namespace tenzo {
@@ -13,138 +13,149 @@ namespace tenzo {
 // ... (попередній код)
 
 void runHybridAffinityBenchmark(mlir::MLIRContext &context, int N) {
-    llvm::outs() << "\n" << std::string(60, '=') << "\n";
-    llvm::outs() << "📊 HYBRID AFFINITY A/B BENCHMARK: " << N << "x" << N << " MatMul\n";
-    llvm::outs() << std::string(60, '=') << "\n\n";
+  llvm::outs() << "\n" << std::string(60, '=') << "\n";
+  llvm::outs() << "📊 HYBRID AFFINITY A/B BENCHMARK: " << N << "x" << N
+               << " MatMul\n";
+  llvm::outs() << std::string(60, '=') << "\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
 
-    // 1. Auto-tuning (from cache if available)
-    AutoTuner tuner(context);
-    auto params = tuner.tune(hwInfo);
+  // 1. Auto-tuning (from cache if available)
+  AutoTuner tuner(context);
+  auto params = tuner.tune(hwInfo);
 
-    // 2. Compilation (using best params)
-    // For simplicity, we reuse existing compile logic or simulate it
-    // In a real scenario, this would generate a kernel that handles row ranges.
-    
-    const int ITERATIONS = 50;
-    double totalOps = 2.0 * N * N * N * ITERATIONS;
+  // 2. Compilation (using best params)
+  // For simplicity, we reuse existing compile logic or simulate it
+  // In a real scenario, this would generate a kernel that handles row ranges.
 
-    auto run_scenario = [&](const std::string& name, bool useAffinity) {
-        llvm::outs() << "\n🚀 Scenario: " << name << "...\n";
-        
-        ThreadPool pool(hwInfo.topology, useAffinity);
-        auto split = HeterogeneousWorkSplit::compute(N, hwInfo.topology);
-        
-        // Warm-up
-        for (int i = 0; i < 5; i++) {
-            pool.executeSplit(split, [&](const auto& work) {
-                // Simulate matrix work for rows work.rowStart..work.rowEnd
-                std::this_thread::sleep_for(std::chrono::microseconds(10)); 
-            });
-        }
+  const int ITERATIONS = 50;
+  double totalOps = 2.0 * N * N * N * ITERATIONS;
 
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < ITERATIONS; i++) {
-            pool.executeSplit(split, [&](const auto& work) {
-                // actual_kernel_call(work.rowStart, work.rowEnd, params);
-                // Placeholder for actual computation
-            });
-        }
-        auto end = std::chrono::high_resolution_clock::now();
-        
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        double gflops = (totalOps / (ms / 1000.0)) / 1e9;
-        
-        llvm::outs() << "   Result [" << name << "]: " << ms << " ms (" << gflops << " GFLOPS)\n";
-        return gflops;
-    };
+  auto run_scenario = [&](const std::string &name, bool useAffinity) {
+    llvm::outs() << "\n🚀 Scenario: " << name << "...\n";
 
-    // A/B Test
-    double baseline = run_scenario("Baseline (OS Default)", false);
-    double optimized = run_scenario("Optimized (Thread Affinity + Hetero Split)", true);
+    ThreadPool pool(hwInfo->getTopology(), useAffinity);
+    auto split = HeterogeneousWorkSplit::compute(N, hwInfo->getTopology());
 
-    llvm::outs() << "\n" << std::string(60, '-') << "\n";
-    if (optimized > baseline) {
-        double gain = (optimized / baseline - 1.0) * 100.0;
-        llvm::outs() << "✅ STABILITY GAIN: " << gain << "% improvement with Thread Affinity\n";
-    } else {
-        llvm::outs() << "⚠️ No significant gain detected in this run.\n";
+    // Warm-up
+    for (int i = 0; i < 5; i++) {
+      pool.executeSplit(split, [&](const auto &work) {
+        // Simulate matrix work for rows work.rowStart..work.rowEnd
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+      });
     }
-    llvm::outs() << std::string(60, '=') << "\n\n";
+
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < ITERATIONS; i++) {
+      pool.executeSplit(split, [&](const auto &work) {
+        // actual_kernel_call(work.rowStart, work.rowEnd, params);
+        // Placeholder for actual computation
+      });
+    }
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+                  .count();
+    double gflops = (totalOps / (ms / 1000.0)) / 1e9;
+
+    llvm::outs() << "   Result [" << name << "]: " << ms << " ms (" << gflops
+                 << " GFLOPS)\n";
+    return gflops;
+  };
+
+  // A/B Test
+  double baseline = run_scenario("Baseline (OS Default)", false);
+  double optimized =
+      run_scenario("Optimized (Thread Affinity + Hetero Split)", true);
+
+  llvm::outs() << "\n" << std::string(60, '-') << "\n";
+  if (optimized > baseline) {
+    double gain = (optimized / baseline - 1.0) * 100.0;
+    llvm::outs() << "✅ STABILITY GAIN: " << gain
+                 << "% improvement with Thread Affinity\n";
+  } else {
+    llvm::outs() << "⚠️ No significant gain detected in this run.\n";
+  }
+  llvm::outs() << std::string(60, '=') << "\n\n";
 }
 
 void runGeluFusionTest(mlir::MLIRContext &context) {
-    // ... logic already provided in earlier turn ...
+  // ... logic already provided in earlier turn ...
 }
 
 void runFusionBenchmark(mlir::MLIRContext &context) {
-    llvm::outs() << "\n" << std::string(60, '=') << "\n";
-    llvm::outs() << "🔥 FINAL OPERATOR FUSION BENCHMARK (N=1024)\n";
-    llvm::outs() << std::string(60, '=') << "\n\n";
+  llvm::outs() << "\n" << std::string(60, '=') << "\n";
+  llvm::outs() << "🔥 FINAL OPERATOR FUSION BENCHMARK (N=1024)\n";
+  llvm::outs() << std::string(60, '=') << "\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
-    
-    const int N = 1024;
-    const int ITERATIONS = 30;
-    double totalOps = 2.0 * N * N * N * ITERATIONS;
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
 
-    auto run_fused_scenario = [&](const std::string& name, const std::string& activation) {
-        llvm::outs() << "🚀 Running " << name << "...\n";
-        
-        // 1. Compile module with specific activation attribute
-        // In real use, this would be a real MLIR module with fused attributes
-        
-        auto start = std::chrono::high_resolution_clock::now();
-        // simulate_execution(N, activation, ITERATIONS);
-        auto end = std::chrono::high_resolution_clock::now();
-        
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-        double gflops = (totalOps / (ms / 1000.0)) / 1e9;
-        
-        llvm::outs() << "   Result [" << name << "]: " << ms << " ms (" << gflops << " GFLOPS)\n";
-        return gflops;
-    };
+  const int N = 1024;
+  const int ITERATIONS = 30;
+  double totalOps = 2.0 * N * N * N * ITERATIONS;
 
-    // FUSION PERFORMANCE ANALYSIS
-    double baseline = run_fused_scenario("Pure MatMul (Baseline)", "none");
-    double relu_fused = run_fused_scenario("MatMul + ReLU (Fused)", "relu");
-    double gelu_fused = run_fused_scenario("MatMul + GELU (Fused)", "gelu");
+  auto run_fused_scenario = [&](const std::string &name,
+                                const std::string &activation) {
+    llvm::outs() << "🚀 Running " << name << "...\n";
 
-    llvm::outs() << "\n" << std::string(60, '-') << "\n";
-    llvm::outs() << "📊 FUSION IMPACT:\n";
-    llvm::outs() << "   MatMul+ReLU: " << (relu_fused/baseline*100-100) << "% penalty (vs expected ~20% without fusion)\n";
-    llvm::outs() << "   MatMul+GELU: " << (gelu_fused/baseline*100-100) << "% penalty (complex math in registers!)\n";
-    llvm::outs() << "   Note: Traditional non-fused GELU would be 1.5x - 2.0x slower.\n";
-    llvm::outs() << std::string(60, '=') << "\n\n";
+    // 1. Compile module with specific activation attribute
+    // In real use, this would be a real MLIR module with fused attributes
+
+    auto start = std::chrono::high_resolution_clock::now();
+    // simulate_execution(N, activation, ITERATIONS);
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+                  .count();
+    double gflops = (totalOps / (ms / 1000.0)) / 1e9;
+
+    llvm::outs() << "   Result [" << name << "]: " << ms << " ms (" << gflops
+                 << " GFLOPS)\n";
+    return gflops;
+  };
+
+  // FUSION PERFORMANCE ANALYSIS
+  double baseline = run_fused_scenario("Pure MatMul (Baseline)", "none");
+  double relu_fused = run_fused_scenario("MatMul + ReLU (Fused)", "relu");
+  double gelu_fused = run_fused_scenario("MatMul + GELU (Fused)", "gelu");
+
+  llvm::outs() << "\n" << std::string(60, '-') << "\n";
+  llvm::outs() << "📊 FUSION IMPACT:\n";
+  llvm::outs() << "   MatMul+ReLU: " << (relu_fused / baseline * 100 - 100)
+               << "% penalty (vs expected ~20% without fusion)\n";
+  llvm::outs() << "   MatMul+GELU: " << (gelu_fused / baseline * 100 - 100)
+               << "% penalty (complex math in registers!)\n";
+  llvm::outs()
+      << "   Note: Traditional non-fused GELU would be 1.5x - 2.0x slower.\n";
+  llvm::outs() << std::string(60, '=') << "\n\n";
 }
 
 } // namespace tenzo
-#include "mlir/ExecutionEngine/OptUtils.h"
-#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
-#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
-#include "mlir/Target/LLVMIR/Dialect/OpenMP/OpenMPToLLVMIRTranslation.h"
-#include "mlir/Parser/Parser.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/Passes.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Dialect/Affine/Passes.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Affine/Passes.h"
-#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
-#include "llvm/Support/TargetSelect.h"
+#include "mlir/ExecutionEngine/OptUtils.h"
+#include "mlir/Parser/Parser.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/OpenMP/OpenMPToLLVMIRTranslation.h"
+#include "mlir/Transforms/DialectConversion.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/Passes.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <thread>
-#include <atomic>
 #include <vector>
 
 namespace tenzo {
@@ -153,11 +164,10 @@ namespace tenzo {
 // Compile with OpenMP parallelism enabled
 // This generates code that uses OpenMP for parallel loops
 //===----------------------------------------------------------------------===//
-std::unique_ptr<mlir::ExecutionEngine> compileWithOpenMP(
-    mlir::MLIRContext &context,
-    bool enableParallel = true) {
+std::unique_ptr<mlir::ExecutionEngine>
+compileWithOpenMP(mlir::MLIRContext &context, bool enableParallel = true) {
 
-    const char* mlirSource = R"(
+  const char *mlirSource = R"(
         module {
             func.func @main() -> f32 {
                 %c2 = arith.constant 2.0 : f32
@@ -179,80 +189,87 @@ std::unique_ptr<mlir::ExecutionEngine> compileWithOpenMP(
         }
     )";
 
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource), llvm::SMLoc());
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
-    if (!module) return nullptr;
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource),
+                               llvm::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> module =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  if (!module)
+    return nullptr;
 
-    mlir::PassManager pm(&context);
+  mlir::PassManager pm(&context);
 
-    // 1. Fusion
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateFusionPatterns(patterns);
-        (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
-    }
+  // 1. Fusion
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateFusionPatterns(patterns);
+    (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+  }
 
-    // 2. Linalg Lowering
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateTenzoToLinalgConversionPatterns(patterns);
-        mlir::ConversionTarget target(context);
-        target.addLegalDialect<mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
-                               mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
-        target.addIllegalDialect<tenzo::TenzoDialect>();
-        (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
-    }
+  // 2. Linalg Lowering
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateTenzoToLinalgConversionPatterns(patterns);
+    mlir::ConversionTarget target(context);
+    target.addLegalDialect<
+        mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
+    target.addIllegalDialect<tenzo::TenzoDialect>();
+    (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
+  }
 
-    // 3. Vectorization - Skip for parallel path (handled in LLVMLowering)
-    // The parallel path in LLVMLowering does its own Affine vectorization
-    if (!enableParallel) {
-        addTenzoVectorizationPass(pm);
-    }
+  // 3. Vectorization - Skip for parallel path (handled in LLVMLowering)
+  // The parallel path in LLVMLowering does its own Affine vectorization
+  if (!enableParallel) {
+    addOptimalVectorizationPass(pm);
+  }
 
-    // 4. Bufferization
-    addTenzoBufferizationPasses(pm);
+  // 4. Bufferization
+  addTenzoBufferizationPasses(pm);
 
-    // 5. LLVM Lowering
-    // For parallel path: enableVectorization=true because LLVMLowering handles it
-    auto hwInfo = HardwareInfo::detect();
-    auto tiles = hwInfo.getOptimalTileSizes();
-    addTenzoToLLVMPasses(pm, /*enableVectorization=*/true, tiles, /*enableParallel=*/enableParallel);
+  // 5. LLVM Lowering
+  // For parallel path: enableVectorization=true because LLVMLowering handles it
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  auto tiles = hwInfo->getOptimalTileSizes();
+  addTenzoToLLVMPasses(pm, /*enableVectorization=*/true, tiles,
+                       /*enableParallel=*/enableParallel);
 
-    if (mlir::failed(pm.run(*module))) {
-        llvm::errs() << "Pipeline failed\n";
-        return nullptr;
-    }
+  if (mlir::failed(pm.run(*module))) {
+    llvm::errs() << "Pipeline failed\n";
+    return nullptr;
+  }
 
-    // JIT Setup with OpenMP support
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    tenzo::registerAllTenzoDialectTranslations(context);
-    mlir::registerLLVMDialectTranslation(context);
-    mlir::registerBuiltinDialectTranslation(context);
-    mlir::registerOpenMPDialectTranslation(context);  // Register OpenMP translation!
+  // JIT Setup with OpenMP support
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  tenzo::registerAllTenzoDialectTranslations(context);
+  mlir::registerLLVMDialectTranslation(context);
+  mlir::registerBuiltinDialectTranslation(context);
+  mlir::registerOpenMPDialectTranslation(
+      context); // Register OpenMP translation!
 
-    mlir::ExecutionEngineOptions engineOptions;
-    engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+  mlir::ExecutionEngineOptions engineOptions;
+  engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+  engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-    // Link with OpenMP runtime (for parallel execution)
-    // Note: The generated code will use OpenMP pragmas that link at runtime
+  // Link with OpenMP runtime (for parallel execution)
+  // Note: The generated code will use OpenMP pragmas that link at runtime
 
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) {
-        llvm::errs() << "Failed to create execution engine: "
-                     << llvm::toString(maybeEngine.takeError()) << "\n";
-        return nullptr;
-    }
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+  if (!maybeEngine) {
+    llvm::errs() << "Failed to create execution engine: "
+                 << llvm::toString(maybeEngine.takeError()) << "\n";
+    return nullptr;
+  }
 
-    return std::move(maybeEngine.get());
+  return std::move(maybeEngine.get());
 }
 
-std::unique_ptr<mlir::ExecutionEngine> compileAndGetEngine(mlir::MLIRContext &context, bool enableVectorization) {
-    // SCALE UP: Матриці 512x512
-    // Очікуваний результат: 512 * 2.0 * 3.0 = 3072.0
-    const char* mlirSource = R"(
+std::unique_ptr<mlir::ExecutionEngine>
+compileAndGetEngine(mlir::MLIRContext &context, bool enableVectorization) {
+  // SCALE UP: Матриці 512x512
+  // Очікуваний результат: 512 * 2.0 * 3.0 = 3072.0
+  const char *mlirSource = R"(
         module {
             func.func @main() -> f32 {
                 %c2 = arith.constant 2.0 : f32
@@ -273,125 +290,146 @@ std::unique_ptr<mlir::ExecutionEngine> compileAndGetEngine(mlir::MLIRContext &co
             }
         }
     )";
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource), llvm::SMLoc());
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
-    if (!module) return nullptr;
-    mlir::PassManager pm(&context);
-    // 1. Fusion
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateFusionPatterns(patterns);
-        (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
-    }
-    // 2. Linalg Lowering (Tenzo -> Linalg)
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateTenzoToLinalgConversionPatterns(patterns);
-        mlir::ConversionTarget target(context);
-        target.addLegalDialect<mlir::linalg::LinalgDialect, mlir::arith::ArithDialect, mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
-        target.addIllegalDialect<tenzo::TenzoDialect>();
-        (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
-    }
-    // 3. Vectorization / Optimization Strategy
-    if (enableVectorization) {
-        addTenzoVectorizationPass(pm);
-    }
-    // 4. Bufferization & Backend
-    addTenzoBufferizationPasses(pm);
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource),
+                               llvm::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> module =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  if (!module)
+    return nullptr;
+  mlir::PassManager pm(&context);
+  // 1. Fusion
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateFusionPatterns(patterns);
+    (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+  }
+  // 2. Linalg Lowering (Tenzo -> Linalg)
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateTenzoToLinalgConversionPatterns(patterns);
+    mlir::ConversionTarget target(context);
+    target.addLegalDialect<
+        mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
+    target.addIllegalDialect<tenzo::TenzoDialect>();
+    (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
+  }
+  // 3. Vectorization / Optimization Strategy
+  if (enableVectorization) {
+    addOptimalVectorizationPass(pm);
+  }
+  // 4. Bufferization & Backend
+  addTenzoBufferizationPasses(pm);
 
-    // Get hardware-optimal tile sizes and pass to LLVM lowering
-    auto hwInfo = HardwareInfo::detect();
-    auto tiles = hwInfo.getOptimalTileSizes();
-    addTenzoToLLVMPasses(pm, enableVectorization, tiles, /*enableParallel=*/false);
+  // Get hardware-optimal tile sizes and pass to LLVM lowering
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  auto tiles = hwInfo->getOptimalTileSizes();
+  addTenzoToLLVMPasses(pm, enableVectorization, tiles,
+                       /*enableParallel=*/false);
 
-    if (mlir::failed(pm.run(*module))) {
-        llvm::errs() << "Pipeline failed\n";
-        return nullptr;
-    }
-    // JIT Setup
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    tenzo::registerAllTenzoDialectTranslations(context);
-    mlir::registerLLVMDialectTranslation(context);
-    mlir::registerBuiltinDialectTranslation(context);
-    mlir::ExecutionEngineOptions engineOptions;
-    engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) {
-        llvm::errs() << "Failed to create execution engine\n";
-        return nullptr;
-    }
-    return std::move(maybeEngine.get());
+  if (mlir::failed(pm.run(*module))) {
+    llvm::errs() << "Pipeline failed\n";
+    return nullptr;
+  }
+  
+  llvm::outs() << "--- IR BEFORE EXECUTION ENGINE ---\n";
+  module->dump();
+  llvm::outs() << "----------------------------------\n";
+
+  // JIT Setup
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  tenzo::registerAllTenzoDialectTranslations(context);
+  mlir::registerLLVMDialectTranslation(context);
+  mlir::registerBuiltinDialectTranslation(context);
+  mlir::ExecutionEngineOptions engineOptions;
+  engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+  engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+  if (!maybeEngine) {
+    llvm::errs() << "Failed to create execution engine\n";
+    return nullptr;
+  }
+  return std::move(maybeEngine.get());
 }
 void runBenchmark(mlir::MLIRContext &context) {
-    llvm::outs() << "\n=========================================\n";
-    llvm::outs() << "🚀 BENCHMARK: 512x512 MatMul\n";
-    llvm::outs() << "=========================================\n\n";
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
-    llvm::outs() << "\n";
-    const int ITERATIONS = 100;
-    llvm::outs() << "Compiling Scalar version...\n";
-    auto scalarEngine = compileAndGetEngine(context, false);
-    llvm::outs() << "Compiling Vector version...\n";
-    auto vectorEngine = compileAndGetEngine(context, true);
-    if (!scalarEngine || !vectorEngine) {
-        llvm::errs() << "Engine creation failed.\n";
-        return;
-    }
-    float scalarRes = 0.0f, vectorRes = 0.0f;
-    void* scalarArgs[] = { &scalarRes };
-    void* vectorArgs[] = { &vectorRes };
-    // Warmup (multiple iterations for stable results)
-    llvm::outs() << "Warming up...\n";
-    for(int i = 0; i < 10; ++i) {
-        (void)scalarEngine->invokePacked("main", scalarArgs);
-        (void)vectorEngine->invokePacked("main", vectorArgs);
-    }
-    // Benchmark Scalar
-    llvm::outs() << "Running Scalar (LLVM O3)...\n";
-    auto startScalar = std::chrono::high_resolution_clock::now();
-    for(int i = 0; i < ITERATIONS; ++i) {
-        if(scalarEngine->invokePacked("main", scalarArgs)) break;
-    }
-    auto endScalar = std::chrono::high_resolution_clock::now();
-    // Benchmark Vector
-    llvm::outs() << "Running Vector (Tenzo Optimized)...\n";
-    auto startVector = std::chrono::high_resolution_clock::now();
-    for(int i = 0; i < ITERATIONS; ++i) {
-        if(vectorEngine->invokePacked("main", vectorArgs)) break;
-    }
-    auto endVector = std::chrono::high_resolution_clock::now();
-    auto scalarDur = std::chrono::duration_cast<std::chrono::milliseconds>(endScalar - startScalar).count();
-    auto vectorDur = std::chrono::duration_cast<std::chrono::milliseconds>(endVector - startVector).count();
+  llvm::outs() << "\n=========================================\n";
+  llvm::outs() << "🚀 BENCHMARK: 512x512 MatMul\n";
+  llvm::outs() << "=========================================\n\n";
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
+  llvm::outs() << "\n";
+  const int ITERATIONS = 100;
+  llvm::outs() << "Compiling Scalar version...\n";
+  auto scalarEngine = compileAndGetEngine(context, false);
+  llvm::outs() << "Compiling Vector version...\n";
+  auto vectorEngine = compileAndGetEngine(context, true);
+  if (!scalarEngine || !vectorEngine) {
+    llvm::errs() << "Engine creation failed.\n";
+    return;
+  }
+  float scalarRes = 0.0f, vectorRes = 0.0f;
+  void *scalarArgs[] = {&scalarRes};
+  void *vectorArgs[] = {&vectorRes};
+  // Warmup (multiple iterations for stable results)
+  llvm::outs() << "Warming up...\n";
+  for (int i = 0; i < 10; ++i) {
+    (void)scalarEngine->invokePacked("main", scalarArgs);
+    (void)vectorEngine->invokePacked("main", vectorArgs);
+  }
+  // Benchmark Scalar
+  llvm::outs() << "Running Scalar (LLVM O3)...\n";
+  auto startScalar = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; ++i) {
+    if (scalarEngine->invokePacked("main", scalarArgs))
+      break;
+  }
+  auto endScalar = std::chrono::high_resolution_clock::now();
+  // Benchmark Vector
+  llvm::outs() << "Running Vector (Tenzo Optimized)...\n";
+  auto startVector = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; ++i) {
+    if (vectorEngine->invokePacked("main", vectorArgs))
+      break;
+  }
+  auto endVector = std::chrono::high_resolution_clock::now();
+  auto scalarDur = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       endScalar - startScalar)
+                       .count();
+  auto vectorDur = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       endVector - startVector)
+                       .count();
 
-    // Calculate GFLOPS: 2 * N^3 * iterations
-    double totalOps = 2.0 * 512 * 512 * 512 * ITERATIONS;
-    double scalarGflops = scalarDur > 0 ? (totalOps / (scalarDur / 1000.0)) / 1e9 : 0;
-    double vectorGflops = vectorDur > 0 ? (totalOps / (vectorDur / 1000.0)) / 1e9 : 0;
+  // Calculate GFLOPS: 2 * N^3 * iterations
+  double totalOps = 2.0 * 512 * 512 * 512 * ITERATIONS;
+  double scalarGflops =
+      scalarDur > 0 ? (totalOps / (scalarDur / 1000.0)) / 1e9 : 0;
+  double vectorGflops =
+      vectorDur > 0 ? (totalOps / (vectorDur / 1000.0)) / 1e9 : 0;
 
-    llvm::outs() << "\n📊 RESULTS (512x512, " << ITERATIONS << " runs):\n";
-    llvm::outs() << "Scalar: " << scalarDur << " ms (" << scalarGflops << " GFLOPS)\n";
-    llvm::outs() << "Vector: " << vectorDur << " ms (" << vectorGflops << " GFLOPS)\n";
-    if (vectorDur > 0 && vectorDur < scalarDur) {
-        double speedup = (double)scalarDur / vectorDur;
-        llvm::outs() << "⚡ Speedup: " << speedup << "x faster!\n";
-    } else {
-        llvm::outs() << "🐢 No speedup yet (Need Affine Tiling!)\n";
-    }
-    llvm::outs() << "Check: " << vectorRes << " (Expected 3072.0)\n";
+  llvm::outs() << "\n📊 RESULTS (512x512, " << ITERATIONS << " runs):\n";
+  llvm::outs() << "Scalar: " << scalarDur << " ms (" << scalarGflops
+               << " GFLOPS)\n";
+  llvm::outs() << "Vector: " << vectorDur << " ms (" << vectorGflops
+               << " GFLOPS)\n";
+  if (vectorDur > 0 && vectorDur < scalarDur) {
+    double speedup = (double)scalarDur / vectorDur;
+    llvm::outs() << "⚡ Speedup: " << speedup << "x faster!\n";
+  } else {
+    llvm::outs() << "🐢 No speedup yet (Need Affine Tiling!)\n";
+  }
+  llvm::outs() << "Check: " << vectorRes << " (Expected 3072.0)\n";
 }
 
 void runConv2DTest(mlir::MLIRContext &context) {
-    llvm::outs() << "\n=========================================\n";
-    llvm::outs() << "🎯 Conv2D Benchmark (NHWC format)\n";
-    llvm::outs() << "=========================================\n\n";
+  llvm::outs() << "\n=========================================\n";
+  llvm::outs() << "🎯 Conv2D Benchmark (NHWC format)\n";
+  llvm::outs() << "=========================================\n\n";
 
-    // Conv2D: Input[1,32,32,3] * Filter[3,3,3,64] -> Output[1,30,30,64]
-    // More realistic: 32x32 RGB image with 64 output channels
-    const char* mlirSource = R"(
+  // Conv2D: Input[1,32,32,3] * Filter[3,3,3,64] -> Output[1,30,30,64]
+  // More realistic: 32x32 RGB image with 64 output channels
+  const char *mlirSource = R"(
         module {
             func.func @main() -> f32 {
                 %c1 = arith.constant 1.0 : f32
@@ -422,102 +460,106 @@ void runConv2DTest(mlir::MLIRContext &context) {
         }
     )";
 
-    llvm::outs() << "Input: [1, 32, 32, 3] (NHWC)\n";
-    llvm::outs() << "Filter: [3, 3, 3, 64] (HWIO)\n";
-    llvm::outs() << "Output: [1, 30, 30, 64] (NHWC)\n";
-    llvm::outs() << "Operations: ~50M MACs\n\n";
+  llvm::outs() << "Input: [1, 32, 32, 3] (NHWC)\n";
+  llvm::outs() << "Filter: [3, 3, 3, 64] (HWIO)\n";
+  llvm::outs() << "Output: [1, 30, 30, 64] (NHWC)\n";
+  llvm::outs() << "Operations: ~50M MACs\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
-    llvm::outs() << "\n";
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
+  llvm::outs() << "\n";
 
-    // Compile optimized version
-    llvm::outs() << "Compiling optimized Conv2D...\n";
+  // Compile optimized version
+  llvm::outs() << "Compiling optimized Conv2D...\n";
 
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource), llvm::SMLoc());
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource),
+                               llvm::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> module =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
 
-    if (!module) {
-        llvm::errs() << "Failed to parse MLIR\n";
-        return;
-    }
+  if (!module) {
+    llvm::errs() << "Failed to parse MLIR\n";
+    return;
+  }
 
-    mlir::PassManager pm(&context);
-    addTenzoVectorizationPass(pm);
-    addTenzoBufferizationPasses(pm);
-    auto tiles = hwInfo.getOptimalTileSizes();
-    addTenzoToLLVMPasses(pm, true, tiles);
+  mlir::PassManager pm(&context);
+  addOptimalVectorizationPass(pm);
+  addTenzoBufferizationPasses(pm);
+  auto tiles = hwInfo->getOptimalTileSizes();
+  addTenzoToLLVMPasses(pm, true, tiles);
 
-    if (mlir::failed(pm.run(*module))) {
-        llvm::errs() << "Pipeline failed\n";
-        return;
-    }
+  if (mlir::failed(pm.run(*module))) {
+    llvm::errs() << "Pipeline failed\n";
+    return;
+  }
 
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    tenzo::registerAllTenzoDialectTranslations(context);
-    mlir::registerLLVMDialectTranslation(context);
-    mlir::registerBuiltinDialectTranslation(context);
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  tenzo::registerAllTenzoDialectTranslations(context);
+  mlir::registerLLVMDialectTranslation(context);
+  mlir::registerBuiltinDialectTranslation(context);
 
-    mlir::ExecutionEngineOptions engineOptions;
-    engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+  mlir::ExecutionEngineOptions engineOptions;
+  engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+  engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) {
-        llvm::errs() << "Failed to create execution engine\n";
-        return;
-    }
-    auto engine = std::move(maybeEngine.get());
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+  if (!maybeEngine) {
+    llvm::errs() << "Failed to create execution engine\n";
+    return;
+  }
+  auto engine = std::move(maybeEngine.get());
 
-    float result = 0.0f;
-    void* args[] = {&result};
+  float result = 0.0f;
+  void *args[] = {&result};
 
-    // Warmup
-    for (int i = 0; i < 5; i++) {
-        (void)engine->invokePacked("main", args);
-    }
+  // Warmup
+  for (int i = 0; i < 5; i++) {
+    (void)engine->invokePacked("main", args);
+  }
 
-    // Benchmark
-    const int ITERATIONS = 100;
-    llvm::outs() << "Running benchmark (" << ITERATIONS << " iterations)...\n";
+  // Benchmark
+  const int ITERATIONS = 100;
+  llvm::outs() << "Running benchmark (" << ITERATIONS << " iterations)...\n";
 
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < ITERATIONS; i++) {
-        (void)engine->invokePacked("main", args);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
+  auto start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; i++) {
+    (void)engine->invokePacked("main", args);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
 
-    auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    double msPerIter = (double)totalMs / ITERATIONS;
+  auto totalMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+          .count();
+  double msPerIter = (double)totalMs / ITERATIONS;
 
-    // Calculate GFLOPS: Conv2D FLOPs = 2 * Out_H * Out_W * K_H * K_W * In_C * Out_C
-    // = 2 * 30 * 30 * 3 * 3 * 3 * 64 = 31,104,000 FLOPs per conv
-    double flops = 2.0 * 30 * 30 * 3 * 3 * 3 * 64;
-    double gflops = (flops / msPerIter) / 1e6;  // GFLOPS
+  // Calculate GFLOPS: Conv2D FLOPs = 2 * Out_H * Out_W * K_H * K_W * In_C *
+  // Out_C = 2 * 30 * 30 * 3 * 3 * 3 * 64 = 31,104,000 FLOPs per conv
+  double flops = 2.0 * 30 * 30 * 3 * 3 * 3 * 64;
+  double gflops = (flops / msPerIter) / 1e6; // GFLOPS
 
-    llvm::outs() << "\n📊 RESULTS:\n";
-    llvm::outs() << "Total time: " << totalMs << " ms\n";
-    llvm::outs() << "Per iteration: " << msPerIter << " ms\n";
-    llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
-    llvm::outs() << "Result: " << result << " (Expected 27.0)\n";
+  llvm::outs() << "\n📊 RESULTS:\n";
+  llvm::outs() << "Total time: " << totalMs << " ms\n";
+  llvm::outs() << "Per iteration: " << msPerIter << " ms\n";
+  llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
+  llvm::outs() << "Result: " << result << " (Expected 27.0)\n";
 
-    if (std::abs(result - 27.0f) < 0.001f) {
-        llvm::outs() << "✅ Conv2D correct!\n";
-    } else {
-        llvm::outs() << "❌ Result mismatch!\n";
-    }
+  if (std::abs(result - 27.0f) < 0.001f) {
+    llvm::outs() << "✅ Conv2D correct!\n";
+  } else {
+    llvm::outs() << "❌ Result mismatch!\n";
+  }
 }
 
 void runSmallMatMulTest(mlir::MLIRContext &context) {
-    llvm::outs() << "\n=========================================\n";
-    llvm::outs() << "🔬 Small MatMul Test (64x64) - Explicit Vectorization\n";
-    llvm::outs() << "=========================================\n\n";
+  llvm::outs() << "\n=========================================\n";
+  llvm::outs() << "🔬 Small MatMul Test (64x64) - Explicit Vectorization\n";
+  llvm::outs() << "=========================================\n\n";
 
-    // 64x64 matrix - small enough for explicit vectorization
-    // Expected result: 64 * 2.0 * 3.0 = 384.0
-    const char* mlirSource = R"(
+  // 64x64 matrix - small enough for explicit vectorization
+  // Expected result: 64 * 2.0 * 3.0 = 384.0
+  const char *mlirSource = R"(
         module {
             func.func @main() -> f32 {
                 %c2 = arith.constant 2.0 : f32
@@ -539,111 +581,122 @@ void runSmallMatMulTest(mlir::MLIRContext &context) {
         }
     )";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
-    llvm::outs() << "\n";
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
+  llvm::outs() << "\n";
 
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource), llvm::SMLoc());
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
-    if (!module) { llvm::errs() << "Parse failed\n"; return; }
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource),
+                               llvm::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> module =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  if (!module) {
+    llvm::errs() << "Parse failed\n";
+    return;
+  }
 
-    // Compile with vectorization
-    mlir::PassManager pm(&context);
+  // Compile with vectorization
+  mlir::PassManager pm(&context);
 
-    // Fusion
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateFusionPatterns(patterns);
-        (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
-    }
+  // Fusion
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateFusionPatterns(patterns);
+    (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+  }
 
-    // Linalg lowering
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateTenzoToLinalgConversionPatterns(patterns);
-        mlir::ConversionTarget target(context);
-        target.addLegalDialect<mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
-                               mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
-        target.addIllegalDialect<tenzo::TenzoDialect>();
-        (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
-    }
+  // Linalg lowering
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateTenzoToLinalgConversionPatterns(patterns);
+    mlir::ConversionTarget target(context);
+    target.addLegalDialect<
+        mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
+    target.addIllegalDialect<tenzo::TenzoDialect>();
+    (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
+  }
 
-    // Vectorization
-    addTenzoVectorizationPass(pm);
+  // Vectorization
+  addOptimalVectorizationPass(pm);
 
-    // Bufferization
-    addTenzoBufferizationPasses(pm);
+  // Bufferization
+  addTenzoBufferizationPasses(pm);
 
-    // LLVM lowering
-    auto tiles = hwInfo.getOptimalTileSizes();
-    addTenzoToLLVMPasses(pm, true, tiles);
+  // LLVM lowering
+  auto tiles = hwInfo->getOptimalTileSizes();
+  addTenzoToLLVMPasses(pm, true, tiles);
 
-    if (mlir::failed(pm.run(*module))) {
-        llvm::errs() << "Pipeline failed\n";
-        return;
-    }
+  if (mlir::failed(pm.run(*module))) {
+    llvm::errs() << "Pipeline failed\n";
+    return;
+  }
 
-    // JIT
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    tenzo::registerAllTenzoDialectTranslations(context);
-    mlir::registerLLVMDialectTranslation(context);
-    mlir::registerBuiltinDialectTranslation(context);
+  // JIT
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  tenzo::registerAllTenzoDialectTranslations(context);
+  mlir::registerLLVMDialectTranslation(context);
+  mlir::registerBuiltinDialectTranslation(context);
 
-    mlir::ExecutionEngineOptions engineOptions;
-    engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+  mlir::ExecutionEngineOptions engineOptions;
+  engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+  engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) { llvm::errs() << "Engine failed\n"; return; }
-    auto engine = std::move(maybeEngine.get());
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+  if (!maybeEngine) {
+    llvm::errs() << "Engine failed\n";
+    return;
+  }
+  auto engine = std::move(maybeEngine.get());
 
-    // Benchmark
-    float result = 0.0f;
-    void* args[] = {&result};
+  // Benchmark
+  float result = 0.0f;
+  void *args[] = {&result};
 
-    // Warmup
-    for (int i = 0; i < 10; i++) {
-        (void)engine->invokePacked("main", args);
-    }
+  // Warmup
+  for (int i = 0; i < 10; i++) {
+    (void)engine->invokePacked("main", args);
+  }
 
-    const int ITERATIONS = 10000;
-    llvm::outs() << "Running " << ITERATIONS << " iterations...\n";
+  const int ITERATIONS = 10000;
+  llvm::outs() << "Running " << ITERATIONS << " iterations...\n";
 
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < ITERATIONS; i++) {
-        (void)engine->invokePacked("main", args);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
+  auto start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; i++) {
+    (void)engine->invokePacked("main", args);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
 
-    auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    double msPerIter = (double)totalMs / ITERATIONS;
+  auto totalMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+          .count();
+  double msPerIter = (double)totalMs / ITERATIONS;
 
-    // Calculate GFLOPS: 2*M*N*K = 2*64*64*64 = 524288
-    double flops = 2.0 * 64 * 64 * 64;
-    double gflops = (flops / msPerIter) / 1e6;
+  // Calculate GFLOPS: 2*M*N*K = 2*64*64*64 = 524288
+  double flops = 2.0 * 64 * 64 * 64;
+  double gflops = (flops / msPerIter) / 1e6;
 
-    llvm::outs() << "\n📊 RESULTS (64x64 MatMul):\n";
-    llvm::outs() << "Total: " << totalMs << " ms\n";
-    llvm::outs() << "Per iteration: " << msPerIter << " ms\n";
-    llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
-    llvm::outs() << "Result: " << result << " (Expected 384.0)\n";
+  llvm::outs() << "\n📊 RESULTS (64x64 MatMul):\n";
+  llvm::outs() << "Total: " << totalMs << " ms\n";
+  llvm::outs() << "Per iteration: " << msPerIter << " ms\n";
+  llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
+  llvm::outs() << "Result: " << result << " (Expected 384.0)\n";
 
-    if (std::abs(result - 384.0f) < 0.1f) {
-        llvm::outs() << "✅ Result correct!\n";
-    } else {
-        llvm::outs() << "❌ Result incorrect!\n";
-    }
+  if (std::abs(result - 384.0f) < 0.1f) {
+    llvm::outs() << "✅ Result correct!\n";
+  } else {
+    llvm::outs() << "❌ Result incorrect!\n";
+  }
 }
 
 void runTransformDialectTest(mlir::MLIRContext &context) {
-    llvm::outs() << "\n=========================================\n";
-    llvm::outs() << "🔄 Transform Dialect Test (8x8 MatMul)\n";
-    llvm::outs() << "=========================================\n\n";
+  llvm::outs() << "\n=========================================\n";
+  llvm::outs() << "🔄 Transform Dialect Test (8x8 MatMul)\n";
+  llvm::outs() << "=========================================\n\n";
 
-    // Use 8x8 matrix - small enough for direct vectorization
-    const char* mlirSource = R"(
+  // Use 8x8 matrix - small enough for direct vectorization
+  const char *mlirSource = R"(
         module {
             func.func @main() -> f32 {
                 %c2 = arith.constant 2.0 : f32
@@ -665,92 +718,99 @@ void runTransformDialectTest(mlir::MLIRContext &context) {
         }
     )";
 
-    // Expected: 8 * 2.0 * 3.0 = 48.0
-    auto hwInfo = HardwareInfo::detect();
-    auto tiles = hwInfo.getOptimalTileSizes();
-    hwInfo.print();
-    llvm::outs() << "\n";
+  // Expected: 8 * 2.0 * 3.0 = 48.0
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  auto tiles = hwInfo->getOptimalTileSizes();
+  hwInfo->print();
+  llvm::outs() << "\n";
 
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource), llvm::SMLoc());
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
-    if (!module) { llvm::errs() << "Parse failed\n"; return; }
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource),
+                               llvm::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> module =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  if (!module) {
+    llvm::errs() << "Parse failed\n";
+    return;
+  }
 
-    // Apply transform dialect strategy BEFORE bufferization
-    mlir::PassManager pm(&context);
+  // Apply transform dialect strategy BEFORE bufferization
+  mlir::PassManager pm(&context);
 
-    // Use Transform Dialect for tiling + vectorization
-    addTransformStrategyPass(pm, tiles);
+  // Use Transform Dialect for tiling + vectorization
+  addTransformStrategyPass(pm, tiles);
 
-    // Standard cleanup
-    pm.addPass(mlir::createCanonicalizerPass());
-    pm.addPass(mlir::createCSEPass());
+  // Standard cleanup
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::createCSEPass());
 
-    // Bufferization
-    addTenzoBufferizationPasses(pm);
+  // Bufferization
+  addTenzoBufferizationPasses(pm);
 
-    // LLVM lowering (without affine tiling since transform already tiled)
-    addTenzoToLLVMPasses(pm, false, tiles);
+  // LLVM lowering (without affine tiling since transform already tiled)
+  addTenzoToLLVMPasses(pm, false, tiles);
 
-    if (mlir::failed(pm.run(*module))) {
-        llvm::errs() << "Transform pipeline failed\n";
-        return;
-    }
+  if (mlir::failed(pm.run(*module))) {
+    llvm::errs() << "Transform pipeline failed\n";
+    return;
+  }
 
-    // JIT
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    tenzo::registerAllTenzoDialectTranslations(context);
-    mlir::registerLLVMDialectTranslation(context);
-    mlir::registerBuiltinDialectTranslation(context);
+  // JIT
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  tenzo::registerAllTenzoDialectTranslations(context);
+  mlir::registerLLVMDialectTranslation(context);
+  mlir::registerBuiltinDialectTranslation(context);
 
-    mlir::ExecutionEngineOptions engineOptions;
-    engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+  mlir::ExecutionEngineOptions engineOptions;
+  engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+  engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) {
-        llvm::errs() << "Engine creation failed\n";
-        return;
-    }
-    auto engine = std::move(maybeEngine.get());
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+  if (!maybeEngine) {
+    llvm::errs() << "Engine creation failed\n";
+    return;
+  }
+  auto engine = std::move(maybeEngine.get());
 
-    // Benchmark
-    float result = 0.0f;
-    void* args[] = {&result};
+  // Benchmark
+  float result = 0.0f;
+  void *args[] = {&result};
 
-    // Warmup
-    for (int i = 0; i < 10; i++) {
-        (void)engine->invokePacked("main", args);
-    }
+  // Warmup
+  for (int i = 0; i < 10; i++) {
+    (void)engine->invokePacked("main", args);
+  }
 
-    const int ITERATIONS = 10000;
-    llvm::outs() << "Running " << ITERATIONS << " iterations...\n";
+  const int ITERATIONS = 10000;
+  llvm::outs() << "Running " << ITERATIONS << " iterations...\n";
 
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < ITERATIONS; i++) {
-        (void)engine->invokePacked("main", args);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
+  auto start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; i++) {
+    (void)engine->invokePacked("main", args);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
 
-    auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    double msPerIter = (double)totalMs / ITERATIONS;
+  auto totalMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+          .count();
+  double msPerIter = (double)totalMs / ITERATIONS;
 
-    // Calculate GFLOPS: 2*M*N*K = 2*8*8*8 = 1024
-    double flops = 2.0 * 8 * 8 * 8;
-    double gflops = (flops / msPerIter) / 1e6;
+  // Calculate GFLOPS: 2*M*N*K = 2*8*8*8 = 1024
+  double flops = 2.0 * 8 * 8 * 8;
+  double gflops = (flops / msPerIter) / 1e6;
 
-    llvm::outs() << "\n📊 RESULTS (Transform Dialect, 8x8):\n";
-    llvm::outs() << "Total: " << totalMs << " ms\n";
-    llvm::outs() << "Per iteration: " << msPerIter << " ms\n";
-    llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
-    llvm::outs() << "Result: " << result << " (Expected 48.0)\n";
+  llvm::outs() << "\n📊 RESULTS (Transform Dialect, 8x8):\n";
+  llvm::outs() << "Total: " << totalMs << " ms\n";
+  llvm::outs() << "Per iteration: " << msPerIter << " ms\n";
+  llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
+  llvm::outs() << "Result: " << result << " (Expected 48.0)\n";
 
-    if (std::abs(result - 48.0f) < 0.1f) {
-        llvm::outs() << "✅ Transform Dialect test passed!\n";
-    } else {
-        llvm::outs() << "❌ Result incorrect!\n";
-    }
+  if (std::abs(result - 48.0f) < 0.1f) {
+    llvm::outs() << "✅ Transform Dialect test passed!\n";
+  } else {
+    llvm::outs() << "❌ Result incorrect!\n";
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -758,124 +818,135 @@ void runTransformDialectTest(mlir::MLIRContext &context) {
 // Compiles with parallel loops that execute on multiple cores
 //===----------------------------------------------------------------------===//
 void runParallelBenchmark(mlir::MLIRContext &context) {
-    llvm::outs() << "\n=========================================\n";
-    llvm::outs() << "🧵 PARALLEL BENCHMARK: 512x512 MatMul\n";
-    llvm::outs() << "=========================================\n\n";
+  llvm::outs() << "\n=========================================\n";
+  llvm::outs() << "🧵 PARALLEL BENCHMARK: 512x512 MatMul\n";
+  llvm::outs() << "=========================================\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
 
-    auto strategy = hwInfo.getMicroKernelStrategy();
-    llvm::outs() << "\n🎯 Parallel Strategy:\n";
-    llvm::outs() << "   Threads: " << strategy.numThreads << "\n";
-    llvm::outs() << "   Tile: " << strategy.tileM << "x" << strategy.tileN << "x" << strategy.tileK << "\n\n";
+  auto strategy = hwInfo->getMicroKernelStrategy();
+  llvm::outs() << "\n🎯 Parallel Strategy:\n";
+  llvm::outs() << "   Threads: " << strategy.numThreads << "\n";
+  llvm::outs() << "   Tile: " << strategy.tileM << "x" << strategy.tileN << "x"
+               << strategy.tileK << "\n\n";
 
-    const int ITERATIONS = 100;
+  const int ITERATIONS = 100;
 
-    // ========================================
-    // 1. Compile SINGLE-THREADED version
-    // ========================================
-    llvm::outs() << "Compiling Single-threaded version (Affine Tiling)...\n";
-    auto singleEngine = compileWithOpenMP(context, /*enableParallel=*/false);
+  // ========================================
+  // 1. Compile SINGLE-THREADED version
+  // ========================================
+  llvm::outs() << "Compiling Single-threaded version (Affine Tiling)...\n";
+  auto singleEngine = compileWithOpenMP(context, /*enableParallel=*/false);
 
-    // ========================================
-    // 2. Compile PARALLEL version (OpenMP)
-    // ========================================
-    llvm::outs() << "Compiling Parallel version (OpenMP)...\n";
-    auto parallelEngine = compileWithOpenMP(context, /*enableParallel=*/true);
+  // ========================================
+  // 2. Compile PARALLEL version (OpenMP)
+  // ========================================
+  llvm::outs() << "Compiling Parallel version (OpenMP)...\n";
+  auto parallelEngine = compileWithOpenMP(context, /*enableParallel=*/true);
 
-    if (!singleEngine) {
-        llvm::errs() << "Single-threaded compilation failed\n";
-        return;
-    }
+  if (!singleEngine) {
+    llvm::errs() << "Single-threaded compilation failed\n";
+    return;
+  }
 
-    float singleResult = 0.0f, parallelResult = 0.0f;
-    void* singleArgs[] = {&singleResult};
-    void* parallelArgs[] = {&parallelResult};
+  float singleResult = 0.0f, parallelResult = 0.0f;
+  void *singleArgs[] = {&singleResult};
+  void *parallelArgs[] = {&parallelResult};
 
-    // Warmup
-    llvm::outs() << "Warming up...\n";
-    for (int i = 0; i < 10; i++) {
-        (void)singleEngine->invokePacked("main", singleArgs);
-        if (parallelEngine) {
-            (void)parallelEngine->invokePacked("main", parallelArgs);
-        }
-    }
-
-    // ========================================
-    // 3. Benchmark SINGLE-THREADED
-    // ========================================
-    llvm::outs() << "Running Single-threaded (" << ITERATIONS << " iterations)...\n";
-    auto startSingle = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < ITERATIONS; i++) {
-        (void)singleEngine->invokePacked("main", singleArgs);
-    }
-    auto endSingle = std::chrono::high_resolution_clock::now();
-
-    // ========================================
-    // 4. Benchmark PARALLEL (OpenMP)
-    // ========================================
-    long parallelMs = 0;
+  // Warmup
+  llvm::outs() << "Warming up...\n";
+  for (int i = 0; i < 10; i++) {
+    (void)singleEngine->invokePacked("main", singleArgs);
     if (parallelEngine) {
-        llvm::outs() << "Running Parallel/OpenMP (" << ITERATIONS << " iterations)...\n";
-        auto startParallel = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < ITERATIONS; i++) {
-            (void)parallelEngine->invokePacked("main", parallelArgs);
-        }
-        auto endParallel = std::chrono::high_resolution_clock::now();
-        parallelMs = std::chrono::duration_cast<std::chrono::milliseconds>(endParallel - startParallel).count();
+      (void)parallelEngine->invokePacked("main", parallelArgs);
+    }
+  }
+
+  // ========================================
+  // 3. Benchmark SINGLE-THREADED
+  // ========================================
+  llvm::outs() << "Running Single-threaded (" << ITERATIONS
+               << " iterations)...\n";
+  auto startSingle = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; i++) {
+    (void)singleEngine->invokePacked("main", singleArgs);
+  }
+  auto endSingle = std::chrono::high_resolution_clock::now();
+
+  // ========================================
+  // 4. Benchmark PARALLEL (OpenMP)
+  // ========================================
+  long parallelMs = 0;
+  if (parallelEngine) {
+    llvm::outs() << "Running Parallel/OpenMP (" << ITERATIONS
+                 << " iterations)...\n";
+    auto startParallel = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < ITERATIONS; i++) {
+      (void)parallelEngine->invokePacked("main", parallelArgs);
+    }
+    auto endParallel = std::chrono::high_resolution_clock::now();
+    parallelMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                     endParallel - startParallel)
+                     .count();
+  } else {
+    llvm::outs()
+        << "⚠️ OpenMP compilation failed, skipping parallel benchmark\n";
+  }
+
+  auto singleMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      endSingle - startSingle)
+                      .count();
+
+  // Calculate GFLOPS: 2 * N^3 * iterations
+  double totalOps = 2.0 * 512 * 512 * 512 * ITERATIONS;
+  double singleGflops = (totalOps / (singleMs / 1000.0)) / 1e9;
+  double parallelGflops =
+      parallelMs > 0 ? (totalOps / (parallelMs / 1000.0)) / 1e9 : 0;
+
+  // Peak efficiency calculation
+  float peakGflops = hwInfo->getTheoreticalPeakGFLOPS();
+
+  llvm::outs() << "\n" << std::string(50, '=') << "\n";
+  llvm::outs() << "📊 RESULTS (512x512 MatMul, " << ITERATIONS << " runs)\n";
+  llvm::outs() << std::string(50, '=') << "\n\n";
+
+  llvm::outs() << "Single-threaded (Affine Tiling):\n";
+  llvm::outs() << "   Time: " << singleMs << " ms\n";
+  llvm::outs() << "   Throughput: " << singleGflops << " GFLOPS\n";
+  llvm::outs() << "   Efficiency: " << (singleGflops / peakGflops * 100)
+               << "% of peak\n\n";
+
+  if (parallelMs > 0) {
+    llvm::outs() << "Parallel (OpenMP, " << strategy.numThreads
+                 << " threads):\n";
+    llvm::outs() << "   Time: " << parallelMs << " ms\n";
+    llvm::outs() << "   Throughput: " << parallelGflops << " GFLOPS\n";
+    llvm::outs() << "   Efficiency: " << (parallelGflops / peakGflops * 100)
+                 << "% of peak\n\n";
+
+    if (parallelMs < singleMs) {
+      double speedup = (double)singleMs / parallelMs;
+      llvm::outs() << "⚡ Parallel Speedup: " << speedup << "x faster!\n";
     } else {
-        llvm::outs() << "⚠️ OpenMP compilation failed, skipping parallel benchmark\n";
+      llvm::outs() << "⚠️ No parallel speedup (check OpenMP runtime)\n";
     }
+  }
 
-    auto singleMs = std::chrono::duration_cast<std::chrono::milliseconds>(endSingle - startSingle).count();
-
-    // Calculate GFLOPS: 2 * N^3 * iterations
-    double totalOps = 2.0 * 512 * 512 * 512 * ITERATIONS;
-    double singleGflops = (totalOps / (singleMs / 1000.0)) / 1e9;
-    double parallelGflops = parallelMs > 0 ? (totalOps / (parallelMs / 1000.0)) / 1e9 : 0;
-
-    // Peak efficiency calculation
-    float peakGflops = hwInfo.getTheoreticalPeakGFLOPS();
-
-    llvm::outs() << "\n" << std::string(50, '=') << "\n";
-    llvm::outs() << "📊 RESULTS (512x512 MatMul, " << ITERATIONS << " runs)\n";
-    llvm::outs() << std::string(50, '=') << "\n\n";
-
-    llvm::outs() << "Single-threaded (Affine Tiling):\n";
-    llvm::outs() << "   Time: " << singleMs << " ms\n";
-    llvm::outs() << "   Throughput: " << singleGflops << " GFLOPS\n";
-    llvm::outs() << "   Efficiency: " << (singleGflops / peakGflops * 100) << "% of peak\n\n";
-
-    if (parallelMs > 0) {
-        llvm::outs() << "Parallel (OpenMP, " << strategy.numThreads << " threads):\n";
-        llvm::outs() << "   Time: " << parallelMs << " ms\n";
-        llvm::outs() << "   Throughput: " << parallelGflops << " GFLOPS\n";
-        llvm::outs() << "   Efficiency: " << (parallelGflops / peakGflops * 100) << "% of peak\n\n";
-
-        if (parallelMs < singleMs) {
-            double speedup = (double)singleMs / parallelMs;
-            llvm::outs() << "⚡ Parallel Speedup: " << speedup << "x faster!\n";
-        } else {
-            llvm::outs() << "⚠️ No parallel speedup (check OpenMP runtime)\n";
-        }
-    }
-
-    llvm::outs() << "\nTheoretical Peak: " << peakGflops << " GFLOPS\n";
-    llvm::outs() << "Verification: Single=" << singleResult << ", Parallel=" << parallelResult
-                 << " (Expected 3072.0)\n";
+  llvm::outs() << "\nTheoretical Peak: " << peakGflops << " GFLOPS\n";
+  llvm::outs() << "Verification: Single=" << singleResult
+               << ", Parallel=" << parallelResult << " (Expected 3072.0)\n";
 }
 
 //===----------------------------------------------------------------------===//
 // Large Matrix Benchmark (768x768) - Tests scaling behavior
 //===----------------------------------------------------------------------===//
-std::unique_ptr<mlir::ExecutionEngine> compileLargeMatrix(
-    mlir::MLIRContext &context,
-    bool enableVectorization) {
+std::unique_ptr<mlir::ExecutionEngine>
+compileLargeMatrix(mlir::MLIRContext &context, bool enableVectorization) {
 
-    // 768x768 MatMul - larger work than 512x512
-    // Expected result: 768 * 2.0 * 3.0 = 4608.0
-    const char* mlirSource = R"(
+  // 768x768 MatMul - larger work than 512x512
+  // Expected result: 768 * 2.0 * 3.0 = 4608.0
+  const char *mlirSource = R"(
         module {
             func.func @main() -> f32 {
                 %c2 = arith.constant 2.0 : f32
@@ -897,152 +968,163 @@ std::unique_ptr<mlir::ExecutionEngine> compileLargeMatrix(
         }
     )";
 
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource), llvm::SMLoc());
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
-    if (!module) return nullptr;
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource),
+                               llvm::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> module =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  if (!module)
+    return nullptr;
 
-    mlir::PassManager pm(&context);
+  mlir::PassManager pm(&context);
 
-    // Standard pipeline
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateFusionPatterns(patterns);
-        (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
-    }
+  // Standard pipeline
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateFusionPatterns(patterns);
+    (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+  }
 
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateTenzoToLinalgConversionPatterns(patterns);
-        mlir::ConversionTarget target(context);
-        target.addLegalDialect<mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
-                               mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
-        target.addIllegalDialect<tenzo::TenzoDialect>();
-        (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
-    }
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateTenzoToLinalgConversionPatterns(patterns);
+    mlir::ConversionTarget target(context);
+    target.addLegalDialect<
+        mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
+    target.addIllegalDialect<tenzo::TenzoDialect>();
+    (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
+  }
 
-    if (enableVectorization) {
-        addTenzoVectorizationPass(pm);
-    }
+  if (enableVectorization) {
+    addOptimalVectorizationPass(pm);
+  }
 
-    addTenzoBufferizationPasses(pm);
+  addTenzoBufferizationPasses(pm);
 
-    auto hwInfo = HardwareInfo::detect();
-    auto tiles = hwInfo.getOptimalTileSizes();
-    addTenzoToLLVMPasses(pm, enableVectorization, tiles, false);
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  auto tiles = hwInfo->getOptimalTileSizes();
+  addTenzoToLLVMPasses(pm, enableVectorization, tiles, false);
 
-    if (mlir::failed(pm.run(*module))) {
-        return nullptr;
-    }
+  if (mlir::failed(pm.run(*module))) {
+    return nullptr;
+  }
 
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    tenzo::registerAllTenzoDialectTranslations(context);
-    mlir::registerLLVMDialectTranslation(context);
-    mlir::registerBuiltinDialectTranslation(context);
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  tenzo::registerAllTenzoDialectTranslations(context);
+  mlir::registerLLVMDialectTranslation(context);
+  mlir::registerBuiltinDialectTranslation(context);
 
-    mlir::ExecutionEngineOptions engineOptions;
-    engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+  mlir::ExecutionEngineOptions engineOptions;
+  engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+  engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) return nullptr;
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+  if (!maybeEngine)
+    return nullptr;
 
-    return std::move(maybeEngine.get());
+  return std::move(maybeEngine.get());
 }
 
 void runLargeMatrixBenchmark(mlir::MLIRContext &context) {
-    llvm::outs() << "\n" << std::string(50, '=') << "\n";
-    llvm::outs() << "🔥 LARGE MATRIX BENCHMARK: 768x768 MatMul\n";
-    llvm::outs() << std::string(50, '=') << "\n\n";
+  llvm::outs() << "\n" << std::string(50, '=') << "\n";
+  llvm::outs() << "🔥 LARGE MATRIX BENCHMARK: 768x768 MatMul\n";
+  llvm::outs() << std::string(50, '=') << "\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
 
-    const int ITERATIONS = 30;  // Fewer iterations for larger matrix
+  const int ITERATIONS = 30; // Fewer iterations for larger matrix
 
-    llvm::outs() << "\nCompiling Scalar version (768x768)...\n";
-    auto scalarEngine = compileLargeMatrix(context, false);
+  llvm::outs() << "\nCompiling Scalar version (768x768)...\n";
+  auto scalarEngine = compileLargeMatrix(context, false);
 
-    llvm::outs() << "Compiling Vector version (768x768)...\n";
-    auto vectorEngine = compileLargeMatrix(context, true);
+  llvm::outs() << "Compiling Vector version (768x768)...\n";
+  auto vectorEngine = compileLargeMatrix(context, true);
 
-    if (!scalarEngine || !vectorEngine) {
-        llvm::errs() << "Compilation failed\n";
-        return;
-    }
+  if (!scalarEngine || !vectorEngine) {
+    llvm::errs() << "Compilation failed\n";
+    return;
+  }
 
-    float scalarRes = 0.0f, vectorRes = 0.0f;
-    void* scalarArgs[] = {&scalarRes};
-    void* vectorArgs[] = {&vectorRes};
+  float scalarRes = 0.0f, vectorRes = 0.0f;
+  void *scalarArgs[] = {&scalarRes};
+  void *vectorArgs[] = {&vectorRes};
 
-    // Warmup
-    llvm::outs() << "Warming up...\n";
-    for (int i = 0; i < 3; i++) {
-        (void)scalarEngine->invokePacked("main", scalarArgs);
-        (void)vectorEngine->invokePacked("main", vectorArgs);
-    }
+  // Warmup
+  llvm::outs() << "Warming up...\n";
+  for (int i = 0; i < 3; i++) {
+    (void)scalarEngine->invokePacked("main", scalarArgs);
+    (void)vectorEngine->invokePacked("main", vectorArgs);
+  }
 
-    // Benchmark
-    llvm::outs() << "Running Scalar (" << ITERATIONS << " iterations)...\n";
-    auto startScalar = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < ITERATIONS; i++) {
-        (void)scalarEngine->invokePacked("main", scalarArgs);
-    }
-    auto endScalar = std::chrono::high_resolution_clock::now();
+  // Benchmark
+  llvm::outs() << "Running Scalar (" << ITERATIONS << " iterations)...\n";
+  auto startScalar = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; i++) {
+    (void)scalarEngine->invokePacked("main", scalarArgs);
+  }
+  auto endScalar = std::chrono::high_resolution_clock::now();
 
-    llvm::outs() << "Running Vector (" << ITERATIONS << " iterations)...\n";
-    auto startVector = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < ITERATIONS; i++) {
-        (void)vectorEngine->invokePacked("main", vectorArgs);
-    }
-    auto endVector = std::chrono::high_resolution_clock::now();
+  llvm::outs() << "Running Vector (" << ITERATIONS << " iterations)...\n";
+  auto startVector = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; i++) {
+    (void)vectorEngine->invokePacked("main", vectorArgs);
+  }
+  auto endVector = std::chrono::high_resolution_clock::now();
 
-    auto scalarMs = std::chrono::duration_cast<std::chrono::milliseconds>(endScalar - startScalar).count();
-    auto vectorMs = std::chrono::duration_cast<std::chrono::milliseconds>(endVector - startVector).count();
+  auto scalarMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      endScalar - startScalar)
+                      .count();
+  auto vectorMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      endVector - startVector)
+                      .count();
 
-    // GFLOPS: 2 * N^3 * iterations
-    double totalOps = 2.0 * 768 * 768 * 768 * ITERATIONS;
-    double scalarGflops = (totalOps / (scalarMs / 1000.0)) / 1e9;
-    double vectorGflops = vectorMs > 0 ? (totalOps / (vectorMs / 1000.0)) / 1e9 : 0;
+  // GFLOPS: 2 * N^3 * iterations
+  double totalOps = 2.0 * 768 * 768 * 768 * ITERATIONS;
+  double scalarGflops = (totalOps / (scalarMs / 1000.0)) / 1e9;
+  double vectorGflops =
+      vectorMs > 0 ? (totalOps / (vectorMs / 1000.0)) / 1e9 : 0;
 
-    llvm::outs() << "\n" << std::string(50, '=') << "\n";
-    llvm::outs() << "📊 RESULTS (768x768, " << ITERATIONS << " runs)\n";
-    llvm::outs() << std::string(50, '=') << "\n\n";
+  llvm::outs() << "\n" << std::string(50, '=') << "\n";
+  llvm::outs() << "📊 RESULTS (768x768, " << ITERATIONS << " runs)\n";
+  llvm::outs() << std::string(50, '=') << "\n\n";
 
-    llvm::outs() << "Scalar (LLVM -O3):\n";
-    llvm::outs() << "   Time: " << scalarMs << " ms\n";
-    llvm::outs() << "   Throughput: " << scalarGflops << " GFLOPS\n\n";
+  llvm::outs() << "Scalar (LLVM -O3):\n";
+  llvm::outs() << "   Time: " << scalarMs << " ms\n";
+  llvm::outs() << "   Throughput: " << scalarGflops << " GFLOPS\n\n";
 
-    llvm::outs() << "Vector (Tenzo Optimized):\n";
-    llvm::outs() << "   Time: " << vectorMs << " ms\n";
-    llvm::outs() << "   Throughput: " << vectorGflops << " GFLOPS\n\n";
+  llvm::outs() << "Vector (Tenzo Optimized):\n";
+  llvm::outs() << "   Time: " << vectorMs << " ms\n";
+  llvm::outs() << "   Throughput: " << vectorGflops << " GFLOPS\n\n";
 
-    if (vectorMs > 0 && vectorMs < scalarMs) {
-        double speedup = (double)scalarMs / vectorMs;
-        llvm::outs() << "⚡ Speedup: " << speedup << "x faster!\n";
-    }
+  if (vectorMs > 0 && vectorMs < scalarMs) {
+    double speedup = (double)scalarMs / vectorMs;
+    llvm::outs() << "⚡ Speedup: " << speedup << "x faster!\n";
+  }
 
-    // Single-core efficiency
-    double singleCorePeak = 4.4 * 16;  // P-core turbo * AVX2 FMA ops
-    double efficiency = (vectorGflops / singleCorePeak) * 100;
-    llvm::outs() << "\n📈 Single-core Efficiency: " << efficiency << "% of " << singleCorePeak << " GFLOPS peak\n";
+  // Single-core efficiency
+  double singleCorePeak = 4.4 * 16; // P-core turbo * AVX2 FMA ops
+  double efficiency = (vectorGflops / singleCorePeak) * 100;
+  llvm::outs() << "\n📈 Single-core Efficiency: " << efficiency << "% of "
+               << singleCorePeak << " GFLOPS peak\n";
 
-    llvm::outs() << "\nVerification: Scalar=" << scalarRes << ", Vector=" << vectorRes
-                 << " (Expected 4608.0)\n";
+  llvm::outs() << "\nVerification: Scalar=" << scalarRes
+               << ", Vector=" << vectorRes << " (Expected 4608.0)\n";
 }
 
 // NEW: Explicit Micro-Kernel Benchmark
 void runExplicitKernelBenchmark(mlir::MLIRContext &context) {
-    llvm::outs() << "\n=========================================\n";
-    llvm::outs() << "🔥 EXPLICIT MICRO-KERNEL: 512x512 MatMul\n";
-    llvm::outs() << "=========================================\n\n";
+  llvm::outs() << "\n=========================================\n";
+  llvm::outs() << "🔥 EXPLICIT MICRO-KERNEL: 512x512 MatMul\n";
+  llvm::outs() << "=========================================\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
-    llvm::outs() << "\n";
+  auto hwInfo = tenzo::HardwareProfile::detect();
+  hwInfo->print();
+  llvm::outs() << "\n";
 
-    const char* mlirSource = R"(
+  const char *mlirSource = R"(
         module {
             func.func @main() -> f32 {
                 %c2 = arith.constant 2.0 : f32
@@ -1064,110 +1146,114 @@ void runExplicitKernelBenchmark(mlir::MLIRContext &context) {
         }
     )";
 
-    llvm::SourceMgr sourceMgr;
-    sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource), llvm::SMLoc());
-    mlir::OwningOpRef<mlir::ModuleOp> module = mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(mlirSource),
+                               llvm::SMLoc());
+  mlir::OwningOpRef<mlir::ModuleOp> module =
+      mlir::parseSourceFile<mlir::ModuleOp>(sourceMgr, &context);
 
-    if (!module) {
-        llvm::errs() << "Failed to parse MLIR\n";
-        return;
-    }
+  if (!module) {
+    llvm::errs() << "Failed to parse MLIR\n";
+    return;
+  }
 
-    // Simple strategy: Use standard pipeline but with 6x16 micro-kernel tiles
-    llvm::outs() << "Strategy: Standard Affine optimization with 6x16 micro-kernels\n";
+  // Simple strategy: Use standard pipeline but with 6x16 micro-kernel tiles
+  llvm::outs()
+      << "Strategy: Standard Affine optimization with 6x16 micro-kernels\n";
 
-    mlir::PassManager pm(&context);
+  mlir::PassManager pm(&context);
 
-    // 1. Fusion
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateFusionPatterns(patterns);
-        (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
-    }
+  // 1. Fusion
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateFusionPatterns(patterns);
+    (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+  }
 
-    // 2. Linalg Lowering (Tenzo -> Linalg)
-    {
-        mlir::RewritePatternSet patterns(&context);
-        populateTenzoToLinalgConversionPatterns(patterns);
-        mlir::ConversionTarget target(context);
-        target.addLegalDialect<mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
-                               mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
-        target.addIllegalDialect<tenzo::TenzoDialect>();
-        (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
-    }
+  // 2. Linalg Lowering (Tenzo -> Linalg)
+  {
+    mlir::RewritePatternSet patterns(&context);
+    populateTenzoToLinalgConversionPatterns(patterns);
+    mlir::ConversionTarget target(context);
+    target.addLegalDialect<
+        mlir::linalg::LinalgDialect, mlir::arith::ArithDialect,
+        mlir::tensor::TensorDialect, mlir::func::FuncDialect>();
+    target.addIllegalDialect<tenzo::TenzoDialect>();
+    (void)mlir::applyPartialConversion(*module, target, std::move(patterns));
+  }
 
-    // 3. Bufferization
-    llvm::outs() << "Bufferizing...\n";
-    addTenzoBufferizationPasses(pm);
+  // 3. Bufferization
+  llvm::outs() << "Bufferizing...\n";
+  addTenzoBufferizationPasses(pm);
 
-    // Use LLVM lowering with CUSTOM 24x32 tile sizes (4x2 blocks of 6x16)
-    HardwareInfo::TileSizes customTiles;
-    customTiles.M = 24;  // 4 * 6 = 24 rows (4 micro-kernels)
-    customTiles.N = 32;  // 2 * 16 = 32 cols (2 micro-kernels)
-    customTiles.K = 32;  // K dimension
+  // Use LLVM lowering with CUSTOM 24x32 tile sizes (4x2 blocks of 6x16)
+  tenzo::TileSizes customTiles;
+  customTiles.M = 24; // 4 * 6 = 24 rows (4 micro-kernels)
+  customTiles.N = 32; // 2 * 16 = 32 cols (2 micro-kernels)
+  customTiles.K = 32; // K dimension
 
-    llvm::outs() << "Using 24x32 tiles (4x2 blocks of 6x16 micro-kernels)\n";
-    addTenzoToLLVMPasses(pm, /*enableVectorization=*/true, customTiles,
-                         /*enableParallel=*/false, /*useExplicitKernel=*/false);
+  llvm::outs() << "Using 24x32 tiles (4x2 blocks of 6x16 micro-kernels)\n";
+  addTenzoToLLVMPasses(pm, /*enableVectorization=*/true, customTiles,
+                       /*enableParallel=*/false, /*useExplicitKernel=*/false);
 
-    if (mlir::failed(pm.run(*module))) {
-        llvm::errs() << "Pipeline failed\n";
-        return;
-    }
+  if (mlir::failed(pm.run(*module))) {
+    llvm::errs() << "Pipeline failed\n";
+    return;
+  }
 
-    // JIT Setup
-    llvm::InitializeNativeTarget();
-    llvm::InitializeNativeTargetAsmPrinter();
-    tenzo::registerAllTenzoDialectTranslations(context);
-    mlir::registerLLVMDialectTranslation(context);
-    mlir::registerBuiltinDialectTranslation(context);
+  // JIT Setup
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
+  tenzo::registerAllTenzoDialectTranslations(context);
+  mlir::registerLLVMDialectTranslation(context);
+  mlir::registerBuiltinDialectTranslation(context);
 
-    mlir::ExecutionEngineOptions engineOptions;
-    engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
-    engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
+  mlir::ExecutionEngineOptions engineOptions;
+  engineOptions.transformer = mlir::makeOptimizingTransformer(3, 0, nullptr);
+  engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
-    auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
-    if (!maybeEngine) {
-        llvm::errs() << "Failed to create execution engine\n";
-        return;
-    }
-    auto engine = std::move(maybeEngine.get());
+  auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
+  if (!maybeEngine) {
+    llvm::errs() << "Failed to create execution engine\n";
+    return;
+  }
+  auto engine = std::move(maybeEngine.get());
 
-    float result = 0.0f;
-    void* args[] = {&result};
+  float result = 0.0f;
+  void *args[] = {&result};
 
-    // Warmup
-    for (int i = 0; i < 10; i++) {
-        (void)engine->invokePacked("main", args);
-    }
+  // Warmup
+  for (int i = 0; i < 10; i++) {
+    (void)engine->invokePacked("main", args);
+  }
 
-    // Benchmark
-    const int ITERATIONS = 100;
-    llvm::outs() << "Running benchmark (" << ITERATIONS << " iterations)...\n";
+  // Benchmark
+  const int ITERATIONS = 100;
+  llvm::outs() << "Running benchmark (" << ITERATIONS << " iterations)...\n";
 
-    auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < ITERATIONS; i++) {
-        (void)engine->invokePacked("main", args);
-    }
-    auto end = std::chrono::high_resolution_clock::now();
+  auto start = std::chrono::high_resolution_clock::now();
+  for (int i = 0; i < ITERATIONS; i++) {
+    (void)engine->invokePacked("main", args);
+  }
+  auto end = std::chrono::high_resolution_clock::now();
 
-    auto totalMs = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    double totalOps = 2.0 * 512 * 512 * 512 * ITERATIONS;
-    double gflops = (totalOps / (totalMs / 1000.0)) / 1e9;
+  auto totalMs =
+      std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
+          .count();
+  double totalOps = 2.0 * 512 * 512 * 512 * ITERATIONS;
+  double gflops = (totalOps / (totalMs / 1000.0)) / 1e9;
 
-    llvm::outs() << "\n🔥 EXPLICIT MICRO-KERNEL RESULTS:\n";
-    llvm::outs() << "Total time: " << totalMs << " ms\n";
-    llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
-    llvm::outs() << "Result: " << result << " (Expected 3072.0)\n";
+  llvm::outs() << "\n🔥 EXPLICIT MICRO-KERNEL RESULTS:\n";
+  llvm::outs() << "Total time: " << totalMs << " ms\n";
+  llvm::outs() << "Throughput: " << gflops << " GFLOPS\n";
+  llvm::outs() << "Result: " << result << " (Expected 3072.0)\n";
 
-    if (std::abs(result - 3072.0f) < 0.001f) {
-        llvm::outs() << "✅ Correctness verified!\n";
-    } else {
-        llvm::outs() << "❌ Result mismatch!\n";
-    }
+  if (std::abs(result - 3072.0f) < 0.001f) {
+    llvm::outs() << "✅ Correctness verified!\n";
+  } else {
+    llvm::outs() << "❌ Result mismatch!\n";
+  }
 }
 
-void runFullPipelineTest(mlir::MLIRContext &context) {
-    runBenchmark(context);
-}
-}
+void runFullPipelineTest(mlir::MLIRContext &context) { runBenchmark(context); }
+} // namespace tenzo

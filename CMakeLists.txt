@@ -116,7 +116,9 @@ add_executable(tenzo-cli
         src/dialect/TenzoDialect.cpp
         src/passes/Lowering.cpp
         src/context/TenzoContext.cpp
-        src/context/HardwareInfo.cpp
+        src/context/HardwareProfile.cpp
+        src/context/X86HardwareProfile.cpp
+        src/context/ARMHardwareProfile.cpp
         src/tests/PipelineTests.cpp
         src/tests/MicroKernelBench.cpp
         src/tests/BLISBenchmark.cpp
@@ -126,8 +128,6 @@ add_executable(tenzo-cli
         src/passes/Bufferization.cpp
         src/passes/LLVMLowering.cpp
         src/passes/TransformStrategy.cpp
-        src/passes/Vectorization.cpp
-        src/passes/MicroKernel.cpp
         src/passes/OptimalVectorization.cpp
         src/passes/PackingPass.cpp
         src/passes/ExplicitMicroKernelPass.cpp
@@ -142,8 +142,10 @@ add_executable(tenzo-cli
         src/passes/gpu/GPULowering.cpp
         src/runtime/VulkanRuntime.cpp
         src/runtime/ThreadPool.cpp
+        src/runtime/ExecutionContext.cpp
         src/context/AutoTuner.cpp
         src/tests/GPUTests.cpp
+        src/tests/DynamicInferenceTest.cpp
 )
 
 add_dependencies(tenzo-cli TenzoOpsIncGen)

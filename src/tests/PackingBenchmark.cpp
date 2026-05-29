@@ -7,7 +7,7 @@
 
 #include "PipelineTests.h"
 #include "passes/Passes.h"
-#include "context/HardwareInfo.h"
+#include "context/HardwareProfile.h"
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
@@ -40,8 +40,8 @@ void runPackingBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "║  Goal: Measure memory bandwidth utilization            ║\n";
     llvm::outs() << "╚════════════════════════════════════════════════════════╝\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
+    auto hwInfo = tenzo::HardwareProfile::detect();
+    hwInfo->print();
     llvm::outs() << "\n";
 
     // Test matrix sizes
