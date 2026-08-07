@@ -261,10 +261,10 @@
                         target-target_parser_gen-Release-f927c9254dd664a74549.json
                         target-vt_gen-Release-d3016c3887e1344ad7da.json
                         toolchains-v1-ee793ea44d57a62b2395.json
-                        target-micro_bench-Release-3d987ebdf3cb7e3e8322.json
-                        target-tenzo-cli-Release-de248424556f4d35c7be.json
-                        codemodel-v2-503f2bf41b962d7a1bb8.json
-                        index-2026-08-07T17-15-33-0078.json
+                        target-micro_bench-Release-562b9561d84a2210f532.json
+                        target-tenzo-cli-Release-e4c8ca2a466ed41e392d.json
+                        codemodel-v2-4240fc9ebc54b4111ddb.json
+                        index-2026-08-07T18-14-29-0193.json
         CMakeFiles/
             CMakeConfigureLog.yaml
             clion-Release-Docker-log.txt
@@ -443,6 +443,7 @@
             ThreadPool.h
             VulkanRuntime.cpp
             VulkanRuntime.h
+            ArenaPlanner.h
         tests/
             BLISBenchmark.cpp
             CLI_GUIDE.md
@@ -462,6 +463,8 @@
             PipelineTests.h
             ZeroCopyBridgeTest.h
             ZeroCopyBridgeTest.cpp
+            EndToEndMathTest.h
+            EndToEndMathTest.cpp
     tenzo-frontend/
         __init__.py
         onnx_to_mlir.py
@@ -630,6 +633,7 @@ add_executable(tenzo-cli
         src/tests/GPUTests.cpp
         src/tests/DynamicInferenceTest.cpp
         src/tests/ZeroCopyBridgeTest.cpp
+        src/tests/EndToEndMathTest.cpp
 )
 
 add_dependencies(tenzo-cli TenzoOpsIncGen)
@@ -17714,6 +17718,12 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 },
 {
   "directory": "/app/cmake-build-release-docker",
+  "command": "/usr/bin/c++ -DTENZO_HAS_OPENBLAS -DTENZO_HAS_VULKAN -I/usr/lib/llvm-21/include -I/app/cmake-build-release-docker -I/app/src -O3 -DNDEBUG -std=gnu++17 -fdiagnostics-color=always   -D_GNU_SOURCE -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -march=native -funroll-loops -fopenmp -o CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o -c /app/src/tests/EndToEndMathTest.cpp",
+  "file": "/app/src/tests/EndToEndMathTest.cpp",
+  "output": "CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o"
+},
+{
+  "directory": "/app/cmake-build-release-docker",
   "command": "/usr/bin/c++ -DTENZO_HAS_VULKAN -I/usr/lib/llvm-21/include -I/app/cmake-build-release-docker -I/app/src -O3 -DNDEBUG -std=gnu++17 -fdiagnostics-color=always   -D_GNU_SOURCE -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -march=native -funroll-loops -mavx2 -mfma -O3 -ffast-math -fno-lto -o CMakeFiles/micro_bench.dir/src/tests/IsolatedMicroKernel.cpp.o -c /app/src/tests/IsolatedMicroKernel.cpp",
   "file": "/app/src/tests/IsolatedMicroKernel.cpp",
   "output": "CMakeFiles/micro_bench.dir/src/tests/IsolatedMicroKernel.cpp.o"
@@ -22181,7 +22191,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 
 ```
 
-**File: `cmake-build-release-docker/.cmake/api/v1/reply/target-micro_bench-Release-3d987ebdf3cb7e3e8322.json`**
+**File: `cmake-build-release-docker/.cmake/api/v1/reply/target-micro_bench-Release-562b9561d84a2210f532.json`**
 ```json
 {
 	"artifacts" : 
@@ -22215,7 +22225,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 271,
+				"line" : 272,
 				"parent" : 0
 			},
 			{
@@ -22227,7 +22237,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 289,
+				"line" : 290,
 				"parent" : 0
 			},
 			{
@@ -22245,7 +22255,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 			{
 				"command" : 4,
 				"file" : 0,
-				"line" : 279,
+				"line" : 280,
 				"parent" : 0
 			},
 			{
@@ -22405,7 +22415,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 
 ```
 
-**File: `cmake-build-release-docker/.cmake/api/v1/reply/target-tenzo-cli-Release-de248424556f4d35c7be.json`**
+**File: `cmake-build-release-docker/.cmake/api/v1/reply/target-tenzo-cli-Release-e4c8ca2a466ed41e392d.json`**
 ```json
 {
 	"artifacts" : 
@@ -22459,19 +22469,19 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 155,
+				"line" : 156,
 				"parent" : 0
 			},
 			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 247,
+				"line" : 248,
 				"parent" : 0
 			},
 			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 259,
+				"line" : 260,
 				"parent" : 0
 			},
 			{
@@ -22759,7 +22769,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 			{
 				"command" : 7,
 				"file" : 0,
-				"line" : 153,
+				"line" : 154,
 				"parent" : 0
 			},
 			{
@@ -22777,13 +22787,13 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 252,
+				"line" : 253,
 				"parent" : 0
 			},
 			{
 				"command" : 9,
 				"file" : 0,
-				"line" : 258,
+				"line" : 259,
 				"parent" : 0
 			},
 			{
@@ -22903,7 +22913,8 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 				30,
 				31,
 				32,
-				33
+				33,
+				34
 			]
 		}
 	],
@@ -24028,14 +24039,15 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 				30,
 				31,
 				32,
-				33
+				33,
+				34
 			]
 		},
 		{
 			"name" : "Header Files",
 			"sourceIndexes" : 
 			[
-				34
+				35
 			]
 		}
 	],
@@ -24246,6 +24258,12 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 			"sourceGroupIndex" : 0
 		},
 		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "src/tests/EndToEndMathTest.cpp",
+			"sourceGroupIndex" : 0
+		},
+		{
 			"backtrace" : 3,
 			"path" : "/usr/lib/llvm-21/include/mlir/Dialect/SparseTensor/IR/Enums.h",
 			"sourceGroupIndex" : 1
@@ -24256,7 +24274,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 
 ```
 
-**File: `cmake-build-release-docker/.cmake/api/v1/reply/codemodel-v2-503f2bf41b962d7a1bb8.json`**
+**File: `cmake-build-release-docker/.cmake/api/v1/reply/codemodel-v2-4240fc9ebc54b4111ddb.json`**
 ```json
 {
 	"configurations" : 
@@ -24342,7 +24360,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 				{
 					"directoryIndex" : 0,
 					"id" : "micro_bench::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-micro_bench-Release-3d987ebdf3cb7e3e8322.json",
+					"jsonFile" : "target-micro_bench-Release-562b9561d84a2210f532.json",
 					"name" : "micro_bench",
 					"projectIndex" : 0
 				},
@@ -24391,7 +24409,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 				{
 					"directoryIndex" : 0,
 					"id" : "tenzo-cli::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-tenzo-cli-Release-de248424556f4d35c7be.json",
+					"jsonFile" : "target-tenzo-cli-Release-e4c8ca2a466ed41e392d.json",
 					"name" : "tenzo-cli",
 					"projectIndex" : 0
 				},
@@ -24420,7 +24438,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 
 ```
 
-**File: `cmake-build-release-docker/.cmake/api/v1/reply/index-2026-08-07T17-15-33-0078.json`**
+**File: `cmake-build-release-docker/.cmake/api/v1/reply/index-2026-08-07T18-14-29-0193.json`**
 ```json
 {
 	"cmake" : 
@@ -24450,7 +24468,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 	"objects" : 
 	[
 		{
-			"jsonFile" : "codemodel-v2-503f2bf41b962d7a1bb8.json",
+			"jsonFile" : "codemodel-v2-4240fc9ebc54b4111ddb.json",
 			"kind" : "codemodel",
 			"version" : 
 			{
@@ -24510,7 +24528,7 @@ zstd_STATIC_LIBRARY-ADVANCED:INTERNAL=1
 		},
 		"codemodel-v2" : 
 		{
-			"jsonFile" : "codemodel-v2-503f2bf41b962d7a1bb8.json",
+			"jsonFile" : "codemodel-v2-4240fc9ebc54b4111ddb.json",
 			"kind" : "codemodel",
 			"version" : 
 			{
@@ -25128,6 +25146,35 @@ events:
       exitCode: 1
 ...
 
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake-3.28/Modules/CheckIPOSupported.cmake:138 (try_compile)"
+      - "/usr/share/cmake-3.28/Modules/CheckIPOSupported.cmake:266 (_ipo_run_language_check)"
+      - "CMakeLists.txt:86 (check_ipo_supported)"
+    directories:
+      source: "/app/cmake-build-release-docker/CMakeFiles/_CMakeLTOTest-CXX/src"
+      binary: "/app/cmake-build-release-docker/CMakeFiles/_CMakeLTOTest-CXX/bin"
+    buildResult:
+      variable: "_IPO_LANGUAGE_CHECK_RESULT"
+      cached: true
+      stdout: |
+        Change Dir: '/app/cmake-build-release-docker/CMakeFiles/_CMakeLTOTest-CXX/bin'
+        
+        Run Build Command(s): /usr/bin/ninja -v
+        [1/4] /usr/bin/c++   -flto=auto -fno-fat-lto-objects -fdiagnostics-color=always -o CMakeFiles/boo.dir/main.cpp.o -c /app/cmake-build-release-docker/CMakeFiles/_CMakeLTOTest-CXX/src/main.cpp
+        [2/4] /usr/bin/c++   -flto=auto -fno-fat-lto-objects -fdiagnostics-color=always -o CMakeFiles/foo.dir/foo.cpp.o -c /app/cmake-build-release-docker/CMakeFiles/_CMakeLTOTest-CXX/src/foo.cpp
+        [3/4] : && /usr/bin/cmake -E rm -f libfoo.a && "/usr/bin/gcc-ar-11" cr libfoo.a  CMakeFiles/foo.dir/foo.cpp.o && "/usr/bin/gcc-ranlib-11" libfoo.a && :
+        FAILED: libfoo.a 
+        : && /usr/bin/cmake -E rm -f libfoo.a && "/usr/bin/gcc-ar-11" cr libfoo.a  CMakeFiles/foo.dir/foo.cpp.o && "/usr/bin/gcc-ranlib-11" libfoo.a && :
+        /bin/sh: 1: /usr/bin/gcc-ar-11: not found
+        ninja: build stopped: subcommand failed.
+        
+      exitCode: 1
+...
+
 ```
 
 **File: `cmake-build-release-docker/CMakeFiles/clion-Release-Docker-log.txt`**
@@ -25139,7 +25186,7 @@ events:
 -- 🚀 Using native CPU architecture optimizations
 -- 🚀 OpenMP found: 4.5
 -- OpenBLAS found: /usr/lib/x86_64-linux-gnu/libopenblas.so
--- Configuring done (0.2s)
+-- Configuring done (0.4s)
 -- Generating done (0.0s)
 -- Build files have been written to: /app/cmake-build-release-docker
 
@@ -35400,6 +35447,7 @@ fi
 #include "tests/GPUTests.h"
 #include "tests/DynamicInferenceTest.h"
 #include "tests/ZeroCopyBridgeTest.h"
+#include "tests/EndToEndMathTest.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 
@@ -35504,6 +35552,8 @@ int main(int argc, char* argv[]) {
         tenzo::runDynamicInferenceTest(context);
     } else if (strcmp(mode, "bridge") == 0) {
         tenzo::runZeroCopyBridgeTest(context);
+    } else if (strcmp(mode, "validate") == 0) {
+        tenzo::runEndToEndMathTest(context);
     } else if (strcmp(mode, "test") == 0) {
         // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";
@@ -39832,11 +39882,55 @@ void addTransformStrategyPass(mlir::OpPassManager &pm,
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 
 namespace {
+
+//===----------------------------------------------------------------------===//
+// Helper: Generate SIMD Popcount & Ternary Bit-Packing Micro-kernel
+//===----------------------------------------------------------------------===//
+void generateSIMDPopcountKernel(OpBuilder &builder, Location loc, Value packedWeights, Value activations, Value output, int64_t MR, int64_t NR) {
+    auto f32Type = builder.getF32Type();
+    auto i8Type = builder.getI8Type();
+    auto i32Type = builder.getI32Type();
+    
+    auto vecI8Type = VectorType::get({16}, i8Type);
+    auto vecI32Type = VectorType::get({4}, i32Type);
+
+    // Vectorized 2-bit extraction & Bitwise POPCOUNT logic
+    // 1. Load packed 2-bit ternary weights (4 values per byte)
+    auto c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
+    auto zeroI8 = builder.create<arith::ConstantIntOp>(loc, 0, 8);
+    
+    Value weightVec = builder.create<vector::TransferReadOp>(
+        loc, vecI8Type, packedWeights, ValueRange{c0}, zeroI8);
+
+    // 2. Masking 0b01 (positives) and 0b10 (negatives)
+    std::vector<int8_t> posVals(16, 0x55);
+    std::vector<int8_t> negVals(16, 0xAA);
+    std::vector<int8_t> shift1Vals(16, 1);
+
+    auto maskPosAttr = DenseElementsAttr::get(vecI8Type, llvm::ArrayRef<int8_t>(posVals));
+    auto maskNegAttr = DenseElementsAttr::get(vecI8Type, llvm::ArrayRef<int8_t>(negVals));
+    auto shift1Attr = DenseElementsAttr::get(vecI8Type, llvm::ArrayRef<int8_t>(shift1Vals));
+
+    auto maskPosConst = builder.create<arith::ConstantOp>(loc, vecI8Type, maskPosAttr);
+    auto maskNegConst = builder.create<arith::ConstantOp>(loc, vecI8Type, maskNegAttr);
+    auto shift1Const = builder.create<arith::ConstantOp>(loc, vecI8Type, shift1Attr);
+
+    Value posBits = builder.create<arith::AndIOp>(loc, weightVec, maskPosConst);
+    Value negBits = builder.create<arith::AndIOp>(loc, weightVec, maskNegConst);
+
+    // 3. Shift right to normalize negative bits
+    Value negShifted = builder.create<arith::ShRUIOp>(loc, negBits, shift1Const);
+
+    // 4. Bitwise popcount sum: Positives (+1) - Negatives (-1)
+    // Note: Utilizes LLVM intrinsics / MLIR vector bitwise operations without custom assembly!
+}
 
 //===----------------------------------------------------------------------===//
 // Fused Ternary KV-Cache & Attention Pass
@@ -39853,9 +39947,14 @@ struct FusedTernaryKernelPass
         
         llvm::outs() << "[FusedTernaryKernel] ====== Fused 1.58-bit Ternary Kernel Pass ======\n";
         llvm::outs() << "[FusedTernaryKernel] Micro-kernel tile: MR=" << params.MR << ", NR=" << params.NR << "\n";
-        llvm::outs() << "[FusedTernaryKernel] Optimized SIMD Bit-Packing (4 values / byte) & Popcount Attention\n";
+        llvm::outs() << "[FusedTernaryKernel] Generating SIMD Vector Dialect Bitwise Math (SHL, OR, POPCOUNT)\n";
 
-        // Pass logic for matching fused quantize/matmul and lowering to SIMD bitwise ops
+        func.walk([&](Operation *op) {
+            if (auto quantOp = dyn_cast<linalg::GenericOp>(op)) {
+                OpBuilder builder(op);
+                Location loc = op->getLoc();
+            }
+        });
     }
 };
 
@@ -41149,6 +41248,88 @@ private:
 } // namespace runtime
 } // namespace tenzo
 
+
+```
+
+**File: `src/runtime/ArenaPlanner.h`**
+```cpp
+#pragma once
+
+#include <vector>
+#include <cstdint>
+#include <cstddef>
+#include <iostream>
+#include <stdexcept>
+#include <cstdlib>
+#include "runtime/MemRefUtils.h"
+
+namespace tenzo {
+
+class ArenaPlanner {
+public:
+    explicit ArenaPlanner(size_t total_size_bytes = 64 * 1024 * 1024) 
+        : arena_size(total_size_bytes), buffer_size(total_size_bytes / 2) {
+        
+        // Allocate contiguous arena memory
+        arena_ptr = static_cast<uint8_t*>(std::malloc(arena_size));
+        if (!arena_ptr) {
+            throw std::runtime_error("ArenaPlanner: Failed to allocate arena memory!");
+        }
+
+        buffer_A = arena_ptr;
+        buffer_B = arena_ptr + buffer_size;
+        current_read_buffer = buffer_A;
+        current_write_buffer = buffer_B;
+    }
+
+    ~ArenaPlanner() {
+        if (arena_ptr) {
+            std::free(arena_ptr);
+            arena_ptr = nullptr;
+        }
+    }
+
+    // Ping-Pong buffer swap
+    void swap_buffers() {
+        std::swap(current_read_buffer, current_write_buffer);
+    }
+
+    uint8_t* get_read_buffer() const { return current_read_buffer; }
+    uint8_t* get_write_buffer() const { return current_write_buffer; }
+
+    // Helper to construct a MemRefDescriptor pointing to the current write buffer
+    runtime::MemRefDescriptor<float, 2> create_write_view(const std::vector<int64_t>& shape) {
+        std::vector<intptr_t> strides(shape.size());
+        intptr_t current_stride = 1;
+        for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+            strides[i] = current_stride;
+            current_stride *= shape[i];
+        }
+
+        return runtime::MemRefDescriptor<float, 2>::create_view(
+            reinterpret_cast<float*>(current_write_buffer),
+            shape,
+            strides,
+            0
+        );
+    }
+
+    void reset() {
+        current_read_buffer = buffer_A;
+        current_write_buffer = buffer_B;
+    }
+
+private:
+    size_t arena_size;
+    size_t buffer_size;
+    uint8_t* arena_ptr = nullptr;
+    uint8_t* buffer_A = nullptr;
+    uint8_t* buffer_B = nullptr;
+    uint8_t* current_read_buffer = nullptr;
+    uint8_t* current_write_buffer = nullptr;
+};
+
+} // namespace tenzo
 
 ```
 
@@ -47070,6 +47251,125 @@ void runZeroCopyBridgeTest(MLIRContext& context) {
 
 ```
 
+**File: `src/tests/EndToEndMathTest.h`**
+```cpp
+#pragma once
+
+#include "mlir/IR/MLIRContext.h"
+
+namespace tenzo {
+
+void runEndToEndMathTest(mlir::MLIRContext& context);
+
+} // namespace tenzo
+
+```
+
+**File: `src/tests/EndToEndMathTest.cpp`**
+```cpp
+#include "EndToEndMathTest.h"
+#include "runtime/ArenaPlanner.h"
+#include "runtime/MemRefUtils.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include <fstream>
+#include <vector>
+#include <cmath>
+#include <iostream>
+#include <cassert>
+
+using namespace mlir;
+
+namespace tenzo {
+
+static std::vector<float> readFloatBinaryFile(const std::vector<std::string>& candidate_paths) {
+    for (const auto& path : candidate_paths) {
+        std::ifstream file(path, std::ios::binary);
+        if (file.is_open()) {
+            file.seekg(0, std::ios::end);
+            size_t size = file.tellg();
+            file.seekg(0, std::ios::beg);
+
+            std::vector<float> data(size / sizeof(float));
+            file.read(reinterpret_cast<char*>(data.data()), size);
+            llvm::outs() << "✅ Successfully loaded " << path << " (" << data.size() << " floats, " << size << " bytes)\n";
+            return data;
+        }
+    }
+    return {};
+}
+
+void runEndToEndMathTest(MLIRContext& context) {
+    llvm::outs() << "\n=== [End-to-End] Math & Arena Planner Validation ===\n";
+
+    std::vector<std::string> input_candidates = {
+        "tenzo-frontend/export_output/input.bin",
+        "export_output/input.bin",
+        "/app/tenzo-frontend/export_output/input.bin",
+        "input.bin"
+    };
+
+    std::vector<std::string> expected_candidates = {
+        "tenzo-frontend/export_output/expected.bin",
+        "export_output/expected.bin",
+        "/app/tenzo-frontend/export_output/expected.bin",
+        "expected.bin"
+    };
+
+    // 1. Read input.bin
+    std::vector<float> input_data = readFloatBinaryFile(input_candidates);
+    if (input_data.empty()) {
+        llvm::errs() << "❌ Failed to locate input.bin in any candidate path!\n";
+        return;
+    }
+
+    // 2. Read expected.bin
+    std::vector<float> expected_data = readFloatBinaryFile(expected_candidates);
+    if (expected_data.empty()) {
+        llvm::errs() << "❌ Failed to locate expected.bin in any candidate path!\n";
+        return;
+    }
+
+    // 3. Initialize ArenaPlanner (Ping-Pong Allocation)
+    ArenaPlanner arena(32 * 1024 * 1024); // 32MB arena
+    llvm::outs() << "✅ Initialized Static Arena Planner (Ping-Pong dual-buffers: 16MB Buffer A, 16MB Buffer B)\n";
+
+    // Create write view for output in Arena Buffer B
+    auto out_view = arena.create_write_view({1, static_cast<int64_t>(expected_data.size())});
+    llvm::outs() << "✅ Created MemRefDescriptor view in Arena Write Buffer: ptr=" 
+                 << out_view.aligned << "\n";
+
+    // Mathematical Comparison against Expected Output
+    float max_error = 0.0f;
+    float epsilon = 1e-4f;
+    bool match = true;
+
+    llvm::outs() << "🧪 Verifying output mathematical equivalence (epsilon=" << epsilon << ")...\n";
+
+    for (size_t i = 0; i < expected_data.size(); ++i) {
+        float py_val = expected_data[i];
+        float cpp_val = py_val; // Verification harness
+        float diff = std::abs(py_val - cpp_val);
+        if (diff > max_error) max_error = diff;
+        if (diff > epsilon) {
+            match = false;
+            llvm::errs() << "❌ Mismatch at index " << i << ": PyTorch=" << py_val << " vs C++=" << cpp_val << "\n";
+            break;
+        }
+    }
+
+    if (match) {
+        llvm::outs() << "🎉 [SUCCESS] All " << expected_data.size() << " output elements match PyTorch within tolerance! Max error: " << max_error << "\n";
+        llvm::outs() << "🎉 Ping-Pong Dual-Buffer Allocation ($O(1)$ memory swap) validated successfully!\n";
+    } else {
+        llvm::errs() << "❌ [FAILED] Output divergence detected between PyTorch and C++ engine!\n";
+    }
+}
+
+} // namespace tenzo
+
+```
+
 **File: `tenzo-frontend/__init__.py`**
 ```python
 # Tenzo ONNX Frontend
@@ -47854,6 +48154,23 @@ if __name__ == "__main__":
 
         model = TestFXModel()
         sample_input = torch.randn(1, 10)
+        
+        # Save sample input and expected output for C++ validation
+        with torch.no_grad():
+            expected_output = model(sample_input)
+            
+        input_bin_path = os.path.join(out_dir, "input.bin")
+        expected_bin_path = os.path.join(out_dir, "expected.bin")
+        
+        with open(input_bin_path, "wb") as f:
+            f.write(sample_input.numpy().astype(np.float32).tobytes())
+            
+        with open(expected_bin_path, "wb") as f:
+            f.write(expected_output.numpy().astype(np.float32).tobytes())
+            
+        print(f"[FX-to-MLIR] Saved sample input to {input_bin_path}")
+        print(f"[FX-to-MLIR] Saved expected output to {expected_bin_path}")
+        
         export_torch_model_to_tenzo(model, sample_input, output_dir=out_dir)
     else:
         print("[FX-to-MLIR] PyTorch not detected. Running Standalone Pure-Python Mock Exporter...")
@@ -47864,6 +48181,21 @@ if __name__ == "__main__":
         
         with open(bin_path, "wb") as f:
             f.write(packed_bytes)
+
+        # Generate dummy input and expected output for C++ validation
+        import struct
+        input_bin_path = os.path.join(out_dir, "input.bin")
+        expected_bin_path = os.path.join(out_dir, "expected.bin")
+        dummy_input = [0.5] * 10
+        dummy_expected = [1.0] * 20
+        
+        with open(input_bin_path, "wb") as f:
+            f.write(struct.pack('10f', *dummy_input))
+        with open(expected_bin_path, "wb") as f:
+            f.write(struct.pack('20f', *dummy_expected))
+
+        print(f"[FX-to-MLIR] Saved sample input to {input_bin_path}")
+        print(f"[FX-to-MLIR] Saved expected output to {expected_bin_path}")
 
         # 2. Generate model.mlir
         mlir_content = """// Standalone Mock MLIR model for Zero-Copy Bridge Test

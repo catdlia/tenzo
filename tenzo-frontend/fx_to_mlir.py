@@ -298,6 +298,23 @@ if __name__ == "__main__":
 
         model = TestFXModel()
         sample_input = torch.randn(1, 10)
+        
+        # Save sample input and expected output for C++ validation
+        with torch.no_grad():
+            expected_output = model(sample_input)
+            
+        input_bin_path = os.path.join(out_dir, "input.bin")
+        expected_bin_path = os.path.join(out_dir, "expected.bin")
+        
+        with open(input_bin_path, "wb") as f:
+            f.write(sample_input.numpy().astype(np.float32).tobytes())
+            
+        with open(expected_bin_path, "wb") as f:
+            f.write(expected_output.numpy().astype(np.float32).tobytes())
+            
+        print(f"[FX-to-MLIR] Saved sample input to {input_bin_path}")
+        print(f"[FX-to-MLIR] Saved expected output to {expected_bin_path}")
+        
         export_torch_model_to_tenzo(model, sample_input, output_dir=out_dir)
     else:
         print("[FX-to-MLIR] PyTorch not detected. Running Standalone Pure-Python Mock Exporter...")
@@ -308,6 +325,21 @@ if __name__ == "__main__":
         
         with open(bin_path, "wb") as f:
             f.write(packed_bytes)
+
+        # Generate dummy input and expected output for C++ validation
+        import struct
+        input_bin_path = os.path.join(out_dir, "input.bin")
+        expected_bin_path = os.path.join(out_dir, "expected.bin")
+        dummy_input = [0.5] * 10
+        dummy_expected = [1.0] * 20
+        
+        with open(input_bin_path, "wb") as f:
+            f.write(struct.pack('10f', *dummy_input))
+        with open(expected_bin_path, "wb") as f:
+            f.write(struct.pack('20f', *dummy_expected))
+
+        print(f"[FX-to-MLIR] Saved sample input to {input_bin_path}")
+        print(f"[FX-to-MLIR] Saved expected output to {expected_bin_path}")
 
         # 2. Generate model.mlir
         mlir_content = """// Standalone Mock MLIR model for Zero-Copy Bridge Test

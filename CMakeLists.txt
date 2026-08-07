@@ -148,6 +148,7 @@ add_executable(tenzo-cli
         src/tests/GPUTests.cpp
         src/tests/DynamicInferenceTest.cpp
         src/tests/ZeroCopyBridgeTest.cpp
+        src/tests/EndToEndMathTest.cpp
 )
 
 add_dependencies(tenzo-cli TenzoOpsIncGen)

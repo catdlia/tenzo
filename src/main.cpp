@@ -3,6 +3,7 @@
 #include "tests/GPUTests.h"
 #include "tests/DynamicInferenceTest.h"
 #include "tests/ZeroCopyBridgeTest.h"
+#include "tests/EndToEndMathTest.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 
@@ -107,6 +108,8 @@ int main(int argc, char* argv[]) {
         tenzo::runDynamicInferenceTest(context);
     } else if (strcmp(mode, "bridge") == 0) {
         tenzo::runZeroCopyBridgeTest(context);
+    } else if (strcmp(mode, "validate") == 0) {
+        tenzo::runEndToEndMathTest(context);
     } else if (strcmp(mode, "test") == 0) {
         // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";
