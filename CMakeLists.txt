@@ -131,6 +131,7 @@ add_executable(tenzo-cli
         src/passes/OptimalVectorization.cpp
         src/passes/PackingPass.cpp
         src/passes/ExplicitMicroKernelPass.cpp
+        src/passes/FusedTernaryKernelPass.cpp
         src/passes/PackingKernels.cpp
         src/passes/MacroKernelPass.cpp
         # Tests
@@ -146,6 +147,7 @@ add_executable(tenzo-cli
         src/context/AutoTuner.cpp
         src/tests/GPUTests.cpp
         src/tests/DynamicInferenceTest.cpp
+        src/tests/ZeroCopyBridgeTest.cpp
 )
 
 add_dependencies(tenzo-cli TenzoOpsIncGen)
@@ -156,6 +158,7 @@ target_link_libraries(tenzo-cli PRIVATE
         MLIRParser
         MLIRSupport
         MLIRInferTypeOpInterface
+        MLIRBytecodeOpInterface
         MLIRFuncDialect
         MLIRArithDialect
         MLIRPass

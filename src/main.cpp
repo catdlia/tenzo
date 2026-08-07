@@ -2,6 +2,7 @@
 #include "tests/PipelineTests.h"
 #include "tests/GPUTests.h"
 #include "tests/DynamicInferenceTest.h"
+#include "tests/ZeroCopyBridgeTest.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 
@@ -104,6 +105,8 @@ int main(int argc, char* argv[]) {
         tenzo::runFusionBenchmark(context);
     } else if (strcmp(mode, "dynamic") == 0) {
         tenzo::runDynamicInferenceTest(context);
+    } else if (strcmp(mode, "bridge") == 0) {
+        tenzo::runZeroCopyBridgeTest(context);
     } else if (strcmp(mode, "test") == 0) {
         // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";

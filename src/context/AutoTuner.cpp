@@ -102,10 +102,13 @@ std::vector<MicroKernelParams> AutoTuner::generateCandidates(
     const std::shared_ptr<tenzo::HardwareProfile> &hwInfo) {
   std::vector<MicroKernelParams> candidates;
   if (hwInfo->hasAVX2() && !hwInfo->hasAVX512()) {
-    candidates.push_back({6, 16, 256, 96, 256, 8});
+    candidates.push_back({6, 16, 256, 96, 256, 8});  // Standard FP32 6x16
+    candidates.push_back({4, 16, 256, 96, 256, 8});  // 1.58-bit candidate (4x16, 8 YMM freed)
+    candidates.push_back({4, 8, 256, 96, 256, 8});   // 1.58-bit candidate (4x8, 10 YMM freed)
     candidates.push_back({4, 24, 256, 96, 256, 8});
   } else if (hwInfo->hasAVX512()) {
     candidates.push_back({14, 32, 512, 128, 512, 16});
+    candidates.push_back({8, 32, 512, 128, 512, 16});  // 1.58-bit candidate for AVX512
     candidates.push_back({8, 48, 512, 128, 512, 16});
   }
   return candidates;

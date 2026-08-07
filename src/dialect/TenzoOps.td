@@ -95,7 +95,7 @@ def QuantizeOp : Tenzo_Op<"quantize", [Pure]> {
   let arguments = (ins 
     AnyTensor:$input,
     I32Attr:$bit_width,
-    StringAttr:$quant_scheme
+    StrAttr:$quant_scheme
   );
   let results = (outs AnyTensor:$result);
   
@@ -111,7 +111,7 @@ def DequantizeOp : Tenzo_Op<"dequantize", [Pure]> {
   let arguments = (ins 
     AnyTensor:$input,
     I32Attr:$bit_width,
-    StringAttr:$quant_scheme
+    StrAttr:$quant_scheme
   );
   let results = (outs AnyTensor:$result);
   

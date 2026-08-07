@@ -103,13 +103,13 @@ func::FuncOp generatePackBFunction(OpBuilder &builder, Location loc, MLIRContext
                     Value dstOffset = b.create<arith::AddIOp>(loc, dstBase, kTimesNR);
 
                     // Use transfer_read with padding and optional routing map for Implicit Shuffle
-                    auto mapAttr = routingMap ? AffineMapAttr::get(routingMap) : AffineMapAttr::get(b.getMultiDimIdentityMap(2));
+                    auto map = routingMap ? routingMap : b.getMultiDimIdentityMap(2);
                     Value srcVec0 = b.create<vector::TransferReadOp>(
-                        loc, vecType, src, ValueRange{k, jStart}, mapAttr, zeroF32);
+                        loc, vecType, src, ValueRange{k, jStart}, zeroF32, map);
 
                     Value jStartPlus8 = b.create<arith::AddIOp>(loc, jStart, cVecSize);
                     Value srcVec1 = b.create<vector::TransferReadOp>(
-                        loc, vecType, src, ValueRange{k, jStartPlus8}, mapAttr, zeroF32);
+                        loc, vecType, src, ValueRange{k, jStartPlus8}, zeroF32, map);
 
                     // Store to packed buffer
                     b.create<vector::TransferWriteOp>(loc, srcVec0, dst, ValueRange{dstOffset});

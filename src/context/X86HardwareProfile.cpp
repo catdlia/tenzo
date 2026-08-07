@@ -308,8 +308,9 @@ X86HardwareProfile::getOptimalMicroKernelParamsForCoreType(
     p.NR = 32;
     p.unrollK = 8;
   } else if (hasAVX2_flag && hasFMA_flag) {
-    p.MR = 6;
-    p.NR = 16;
+    // MR=4, NR=8 to free up YMM registers for bitwise operations and avoid register spilling
+    p.MR = 4;
+    p.NR = 8;
     p.unrollK = 4;
   } else if (hasNEON_flag) {
     p.MR = 8;
