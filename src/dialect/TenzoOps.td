@@ -83,3 +83,74 @@ def MatMulOp : Tenzo_Op<"matmul", [Pure]> {
 
   let assemblyFormat = "$lhs `,` $rhs attr-dict `:` functional-type(operands, results)";
 }
+
+// --- Quantization Operations ---
+def QuantizeOp : Tenzo_Op<"quantize", [Pure]> {
+  let summary = "Quantize a tensor to lower precision";
+  let description = [{
+    Quantizes a floating-point tensor to a lower precision tensor.
+    Supports parameterized bit_width and quant_scheme (e.g., "ternary").
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$input,
+    I32Attr:$bit_width,
+    StringAttr:$quant_scheme
+  );
+  let results = (outs AnyTensor:$result);
+  
+  let assemblyFormat = "$input attr-dict `:` functional-type($input, $result)";
+}
+
+def DequantizeOp : Tenzo_Op<"dequantize", [Pure]> {
+  let summary = "Dequantize a tensor to floating point";
+  let description = [{
+    Dequantizes a lower precision tensor back to a floating-point tensor.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$input,
+    I32Attr:$bit_width,
+    StringAttr:$quant_scheme
+  );
+  let results = (outs AnyTensor:$result);
+  
+  let assemblyFormat = "$input attr-dict `:` functional-type($input, $result)";
+}
+
+// --- Attention & KV Cache Operations ---
+def AttentionOp : Tenzo_Op<"attention", [Pure]> {
+  let summary = "Scaled Dot-Product Attention";
+  let description = [{
+    Computes attention over Q, K, V tensors.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$query,
+    AnyTensor:$key,
+    AnyTensor:$value
+  );
+  let results = (outs AnyTensor:$result);
+  
+  let assemblyFormat = "$query `,` $key `,` $value attr-dict `:` functional-type(operands, results)";
+}
+
+def KVCacheUpdateOp : Tenzo_Op<"kv_cache_update", []> {
+  let summary = "Update KV Cache";
+  let description = [{
+    Appends new key and value tensors to the existing cache.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$cache_k,
+    AnyTensor:$cache_v,
+    AnyTensor:$new_k,
+    AnyTensor:$new_v
+  );
+  let results = (outs 
+    AnyTensor:$updated_cache_k,
+    AnyTensor:$updated_cache_v
+  );
+  
+  let assemblyFormat = "$cache_k `,` $cache_v `,` $new_k `,` $new_v attr-dict `:` functional-type(operands, results)";
+}

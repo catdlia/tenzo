@@ -36,6 +36,20 @@ struct MemRefDescriptor {
         }
         return desc;
     }
+
+    // Helper to create a strided view (Zero-Copy)
+    static MemRefDescriptor create_view(T* ptr, const std::vector<int64_t>& shape, const std::vector<intptr_t>& strides, intptr_t offset = 0) {
+        MemRefDescriptor desc;
+        desc.allocated = ptr;
+        desc.aligned = ptr;
+        desc.offset = offset;
+        
+        for (std::size_t i = 0; i < Rank; ++i) {
+            desc.sizes[i] = shape[i];
+            desc.strides[i] = strides[i];
+        }
+        return desc;
+    }
 };
 
 using MemRef2D = MemRefDescriptor<float, 2>;

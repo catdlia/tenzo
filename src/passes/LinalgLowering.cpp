@@ -146,12 +146,95 @@ struct Conv2DLoweringToLinalg : public OpConversionPattern<tenzo::Conv2DOp> {
     }
 };
 
+//===----------------------------------------------------------------------===//
+// tenzo.quantize -> linalg.generic
+//===----------------------------------------------------------------------===//
+struct QuantizeLoweringToLinalg : public OpConversionPattern<tenzo::QuantizeOp> {
+    using OpConversionPattern<tenzo::QuantizeOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::QuantizeOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        SmallVector<AffineMap, 2> indexingMaps(
+            2, rewriter.getMultiDimIdentityMap(resultType.getRank()));
+
+        SmallVector<utils::IteratorType, 1> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        SmallVector<Value> dynamicSizes;
+        for (int i = 0; i < resultType.getRank(); ++i) {
+            if (resultType.isDynamicDim(i)) {
+                dynamicSizes.push_back(rewriter.create<tensor::DimOp>(loc, adaptor.getInput(), i));
+            }
+        }
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{adaptor.getInput()},
+            ValueRange{rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType, dynamicSizes)},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+                // Dummy lowering to just pass through for now, real implementation depends on scheme
+                // Usually this would involve scaling, rounding, clamping
+                nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
+            });
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
+// tenzo.dequantize -> linalg.generic
+//===----------------------------------------------------------------------===//
+struct DequantizeLoweringToLinalg : public OpConversionPattern<tenzo::DequantizeOp> {
+    using OpConversionPattern<tenzo::DequantizeOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::DequantizeOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        SmallVector<AffineMap, 2> indexingMaps(
+            2, rewriter.getMultiDimIdentityMap(resultType.getRank()));
+
+        SmallVector<utils::IteratorType, 1> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        SmallVector<Value> dynamicSizes;
+        for (int i = 0; i < resultType.getRank(); ++i) {
+            if (resultType.isDynamicDim(i)) {
+                dynamicSizes.push_back(rewriter.create<tensor::DimOp>(loc, adaptor.getInput(), i));
+            }
+        }
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{adaptor.getInput()},
+            ValueRange{rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType, dynamicSizes)},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+                // Dummy pass through
+                nestedBuilder.create<linalg::YieldOp>(nestedLoc, args[0]);
+            });
+        return success();
+    }
+};
+
 } // namespace
 
 void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns) {
     patterns.add<FusedLoweringToLinalg>(patterns.getContext());
     patterns.add<MatMulLoweringToLinalg>(patterns.getContext());
     patterns.add<Conv2DLoweringToLinalg>(patterns.getContext());
+    patterns.add<QuantizeLoweringToLinalg>(patterns.getContext());
+    patterns.add<DequantizeLoweringToLinalg>(patterns.getContext());
 }
 
 namespace {
