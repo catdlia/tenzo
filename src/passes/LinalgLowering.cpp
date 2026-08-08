@@ -881,6 +881,122 @@ struct KVCacheUpdateLowering : public OpConversionPattern<tenzo::KVCacheUpdateOp
     }
 };
 
+struct RMSNormLoweringToLinalg : public OpConversionPattern<tenzo::RMSNormOp> {
+    using OpConversionPattern<tenzo::RMSNormOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::RMSNormOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value input = adaptor.getInput();
+        Value weight = adaptor.getWeight();
+        float eps = op.getEps().convertToFloat();
+
+        auto inType = mlir::cast<RankedTensorType>(input.getType());
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+        int rank = resultType.getRank();
+        int64_t dSize = inType.getDimSize(rank - 1);
+
+        Value emptyOut = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType);
+
+        Value dSizeConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, static_cast<double>(dSize)));
+        Value epsConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, static_cast<double>(eps)));
+
+        SmallVector<AffineMap, 1> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(rank)
+        };
+        SmallVector<utils::IteratorType, 3> iterators(rank, utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op, resultType,
+            ValueRange{}, ValueRange{emptyOut},
+            indexingMaps, iterators,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                Value dIdx = b.create<linalg::IndexOp>(l, rank - 1);
+                
+                Value sumSq = b.create<arith::ConstantOp>(l, b.getFloatAttr(elemType, 0.0));
+                for (int64_t i = 0; i < dSize; ++i) {
+                    Value iVal = b.create<arith::ConstantIndexOp>(l, i);
+                    SmallVector<Value> indices;
+                    for (int r = 0; r < rank - 1; ++r) {
+                        indices.push_back(b.create<linalg::IndexOp>(l, r));
+                    }
+                    indices.push_back(iVal);
+
+                    Value xVal = b.create<tensor::ExtractOp>(l, input, indices);
+                    Value sq = b.create<arith::MulFOp>(l, xVal, xVal);
+                    sumSq = b.create<arith::AddFOp>(l, sumSq, sq);
+                }
+
+                Value meanSq = b.create<arith::DivFOp>(l, sumSq, dSizeConst);
+                Value meanSqEps = b.create<arith::AddFOp>(l, meanSq, epsConst);
+                Value invRsqrt = b.create<math::RsqrtOp>(l, meanSqEps);
+
+                SmallVector<Value> curIndices;
+                for (int r = 0; r < rank; ++r) {
+                    curIndices.push_back(b.create<linalg::IndexOp>(l, r));
+                }
+                Value curX = b.create<tensor::ExtractOp>(l, input, curIndices);
+
+                auto wType = mlir::cast<RankedTensorType>(weight.getType());
+                SmallVector<Value> wIndices;
+                if (wType.getRank() == 1) {
+                    wIndices.push_back(dIdx);
+                } else {
+                    wIndices = curIndices;
+                }
+                Value curW = b.create<tensor::ExtractOp>(l, weight, wIndices);
+
+                Value normX = b.create<arith::MulFOp>(l, curX, invRsqrt);
+                Value res = b.create<arith::MulFOp>(l, normX, curW);
+                b.create<linalg::YieldOp>(l, res);
+            }
+        );
+        return success();
+    }
+};
+
+struct EmbeddingLoweringToLinalg : public OpConversionPattern<tenzo::EmbeddingOp> {
+    using OpConversionPattern<tenzo::EmbeddingOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::EmbeddingOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value indices = adaptor.getIndices();
+        Value weight = adaptor.getWeight();
+
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+        int rank = resultType.getRank();
+
+        Value emptyOut = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType);
+
+        SmallVector<AffineMap, 1> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(rank)
+        };
+        SmallVector<utils::IteratorType, 3> iterators(rank, utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op, resultType,
+            ValueRange{}, ValueRange{emptyOut},
+            indexingMaps, iterators,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                SmallVector<Value> idxIndices;
+                for (int r = 0; r < rank - 1; ++r) {
+                    idxIndices.push_back(b.create<linalg::IndexOp>(l, r));
+                }
+                Value tokenI32 = b.create<tensor::ExtractOp>(l, indices, idxIndices);
+                Value tokenIdx = b.create<arith::IndexCastOp>(l, b.getIndexType(), tokenI32);
+                Value dIdx = b.create<linalg::IndexOp>(l, rank - 1);
+
+                Value embVal = b.create<tensor::ExtractOp>(l, weight, ValueRange{tokenIdx, dIdx});
+                b.create<linalg::YieldOp>(l, embVal);
+            }
+        );
+        return success();
+    }
+};
+
 } // namespace
 
 void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns) {
@@ -894,6 +1010,8 @@ void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns)
     patterns.add<QuantizeLoweringToLinalg>(patterns.getContext());
     patterns.add<DequantizeLoweringToLinalg>(patterns.getContext());
     patterns.add<KVCacheUpdateLowering>(patterns.getContext());
+    patterns.add<RMSNormLoweringToLinalg>(patterns.getContext());
+    patterns.add<EmbeddingLoweringToLinalg>(patterns.getContext());
 }
 
 namespace {

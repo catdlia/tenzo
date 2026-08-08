@@ -140,4 +140,11 @@ if __name__ == "__main__":
     with open(expected_bin_path, "wb") as f:
         f.write(flat_outputs)
         
-    print(f"[Generation Test] Saved seq inputs ({len(flat_inputs)} bytes) and expected outputs ({len(flat_outputs)} bytes)")
+    vocab_path = os.path.join(out_dir, "tokenizer.vocab")
+    with open(vocab_path, "w") as f:
+        words = ["<unk>", "Tenzo", " ", "Edge", " ", "AI", "Hello", "World", "Transformer", "LLM"]
+        for i in range(320):
+            token_str = words[i % len(words)] if i < len(words) else f"token_{i}"
+            f.write(f"{i} {token_str}\n")
+            
+    print(f"[Generation Test] Saved seq inputs ({len(flat_inputs)} bytes), expected outputs ({len(flat_outputs)} bytes), and tokenizer.vocab")

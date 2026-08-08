@@ -172,3 +172,34 @@ def KVCacheUpdateOp : Tenzo_Op<"kv_cache_update", []> {
   
   let assemblyFormat = "$cache_k `,` $cache_v `,` $new_k `,` $new_v `,` $seq_pos attr-dict `:` functional-type(operands, results)";
 }
+
+def RMSNormOp : Tenzo_Op<"rmsnorm", [Pure]> {
+  let summary = "Root Mean Square Normalization";
+  let description = [{
+    Applies RMSNorm normalization over the last dimension of input tensor using weight.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$input,
+    AnyTensor:$weight,
+    F32Attr:$eps
+  );
+  let results = (outs AnyTensor:$result);
+  
+  let assemblyFormat = "$input `,` $weight attr-dict `:` functional-type(operands, results)";
+}
+
+def EmbeddingOp : Tenzo_Op<"embedding", [Pure]> {
+  let summary = "Token Embedding Lookup";
+  let description = [{
+    Looks up token IDs from input in the embedding weight table.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$indices,
+    AnyTensor:$weight
+  );
+  let results = (outs AnyTensor:$result);
+  
+  let assemblyFormat = "$indices `,` $weight attr-dict `:` functional-type(operands, results)";
+}

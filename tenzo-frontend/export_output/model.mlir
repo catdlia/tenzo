@@ -5,7 +5,7 @@ module {
     %v0 = arith.constant 0 : index
     %v1 = memref.view %arg1[%v0][] : memref<?xi8> to memref<128x32xi8>
     %v2 = bufferization.to_tensor %v1 : memref<128x32xi8> to tensor<128x32xi8>
-    %v3 = arith.constant 4.45707962e-02 : f32
+    %v3 = arith.constant 4.40454446e-02 : f32
     %v4 = "tenzo.dequantize"(%v2, %v3) {bit_width = 2 : i32, quant_scheme = "ternary"} : (tensor<128x32xi8>, f32) -> tensor<128x128xf32>
     %v5 = "tenzo.matmul"(%arg0, %v4) : (tensor<1x1x128xf32>, tensor<128x128xf32>) -> tensor<1x1x128xf32>
     %v6 = arith.constant 4096 : index
@@ -18,7 +18,7 @@ module {
     %v13 = arith.constant 4128 : index
     %v14 = memref.view %arg1[%v13][] : memref<?xi8> to memref<128x32xi8>
     %v15 = bufferization.to_tensor %v14 : memref<128x32xi8> to tensor<128x32xi8>
-    %v16 = arith.constant 4.41555046e-02 : f32
+    %v16 = arith.constant 4.41388898e-02 : f32
     %v17 = "tenzo.dequantize"(%v15, %v16) {bit_width = 2 : i32, quant_scheme = "ternary"} : (tensor<128x32xi8>, f32) -> tensor<128x128xf32>
     %v18 = "tenzo.matmul"(%arg0, %v17) : (tensor<1x1x128xf32>, tensor<128x128xf32>) -> tensor<1x1x128xf32>
     %v19 = arith.constant 8224 : index
@@ -31,7 +31,7 @@ module {
     %v26 = arith.constant 8256 : index
     %v27 = memref.view %arg1[%v26][] : memref<?xi8> to memref<128x32xi8>
     %v28 = bufferization.to_tensor %v27 : memref<128x32xi8> to tensor<128x32xi8>
-    %v29 = arith.constant 4.43285666e-02 : f32
+    %v29 = arith.constant 4.38770503e-02 : f32
     %v30 = "tenzo.dequantize"(%v28, %v29) {bit_width = 2 : i32, quant_scheme = "ternary"} : (tensor<128x32xi8>, f32) -> tensor<128x128xf32>
     %v31 = "tenzo.matmul"(%arg0, %v30) : (tensor<1x1x128xf32>, tensor<128x128xf32>) -> tensor<1x1x128xf32>
     %v32 = arith.constant 12352 : index
@@ -51,7 +51,7 @@ module {
     %v47 = arith.constant 12384 : index
     %v48 = memref.view %arg1[%v47][] : memref<?xi8> to memref<128x32xi8>
     %v49 = bufferization.to_tensor %v48 : memref<128x32xi8> to tensor<128x32xi8>
-    %v50 = arith.constant 4.40602750e-02 : f32
+    %v50 = arith.constant 4.38929126e-02 : f32
     %v51 = "tenzo.dequantize"(%v49, %v50) {bit_width = 2 : i32, quant_scheme = "ternary"} : (tensor<128x32xi8>, f32) -> tensor<128x128xf32>
     %v52 = "tenzo.matmul"(%v46, %v51) : (tensor<1x1x128xf32>, tensor<128x128xf32>) -> tensor<1x1x128xf32>
     %v53 = arith.constant 16480 : index
@@ -62,7 +62,7 @@ module {
     %v58 = arith.constant 16512 : index
     %v59 = memref.view %arg1[%v58][] : memref<?xi8> to memref<256x32xi8>
     %v60 = bufferization.to_tensor %v59 : memref<256x32xi8> to tensor<256x32xi8>
-    %v61 = arith.constant 4.41878811e-02 : f32
+    %v61 = arith.constant 4.45136800e-02 : f32
     %v62 = "tenzo.dequantize"(%v60, %v61) {bit_width = 2 : i32, quant_scheme = "ternary"} : (tensor<256x32xi8>, f32) -> tensor<256x128xf32>
     %v63 = "tenzo.matmul"(%v57, %v62) : (tensor<1x1x128xf32>, tensor<256x128xf32>) -> tensor<1x1x256xf32>
     %v64 = arith.constant 24704 : index
@@ -73,7 +73,7 @@ module {
     %v69 = arith.constant 24768 : index
     %v70 = memref.view %arg1[%v69][] : memref<?xi8> to memref<128x64xi8>
     %v71 = bufferization.to_tensor %v70 : memref<128x64xi8> to tensor<128x64xi8>
-    %v72 = arith.constant 3.13445479e-02 : f32
+    %v72 = arith.constant 3.10523510e-02 : f32
     %v73 = "tenzo.dequantize"(%v71, %v72) {bit_width = 2 : i32, quant_scheme = "ternary"} : (tensor<128x64xi8>, f32) -> tensor<128x256xf32>
     %v74 = "tenzo.matmul"(%v68, %v73) : (tensor<1x1x256xf32>, tensor<128x256xf32>) -> tensor<1x1x128xf32>
     %v75 = arith.constant 32960 : index

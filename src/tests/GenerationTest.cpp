@@ -3,6 +3,8 @@
 #include "runtime/MemRefUtils.h"
 #include "runtime/ExecutionContext.h"
 #include "runtime/KVCacheManager.h"
+#include "runtime/Sampler.h"
+#include "runtime/Tokenizer.h"
 #include "passes/Passes.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
@@ -203,9 +205,36 @@ void runGenerationTest(MLIRContext& context) {
             llvm::outs() << "    ✅ Token " << (i + 1) << " matches PyTorch (max err: " << max_err << ")\n";
         }
 
+        // Test C++ Sampler (Top-P / Temperature)
+        runtime::SamplerConfig s_cfg;
+        s_cfg.temperature = 0.7f;
+        s_cfg.top_p = 0.9f;
+        runtime::Sampler sampler(s_cfg);
+        int32_t sampled_token_id = sampler.sample(output.data, 128);
+        llvm::outs() << "    🎲 [C++ Sampler] Sampled next token ID: " << sampled_token_id << " (temp=0.7, top_p=0.9)\n";
+
         kv_cache.increment_seq_len(1);
     }
     
+    // Test C++ Tokenizer
+    runtime::Tokenizer tokenizer;
+    std::vector<std::string> vocab_candidates = {
+        "tenzo-frontend/export_output/tokenizer.vocab",
+        "export_output/tokenizer.vocab",
+        "/app/tenzo-frontend/export_output/tokenizer.vocab",
+        "tokenizer.vocab"
+    };
+
+    for (const auto& path : vocab_candidates) {
+        if (tokenizer.load(path)) {
+            llvm::outs() << "✅ Successfully loaded C++ Tokenizer from " << path << " (" << tokenizer.vocab_size() << " tokens)\n";
+            auto encoded = tokenizer.encode("Tenzo Edge AI");
+            std::string decoded = tokenizer.decode(encoded);
+            llvm::outs() << "🔤 [C++ Tokenizer] Encoded 'Tenzo Edge AI' -> " << encoded.size() << " tokens. Decoded back -> '" << decoded << "'\n";
+            break;
+        }
+    }
+
     llvm::outs() << "🎉 Generation loop completed successfully!\n";
 }
 

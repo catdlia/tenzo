@@ -145,6 +145,8 @@ add_executable(tenzo-cli
         src/runtime/ThreadPool.cpp
         src/runtime/ExecutionContext.cpp
         src/runtime/KVCacheManager.cpp
+        src/runtime/Sampler.cpp
+        src/runtime/Tokenizer.cpp
         src/context/AutoTuner.cpp
         src/tests/GPUTests.cpp
         src/tests/DynamicInferenceTest.cpp
