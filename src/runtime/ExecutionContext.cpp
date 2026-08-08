@@ -42,34 +42,33 @@ ExecutionContext::ExecutionContext(mlir::MLIRContext& context, mlir::ModuleOp mo
     engine = std::move(maybeEngine.get());
 }
 
+#include <deque>
+
 void ExecutionContext::forward(const std::vector<Tensor*>& inputs, const std::vector<Tensor*>& outputs) {
     std::vector<void*> args;
-    std::vector<std::unique_ptr<void, void(*)(void*)>> memrefs;
     std::vector<void*> desc_ptrs;
+    std::deque<MemRef1D> memrefs1D;
+    std::deque<MemRef2D> memrefs2D;
+    std::deque<MemRef3D> memrefs3D;
+    std::deque<MemRef4D> memrefs4D;
 
     auto push_tensor = [&](Tensor* t) {
         size_t rank = t->shape.size();
-        void* desc = nullptr;
         if (rank == 1) {
-            auto* d = new MemRef1D(MemRef1D::create((float*)t->data, t->shape));
-            memrefs.emplace_back(d, [](void* ptr) { delete static_cast<MemRef1D*>(ptr); });
-            desc = d;
+            memrefs1D.push_back(MemRef1D::create((float*)t->data, t->shape));
+            desc_ptrs.push_back(&memrefs1D.back());
         } else if (rank == 2) {
-            auto* d = new MemRef2D(MemRef2D::create((float*)t->data, t->shape));
-            memrefs.emplace_back(d, [](void* ptr) { delete static_cast<MemRef2D*>(ptr); });
-            desc = d;
+            memrefs2D.push_back(MemRef2D::create((float*)t->data, t->shape));
+            desc_ptrs.push_back(&memrefs2D.back());
         } else if (rank == 3) {
-            auto* d = new MemRef3D(MemRef3D::create((float*)t->data, t->shape));
-            memrefs.emplace_back(d, [](void* ptr) { delete static_cast<MemRef3D*>(ptr); });
-            desc = d;
+            memrefs3D.push_back(MemRef3D::create((float*)t->data, t->shape));
+            desc_ptrs.push_back(&memrefs3D.back());
         } else if (rank == 4) {
-            auto* d = new MemRef4D(MemRef4D::create((float*)t->data, t->shape));
-            memrefs.emplace_back(d, [](void* ptr) { delete static_cast<MemRef4D*>(ptr); });
-            desc = d;
+            memrefs4D.push_back(MemRef4D::create((float*)t->data, t->shape));
+            desc_ptrs.push_back(&memrefs4D.back());
         } else {
             throw std::runtime_error("Unsupported tensor rank: " + std::to_string(rank));
         }
-        desc_ptrs.push_back(desc);
     };
 
     for (auto* in : inputs) push_tensor(in);
@@ -82,11 +81,26 @@ void ExecutionContext::forward(const std::vector<Tensor*>& inputs, const std::ve
     auto error = engine->invokePacked("_mlir_ciface_main", llvm::MutableArrayRef<void*>(args));
     if (error) {
         llvm::consumeError(std::move(error));
-        // Fallback for tests that don't have _mlir_ciface_main
         error = engine->invokePacked("main", llvm::MutableArrayRef<void*>(args));
         if (error) {
             llvm::consumeError(std::move(error));
             throw std::runtime_error("JIT invocation failed");
+        }
+    }
+
+    // Update output tensor pointers from descriptor aligned pointers
+    for (size_t i = 0; i < outputs.size(); ++i) {
+        void* desc = desc_ptrs[inputs.size() + i];
+        size_t rank = outputs[i]->shape.size();
+        float* new_ptr = nullptr;
+        if (rank == 1) new_ptr = static_cast<MemRef1D*>(desc)->aligned;
+        else if (rank == 2) new_ptr = static_cast<MemRef2D*>(desc)->aligned;
+        else if (rank == 3) new_ptr = static_cast<MemRef3D*>(desc)->aligned;
+        else if (rank == 4) new_ptr = static_cast<MemRef4D*>(desc)->aligned;
+
+        if (new_ptr) {
+            outputs[i]->data = new_ptr;
+            outputs[i]->is_owned = false;
         }
     }
 }

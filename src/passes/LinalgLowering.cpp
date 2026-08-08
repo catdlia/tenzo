@@ -267,6 +267,9 @@ struct AttentionLoweringToLinalg : public OpConversionPattern<tenzo::AttentionOp
             int64_t MaxSeq = keyType.getDimSize(2);
             int64_t Dh = queryType.getDimSize(3);
 
+            int64_t H_kv = keyType.getDimSize(1);
+            int64_t gqaRatio = (H_kv > 0) ? (H / H_kv) : 1;
+
             // --- Step 1: Compute Q @ K^T -> scores [B, H, MaxSeq] ---
             RankedTensorType scoresType = RankedTensorType::get({B, H, MaxSeq}, elemType);
             Value emptyScores = rewriter.create<tensor::EmptyOp>(loc, ArrayRef<int64_t>{B, H, MaxSeq}, elemType);
@@ -277,8 +280,10 @@ struct AttentionLoweringToLinalg : public OpConversionPattern<tenzo::AttentionOp
             auto d2 = rewriter.getAffineDimExpr(2);
             auto d3 = rewriter.getAffineDimExpr(3);
 
+            AffineExpr kvHeadExpr = (gqaRatio > 1) ? d1.floorDiv(gqaRatio) : d1;
+
             AffineMap qMap = AffineMap::get(4, 0, {d0, d1, rewriter.getAffineConstantExpr(0), d3}, rewriter.getContext());
-            AffineMap kMap = AffineMap::get(4, 0, {d0, d1, d2, d3}, rewriter.getContext());
+            AffineMap kMap = AffineMap::get(4, 0, {d0, kvHeadExpr, d2, d3}, rewriter.getContext());
             AffineMap scoresMap = AffineMap::get(4, 0, {d0, d1, d2}, rewriter.getContext());
 
             SmallVector<utils::IteratorType, 4> qkIterators = {
@@ -366,7 +371,7 @@ struct AttentionLoweringToLinalg : public OpConversionPattern<tenzo::AttentionOp
             Value filledOut = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF}, ValueRange{emptyOut}).getResult(0);
 
             AffineMap probMap = AffineMap::get(4, 0, {d0, d1, d3}, rewriter.getContext());
-            AffineMap vMap = AffineMap::get(4, 0, {d0, d1, d3, d2}, rewriter.getContext());
+            AffineMap vMap = AffineMap::get(4, 0, {d0, kvHeadExpr, d3, d2}, rewriter.getContext());
             AffineMap outMap = AffineMap::get(4, 0, {d0, d1, rewriter.getAffineConstantExpr(0), d2}, rewriter.getContext());
 
             SmallVector<utils::IteratorType, 4> pvIterators = {
@@ -787,12 +792,12 @@ struct DequantizeLoweringToLinalg : public OpConversionPattern<tenzo::Dequantize
                     Value rIdx = b.create<linalg::IndexOp>(l, 0);
                     Value cIdx = b.create<linalg::IndexOp>(l, 1);
 
-                    Value byteIdx = b.create<arith::DivUIOp>(l, cIdx, fourVal);
-                    Value remIdx = b.create<arith::RemUIOp>(l, cIdx, fourVal);
+                    Value rowByteIdx = b.create<arith::DivUIOp>(l, rIdx, fourVal);
+                    Value remIdx = b.create<arith::RemUIOp>(l, rIdx, fourVal);
                     Value shiftIdx = b.create<arith::MulIOp>(l, remIdx, twoVal);
                     Value shiftI8 = b.create<arith::IndexCastOp>(l, b.getI8Type(), shiftIdx);
 
-                    Value byteVal = b.create<tensor::ExtractOp>(l, input, ValueRange{rIdx, byteIdx});
+                    Value byteVal = b.create<tensor::ExtractOp>(l, input, ValueRange{rowByteIdx, cIdx});
                     Value shifted = b.create<arith::ShRUIOp>(l, byteVal, shiftI8);
                     Value code = b.create<arith::AndIOp>(l, shifted, threeI8);
 
@@ -852,29 +857,56 @@ struct KVCacheUpdateLowering : public OpConversionPattern<tenzo::KVCacheUpdateOp
         }
         Value seqPosIndex = rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(), seqPosI32);
 
-        auto createInsertSlice = [&](Value source, Value dest, RankedTensorType sourceType) -> Value {
+        auto reshapeTo4D = [&](Value val, RankedTensorType valType, RankedTensorType targetKVType) -> Value {
+            if (valType.getRank() == 4) return val;
+            int64_t B = targetKVType.getDimSize(0);
+            int64_t H = targetKVType.getDimSize(1);
+            int64_t Dh = targetKVType.getDimSize(3);
+            auto targetType = RankedTensorType::get({B, H, 1, Dh}, valType.getElementType());
+            
+            Value empty = rewriter.create<tensor::EmptyOp>(loc, targetType.getShape(), valType.getElementType());
+            auto d0 = rewriter.getAffineDimExpr(0);
+            auto d1 = rewriter.getAffineDimExpr(1);
+            auto d2 = rewriter.getAffineDimExpr(2);
+            auto d3 = rewriter.getAffineDimExpr(3);
+            
+            AffineExpr flatIdx = d1 * Dh + d3;
+            AffineMap inMap = AffineMap::get(4, 0, {d0, rewriter.getAffineConstantExpr(0), flatIdx}, rewriter.getContext());
+            AffineMap outMap = rewriter.getMultiDimIdentityMap(4);
+            
+            return rewriter.create<linalg::GenericOp>(
+                loc, targetType, ValueRange{val}, ValueRange{empty},
+                ArrayRef<AffineMap>{inMap, outMap},
+                SmallVector<utils::IteratorType, 4>(4, utils::IteratorType::parallel),
+                [&](OpBuilder &b, Location l, ValueRange args) {
+                    b.create<linalg::YieldOp>(l, args[0]);
+                }
+            ).getResult(0);
+        };
+
+        Value newK4D = reshapeTo4D(adaptor.getNewK(), newKType, cacheKType);
+        Value newV4D = reshapeTo4D(adaptor.getNewV(), newVType, cacheVType);
+        auto newK4DType = mlir::cast<RankedTensorType>(newK4D.getType());
+        auto newV4DType = mlir::cast<RankedTensorType>(newV4D.getType());
+
+        auto createInsertSlice = [&](Value source, Value dest, RankedTensorType sourceType, RankedTensorType destType) -> Value {
             SmallVector<OpFoldResult> offsets, sizes, strides;
-            int rank = sourceType.getRank();
+            int rank = destType.getRank();
             for (int i = 0; i < rank; ++i) {
-                if (i == rank - 2) { // Sequence dimension is usually the second to last (e.g. batch, seq, dim)
+                if (i == rank - 2) { // Sequence dimension (e.g. [B, H, Seq, Dim])
                     offsets.push_back(seqPosIndex);
+                    sizes.push_back(rewriter.getIndexAttr(1));
                 } else {
                     offsets.push_back(rewriter.getIndexAttr(0));
-                }
-                
-                if (sourceType.isDynamicDim(i)) {
-                    sizes.push_back(rewriter.create<tensor::DimOp>(loc, source, i).getResult());
-                } else {
                     sizes.push_back(rewriter.getIndexAttr(sourceType.getDimSize(i)));
                 }
-                
                 strides.push_back(rewriter.getIndexAttr(1));
             }
             return rewriter.create<tensor::InsertSliceOp>(loc, source, dest, offsets, sizes, strides);
         };
 
-        Value updatedK = createInsertSlice(adaptor.getNewK(), adaptor.getCacheK(), newKType);
-        Value updatedV = createInsertSlice(adaptor.getNewV(), adaptor.getCacheV(), newVType);
+        Value updatedK = createInsertSlice(newK4D, adaptor.getCacheK(), newK4DType, cacheKType);
+        Value updatedV = createInsertSlice(newV4D, adaptor.getCacheV(), newV4DType, cacheVType);
 
         rewriter.replaceOp(op, {updatedK, updatedV});
         return success();
@@ -907,48 +939,67 @@ struct RMSNormLoweringToLinalg : public OpConversionPattern<tenzo::RMSNormOp> {
         };
         SmallVector<utils::IteratorType, 3> iterators(rank, utils::IteratorType::parallel);
 
+        // Step 1: Compute sum of squares along last dimension (reduction)
+        SmallVector<int64_t> redShape(resultType.getShape().begin(), resultType.getShape().end() - 1);
+        auto redType = RankedTensorType::get(redShape, elemType);
+
+        Value zeroF = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, 0.0));
+        Value emptyRed = rewriter.create<tensor::EmptyOp>(loc, redShape, elemType);
+        Value initRed = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF}, ValueRange{emptyRed}).getResult(0);
+
+        SmallVector<AffineExpr, 4> redExprs;
+        for (int i = 0; i < rank - 1; ++i) {
+            redExprs.push_back(rewriter.getAffineDimExpr(i));
+        }
+        AffineMap redOutMap = AffineMap::get(rank, 0, redExprs, rewriter.getContext());
+
+        SmallVector<AffineMap, 2> redMaps = {
+            rewriter.getMultiDimIdentityMap(rank),
+            redOutMap
+        };
+
+        SmallVector<utils::IteratorType> redIterators(rank - 1, utils::IteratorType::parallel);
+        redIterators.push_back(utils::IteratorType::reduction);
+
+        Value sumSq = rewriter.create<linalg::GenericOp>(
+            loc, redType, ValueRange{input}, ValueRange{initRed},
+            redMaps, redIterators,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                Value x = args[0];
+                Value acc = args[1];
+                Value sq = b.create<arith::MulFOp>(l, x, x);
+                Value newAcc = b.create<arith::AddFOp>(l, acc, sq);
+                b.create<linalg::YieldOp>(l, newAcc);
+            }
+        ).getResult(0);
+
+        // Step 2: Normalize and scale elementwise
+        AffineMap weightMap = AffineMap::get(rank, 0, {rewriter.getAffineDimExpr(rank - 1)}, rewriter.getContext());
+
+        SmallVector<AffineMap, 4> normMaps = {
+            rewriter.getMultiDimIdentityMap(rank),
+            redOutMap,
+            weightMap,
+            rewriter.getMultiDimIdentityMap(rank)
+        };
+
+        SmallVector<utils::IteratorType> normIterators(rank, utils::IteratorType::parallel);
+
         rewriter.replaceOpWithNewOp<linalg::GenericOp>(
             op, resultType,
-            ValueRange{}, ValueRange{emptyOut},
-            indexingMaps, iterators,
+            ValueRange{input, sumSq, weight}, ValueRange{emptyOut},
+            normMaps, normIterators,
             [&](OpBuilder &b, Location l, ValueRange args) {
-                Value dIdx = b.create<linalg::IndexOp>(l, rank - 1);
-                
-                Value sumSq = b.create<arith::ConstantOp>(l, b.getFloatAttr(elemType, 0.0));
-                for (int64_t i = 0; i < dSize; ++i) {
-                    Value iVal = b.create<arith::ConstantIndexOp>(l, i);
-                    SmallVector<Value> indices;
-                    for (int r = 0; r < rank - 1; ++r) {
-                        indices.push_back(b.create<linalg::IndexOp>(l, r));
-                    }
-                    indices.push_back(iVal);
+                Value x = args[0];
+                Value sSq = args[1];
+                Value w = args[2];
 
-                    Value xVal = b.create<tensor::ExtractOp>(l, input, indices);
-                    Value sq = b.create<arith::MulFOp>(l, xVal, xVal);
-                    sumSq = b.create<arith::AddFOp>(l, sumSq, sq);
-                }
-
-                Value meanSq = b.create<arith::DivFOp>(l, sumSq, dSizeConst);
+                Value meanSq = b.create<arith::DivFOp>(l, sSq, dSizeConst);
                 Value meanSqEps = b.create<arith::AddFOp>(l, meanSq, epsConst);
-                Value invRsqrt = b.create<math::RsqrtOp>(l, meanSqEps);
+                Value rsqrt = b.create<math::RsqrtOp>(l, meanSqEps);
 
-                SmallVector<Value> curIndices;
-                for (int r = 0; r < rank; ++r) {
-                    curIndices.push_back(b.create<linalg::IndexOp>(l, r));
-                }
-                Value curX = b.create<tensor::ExtractOp>(l, input, curIndices);
-
-                auto wType = mlir::cast<RankedTensorType>(weight.getType());
-                SmallVector<Value> wIndices;
-                if (wType.getRank() == 1) {
-                    wIndices.push_back(dIdx);
-                } else {
-                    wIndices = curIndices;
-                }
-                Value curW = b.create<tensor::ExtractOp>(l, weight, wIndices);
-
-                Value normX = b.create<arith::MulFOp>(l, curX, invRsqrt);
-                Value res = b.create<arith::MulFOp>(l, normX, curW);
+                Value normX = b.create<arith::MulFOp>(l, x, rsqrt);
+                Value res = b.create<arith::MulFOp>(l, normX, w);
                 b.create<linalg::YieldOp>(l, res);
             }
         );

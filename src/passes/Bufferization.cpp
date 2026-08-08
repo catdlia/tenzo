@@ -58,7 +58,7 @@ void tenzo::addTenzoBufferizationPasses(mlir::OpPassManager &pm) {
     // 2. OneShot Bufferization
     mlir::bufferization::OneShotBufferizePassOptions options;
     options.bufferizeFunctionBoundaries = true;
-    options.copyBeforeWrite = true;
+    options.copyBeforeWrite = false;
     pm.addPass(mlir::bufferization::createOneShotBufferizePass(options));
 
     // 3. Convert function return memrefs to out parameters AFTER bufferization

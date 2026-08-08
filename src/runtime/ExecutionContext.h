@@ -21,13 +21,15 @@ struct Tensor {
         if (!data) {
             size_t size = 1;
             for (auto dim : shape) size *= dim;
-            data = new float[size];
+            data = static_cast<float*>(std::malloc(size * sizeof(float)));
             is_owned = true;
         }
     }
 
     ~Tensor() {
-        if (is_owned) delete[] data;
+        if (is_owned && data) {
+            std::free(data);
+        }
     }
 
     // No copy, only move for safety
