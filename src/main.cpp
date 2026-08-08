@@ -28,6 +28,8 @@ void printUsage() {
     llvm::outs() << "  gpu       Run GPU pipeline test\n";
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
     llvm::outs() << "  hybrid-bench Run A/B benchmark for Hybrid Affinity and Heterogeneous Split\n";
+    llvm::outs() << "  validate  Run single-pass E2E math validation\n";
+    llvm::outs() << "  generate  Run autoregressive text generation loop\n";
     llvm::outs() << "  test      Run quick validation tests\n";
     llvm::outs() << "  all       Run all tests\n";
     llvm::outs() << "  version   Show version info\n";
@@ -110,6 +112,8 @@ int main(int argc, char* argv[]) {
         tenzo::runZeroCopyBridgeTest(context);
     } else if (strcmp(mode, "validate") == 0) {
         tenzo::runEndToEndMathTest(context);
+    } else if (strcmp(mode, "generate") == 0) {
+        tenzo::runGenerationTest(context);
     } else if (strcmp(mode, "test") == 0) {
         // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";

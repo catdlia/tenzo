@@ -15,6 +15,7 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
+#include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
 
 // Async Dialect for Multithreading
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
@@ -314,14 +315,22 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm, bool enableVectorization,
   // LOWERING TO LLVM (Standard Pipeline)
   // -------------------------------------------------------
 
+  // Lower Affine -> SCF (bufferization leaves affine.apply ops)
+  pm.addPass(mlir::createLowerAffinePass());
+  pm.addNestedPass<func::FuncOp>(mlir::affine::createAffineExpandIndexOpsPass());
+
   // Vector -> SCF (handles remaining vector.transfer ops)
   pm.addPass(mlir::createConvertVectorToSCFPass());
 
   // SCF -> Control Flow
   pm.addPass(mlir::createSCFToControlFlowPass());
 
-  // MemRef metadata expansion
+  // MemRef metadata expansion (generates new affine.apply ops!)
   pm.addPass(mlir::memref::createExpandStridedMetadataPass());
+  
+  // Expand the newly generated affine.apply ops from metadata expansion
+  pm.addPass(mlir::createLowerAffinePass());
+  pm.addNestedPass<func::FuncOp>(mlir::affine::createAffineExpandIndexOpsPass());
 
   // Index -> LLVM
   pm.addPass(mlir::createConvertIndexToLLVMPass());
@@ -330,6 +339,9 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm, bool enableVectorization,
   pm.addPass(mlir::createCanonicalizerPass());
   pm.addPass(mlir::createCSEPass());
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+
+  // Math -> LLVM
+  pm.addPass(mlir::createConvertMathToLLVMPass());
 
   // Arith -> LLVM
   pm.addPass(mlir::createArithToLLVMConversionPass());
@@ -353,6 +365,7 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm, bool enableVectorization,
 
   // Final type reconciliation and redundant lowering to catch anything left
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
+  pm.addPass(mlir::createConvertMathToLLVMPass());
   pm.addPass(mlir::createArithToLLVMConversionPass());
   pm.addPass(mlir::createConvertIndexToLLVMPass());
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
@@ -367,6 +380,7 @@ void registerAllTenzoDialectTranslations(mlir::MLIRContext &context) {
   
   // Register conversion interfaces (some versions of MLIR/ExecutionEngine need these)
   mlir::arith::registerConvertArithToLLVMInterface(registry);
+  mlir::registerConvertMathToLLVMInterface(registry);
   mlir::cf::registerConvertControlFlowToLLVMInterface(registry);
   mlir::registerConvertFuncToLLVMInterface(registry);
   mlir::index::registerConvertIndexToLLVMInterface(registry);

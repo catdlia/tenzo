@@ -110,12 +110,13 @@ def DequantizeOp : Tenzo_Op<"dequantize", [Pure]> {
   
   let arguments = (ins 
     AnyTensor:$input,
+    Optional<AnyType>:$scale,
     I32Attr:$bit_width,
     StrAttr:$quant_scheme
   );
   let results = (outs AnyTensor:$result);
   
-  let assemblyFormat = "$input attr-dict `:` functional-type($input, $result)";
+  let assemblyFormat = "$input (`,` $scale^)? attr-dict `:` functional-type(operands, results)";
 }
 
 // --- Attention & KV Cache Operations ---
@@ -128,11 +129,27 @@ def AttentionOp : Tenzo_Op<"attention", [Pure]> {
   let arguments = (ins 
     AnyTensor:$query,
     AnyTensor:$key,
-    AnyTensor:$value
+    AnyTensor:$value,
+    AnyTensor:$seq_pos
   );
   let results = (outs AnyTensor:$result);
   
-  let assemblyFormat = "$query `,` $key `,` $value attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = "$query `,` $key `,` $value `,` $seq_pos attr-dict `:` functional-type(operands, results)";
+}
+
+def RopeOp : Tenzo_Op<"rope", [Pure]> {
+  let summary = "Rotary Position Embedding";
+  let description = [{
+    Applies Rotary Position Embedding (RoPE) to Query or Key tensor at seq_pos.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$input,
+    AnyTensor:$seq_pos
+  );
+  let results = (outs AnyTensor:$result);
+  
+  let assemblyFormat = "$input `,` $seq_pos attr-dict `:` functional-type(operands, results)";
 }
 
 def KVCacheUpdateOp : Tenzo_Op<"kv_cache_update", []> {
@@ -145,12 +162,13 @@ def KVCacheUpdateOp : Tenzo_Op<"kv_cache_update", []> {
     AnyTensor:$cache_k,
     AnyTensor:$cache_v,
     AnyTensor:$new_k,
-    AnyTensor:$new_v
+    AnyTensor:$new_v,
+    AnyTensor:$seq_pos
   );
   let results = (outs 
     AnyTensor:$updated_cache_k,
     AnyTensor:$updated_cache_v
   );
   
-  let assemblyFormat = "$cache_k `,` $cache_v `,` $new_k `,` $new_v attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = "$cache_k `,` $cache_v `,` $new_k `,` $new_v `,` $seq_pos attr-dict `:` functional-type(operands, results)";
 }

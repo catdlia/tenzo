@@ -144,11 +144,13 @@ add_executable(tenzo-cli
         src/runtime/VulkanRuntime.cpp
         src/runtime/ThreadPool.cpp
         src/runtime/ExecutionContext.cpp
+        src/runtime/KVCacheManager.cpp
         src/context/AutoTuner.cpp
         src/tests/GPUTests.cpp
         src/tests/DynamicInferenceTest.cpp
         src/tests/ZeroCopyBridgeTest.cpp
         src/tests/EndToEndMathTest.cpp
+        src/tests/GenerationTest.cpp
 )
 
 add_dependencies(tenzo-cli TenzoOpsIncGen)

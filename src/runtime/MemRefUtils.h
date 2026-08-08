@@ -52,7 +52,10 @@ struct MemRefDescriptor {
     }
 };
 
+using MemRef1D = MemRefDescriptor<float, 1>;
 using MemRef2D = MemRefDescriptor<float, 2>;
+using MemRef3D = MemRefDescriptor<float, 3>;
+using MemRef4D = MemRefDescriptor<float, 4>;
 
 } // namespace runtime
 } // namespace tenzo
