@@ -164,7 +164,9 @@ class FXToMLIREmitter:
             def is_leaf_module(self, m: "torch.nn.Module", module_qualified_name: str) -> bool:
                 if BitLinear is not None and isinstance(m, BitLinear):
                     return True
-                if m.__class__.__name__ in ("RotaryEmbedding", "BitLinear"):
+                if isinstance(m, (nn.Embedding, nn.LayerNorm)):
+                    return True
+                if m.__class__.__name__ in ("RotaryEmbedding", "BitLinear", "LlamaRMSNorm", "RMSNorm", "Embedding"):
                     return True
                 return super().is_leaf_module(m, module_qualified_name)
 
@@ -201,7 +203,11 @@ class FXToMLIREmitter:
                 if sample_input is not None:
                     shape_str = "x".join(map(str, list(sample_input.shape)))
                 
-                t_type = f"tensor<{shape_str}xf32>"
+                if sample_input is not None and sample_input.dtype in (torch.int32, torch.int64):
+                    t_type = f"tensor<{shape_str}xi32>"
+                else:
+                    t_type = f"tensor<{shape_str}xf32>"
+
                 ssa_name = f"%arg{arg_idx}"
                 arg_idx += 1
                 input_args.append(f"{ssa_name}: {t_type}")
@@ -252,9 +258,8 @@ class FXToMLIREmitter:
         self.type_map[cache_v_arg] = cache_v_type
         self.type_map[seq_pos_arg] = seq_pos_type
 
-        # Output signature placeholder (Input + updated cache K + updated cache V)
-        out_type = input_types[0] if input_types else "tensor<1x2xf32>"
-        func_sig = f"  func.func @main({', '.join(input_args)}) -> ({out_type}, {cache_k_type}, {cache_v_type}) attributes {{llvm.emit_c_interface}} {{"
+        # Output signature placeholder (Input/Output tensor + updated cache K + updated cache V)
+        func_sig = f"  func.func @main({', '.join(input_args)}) -> (__OUT_TYPE__, {cache_k_type}, {cache_v_type}) attributes {{llvm.emit_c_interface}} {{"
         self.mlir_lines.append(func_sig)
 
         current_cache_k = cache_k_arg
@@ -273,6 +278,58 @@ class FXToMLIREmitter:
                     res_var = self._get_new_var(inp_type)
                     self.mlir_lines.append(
                         f'    {res_var} = "tenzo.rope"({inp}, {seq_pos_arg}) : ({inp_type}, {seq_pos_type}) -> {inp_type}'
+                    )
+                    self.ssa_map[node] = res_var
+                    self.type_map[res_var] = inp_type
+
+                elif isinstance(submod, nn.Embedding) or submod.__class__.__name__ == "Embedding":
+                    inp = self.ssa_map[node.args[0]]
+                    inp_type = self.type_map[inp]
+                    
+                    w_name = f"{node.target}.weight"
+                    w_meta = self.weight_metadata[w_name]
+                    w_offset = w_meta["offset"]
+                    w_shape = w_meta["shape"]
+                    
+                    w_shape_str = f"{w_shape[0]}x{w_shape[1]}"
+                    c_off_var = self._get_new_var("index")
+                    self.mlir_lines.append(f'    {c_off_var} = arith.constant {w_offset} : index')
+                    
+                    w_memref_var = self._get_new_var(f"memref<{w_shape_str}xf32>")
+                    self.mlir_lines.append(f'    {w_memref_var} = memref.view {weights_buf_arg}[{c_off_var}][] : memref<?xi8> to memref<{w_shape_str}xf32>')
+                    w_tensor_var = self._get_new_var(f"tensor<{w_shape_str}xf32>")
+                    self.mlir_lines.append(f'    {w_tensor_var} = bufferization.to_tensor {w_memref_var} : memref<{w_shape_str}xf32> to tensor<{w_shape_str}xf32>')
+                    
+                    res_type = f"tensor<1x1x{w_shape[1]}xf32>"
+                    res_var = self._get_new_var(res_type)
+                    self.mlir_lines.append(
+                        f'    {res_var} = "tenzo.embedding"({inp}, {w_tensor_var}) : ({inp_type}, tensor<{w_shape_str}xf32>) -> {res_type}'
+                    )
+                    self.ssa_map[node] = res_var
+                    self.type_map[res_var] = res_type
+
+                elif submod.__class__.__name__ in ("LlamaRMSNorm", "RMSNorm"):
+                    inp = self.ssa_map[node.args[0]]
+                    inp_type = self.type_map[inp]
+                    
+                    w_name = f"{node.target}.weight"
+                    w_meta = self.weight_metadata[w_name]
+                    w_offset = w_meta["offset"]
+                    w_shape = w_meta["shape"]
+                    w_shape_str = "x".join(map(str, w_shape))
+                    
+                    c_off_var = self._get_new_var("index")
+                    self.mlir_lines.append(f'    {c_off_var} = arith.constant {w_offset} : index')
+                    
+                    w_memref_var = self._get_new_var(f"memref<{w_shape_str}xf32>")
+                    self.mlir_lines.append(f'    {w_memref_var} = memref.view {weights_buf_arg}[{c_off_var}][] : memref<?xi8> to memref<{w_shape_str}xf32>')
+                    w_tensor_var = self._get_new_var(f"tensor<{w_shape_str}xf32>")
+                    self.mlir_lines.append(f'    {w_tensor_var} = bufferization.to_tensor {w_memref_var} : memref<{w_shape_str}xf32> to tensor<{w_shape_str}xf32>')
+                    
+                    eps_val = getattr(submod, "variance_epsilon", 1e-6)
+                    res_var = self._get_new_var(inp_type)
+                    self.mlir_lines.append(
+                        f'    {res_var} = "tenzo.rmsnorm"({inp}, {w_tensor_var}) {{eps = {eps_val:.8e} : f32}} : ({inp_type}, tensor<{w_shape_str}xf32>) -> {inp_type}'
                     )
                     self.ssa_map[node] = res_var
                     self.type_map[res_var] = inp_type
@@ -522,6 +579,8 @@ class FXToMLIREmitter:
         self.weights_file.close()
         
         mlir_content = "\n".join(self.mlir_lines)
+        mlir_content = mlir_content.replace("__OUT_TYPE__", res_type)
+
         mlir_out_path = os.path.join(self.output_dir, "model.mlir")
         with open(mlir_out_path, "w") as f:
             f.write(mlir_content)

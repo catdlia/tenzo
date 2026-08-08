@@ -113,7 +113,9 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(mode, "validate") == 0) {
         tenzo::runEndToEndMathTest(context);
     } else if (strcmp(mode, "generate") == 0) {
-        tenzo::runGenerationTest(context);
+        std::string prompt = (argc > 2) ? argv[2] : "Tenzo Edge AI";
+        int max_tokens = (argc > 3) ? std::atoi(argv[3]) : 20;
+        tenzo::runGenerationTest(context, prompt, max_tokens);
     } else if (strcmp(mode, "test") == 0) {
         // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";
