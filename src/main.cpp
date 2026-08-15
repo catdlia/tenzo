@@ -1,29 +1,32 @@
 #include "context/TenzoContext.h"
 #include "tests/PipelineTests.h"
 #include "tests/GPUTests.h"
+#include "tests/DynamicInferenceTest.h"
+#include "tests/ZeroCopyBridgeTest.h"
+#include "tests/EndToEndMathTest.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
+#include <cstdlib>
 
 void printUsage() {
-    llvm::outs() << "Usage: tenzo-cli [command]\n";
+    llvm::outs() << "Usage: tenzo-cli [command] [options]\n\n";
     llvm::outs() << "Commands:\n";
+    llvm::outs() << "  generate  Run autoregressive text generation loop\n";
+    llvm::outs() << "            Options:\n";
+    llvm::outs() << "              -p, --prompt <str>       Prompt string (default: \"Tenzo Edge AI\")\n";
+    llvm::outs() << "              -n, --max-tokens <int>   Max generated tokens (default: 20)\n";
+    llvm::outs() << "              -t, --temp <float>       Temperature (default: 0.7, 0.0 = Greedy/ArgMax)\n";
+    llvm::outs() << "                  --top-p <float>      Nucleus sampling top-p (default: 0.9)\n";
+    llvm::outs() << "              -m, --model-dir <path>   Directory with model.mlir, weights.bin, etc.\n";
     llvm::outs() << "  cpu       Run CPU MatMul benchmark (512x512, default)\n";
     llvm::outs() << "  explicit  Run Explicit Micro-Kernel benchmark (GotoBLAS-style)\n";
     llvm::outs() << "  large     Run large MatMul benchmark (1024x1024)\n";
     llvm::outs() << "  parallel  Run parallel (multithreaded) benchmark\n";
-    llvm::outs() << "  small     Run small MatMul test (64x64, explicit vectorization)\n";
     llvm::outs() << "  microkernel Run micro-kernel benchmark (6x16, pure performance)\n";
     llvm::outs() << "  blis      Run BLIS-style benchmark (packing + explicit kernel, 40+ GFLOPS target)\n";
-    llvm::outs() << "  generate-microkernel Generate MLIR micro-kernel source code\n";
-    llvm::outs() << "  packing   Run packing kernels bandwidth benchmark (Etap 3)\n";
-    llvm::outs() << "  gemm      Run full GEMM with 5-loop macro-kernel (Etap 3 Day 2)\n";
-    llvm::outs() << "  gemm-e2e  Run native AVX2 GEMM end-to-end benchmark (Etap 3 - Packing)\n";
-    llvm::outs() << "  linear    Run Linear Layer inference benchmark (Etap 3 Day 3 - Real NN)\n";
-    llvm::outs() << "  transform Run Transform Dialect test (64x64)\n";
-    llvm::outs() << "  conv2d    Run Conv2D benchmark\n";
+    llvm::outs() << "  validate  Run single-pass E2E math validation\n";
     llvm::outs() << "  gpu       Run GPU pipeline test\n";
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
-    llvm::outs() << "  hybrid-bench Run A/B benchmark for Hybrid Affinity and Heterogeneous Split\n";
     llvm::outs() << "  test      Run quick validation tests\n";
     llvm::outs() << "  all       Run all tests\n";
     llvm::outs() << "  version   Show version info\n";
@@ -100,20 +103,51 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(mode, "fusion-bench") == 0) {
         llvm::outs() << "--- Running Final Operator Fusion Benchmark ---\n";
         tenzo::runFusionBenchmark(context);
+    } else if (strcmp(mode, "dynamic") == 0) {
+        tenzo::runDynamicInferenceTest(context);
+    } else if (strcmp(mode, "bridge") == 0) {
+        tenzo::runZeroCopyBridgeTest(context);
+    } else if (strcmp(mode, "tl1") == 0) { tenzo::runTestTL1(context); } else if (strcmp(mode, "validate") == 0) {
+        tenzo::runEndToEndMathTest(context);
+    } else if (strcmp(mode, "generate") == 0) {
+        tenzo::GenerationConfig config;
+        
+        int i = 2;
+        while (i < argc) {
+            std::string arg = argv[i];
+            if (arg == "-p" || arg == "--prompt") {
+                if (i + 1 < argc) { config.prompt = argv[++i]; }
+            } else if (arg == "-n" || arg == "--max-tokens") {
+                if (i + 1 < argc) { config.max_tokens = std::atoi(argv[++i]); }
+            } else if (arg == "-t" || arg == "--temp" || arg == "--temperature") {
+                if (i + 1 < argc) { config.temperature = std::atof(argv[++i]); }
+            } else if (arg == "--top-p") {
+                if (i + 1 < argc) { config.top_p = std::atof(argv[++i]); }
+            } else if (arg == "-m" || arg == "--model-dir") {
+                if (i + 1 < argc) { config.model_dir = argv[++i]; }
+            } else if (arg == "-h" || arg == "--help") {
+                printUsage();
+                return 0;
+            } else if (arg[0] != '-') {
+                // Positional arguments fallback: 1st is prompt, 2nd is max_tokens
+                if (i == 2) config.prompt = arg;
+                else if (i == 3) config.max_tokens = std::atoi(arg.c_str());
+            }
+            i++;
+        }
+
+        tenzo::runGenerationTest(context, config);
+
     } else if (strcmp(mode, "test") == 0) {
-        // Quick validation tests
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";
         bool allPassed = true;
 
-        // Test 1: CPU pipeline
         llvm::outs() << "[1/3] CPU MatMul... ";
         tenzo::runFullPipelineTest(context);
 
-        // Test 2: Conv2D
         llvm::outs() << "\n[2/3] Conv2D... ";
         tenzo::runConv2DTest(context);
 
-        // Test 3: GPU pipeline
         llvm::outs() << "\n[3/3] GPU Pipeline... ";
         tenzo::gpu::runGPUPipelineTest(context);
 

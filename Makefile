@@ -1,100 +1,148 @@
 # Tenzo Compiler Makefile
 # Convenience wrapper for common operations
 
-.PHONY: all build test clean docker-build docker-run cpu gpu conv2d bench help q
+.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench bench version docker-build dev docker-shell compile-commands format watch help
 
 # Default target
 all: build
 
-# Quick rebuild and test (fastest iteration)
-q:
-	@docker compose run --rm dev bash -c "ninja -C /app/cmake-build-debug tenzo-cli && /app/cmake-build-debug/tenzo-cli cpu 2>&1 | tail -8"
+# ==========================================
+# 🚀 BUILD TARGETS
+# ==========================================
 
-# Build inside Docker
+# Головний білд: використовує Hetzner
 build:
-	@echo "🔨 Building Tenzo Compiler..."
-	docker compose run --rm dev ninja -C /app/cmake-build-debug tenzo-cli
+	@echo "🚀 Запуск віддаленої компіляції через Hetzner..."
+	./remote_build.sh
 
-# Configure CMake
-configure:
-	@echo "⚙️ Configuring CMake..."
-	docker compose run --rm dev cmake -B/app/cmake-build-debug -S/app -GNinja -DCMAKE_BUILD_TYPE=Debug
+# Локальний бекап (на випадок відсутності інтернету)
+build-local:
+	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli
 
-# Clean build
-clean:
-	@echo "🧹 Cleaning build directory..."
-	docker compose run --rm dev rm -rf /app/cmake-build-debug/*
+# ==========================================
+# 🧪 TESTING & RUNNING (via Docker)
+# ==========================================
+
+# Quick rebuild and test (fastest iteration)
+q: build
+	@docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "/app/cmake-build-debug/tenzo-cli cpu 2>&1 | tail -8"
 
 # Run all tests
 test: build
 	@echo "🧪 Running tests..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli test
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli test
 
 # Run CPU benchmark
 cpu: build
 	@echo "⚡ Running CPU benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli cpu
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli cpu
 
 # Run large matrix benchmark (768x768)
 large: build
 	@echo "🔥 Running Large Matrix benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli large
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli large
 
 # Run parallel (multithreaded) benchmark
 parallel: build
 	@echo "🔀 Running Parallel benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli parallel
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli parallel
 
 # Run stability test (3 runs)
 stability: build
 	@echo "📊 Running Stability Test (3 runs)..."
 	@for i in 1 2 3; do \
 		echo "=== Run $$i ==="; \
-		docker compose run --rm dev /app/cmake-build-debug/tenzo-cli cpu 2>&1 | grep -E "Scalar:|Vector:|Speedup:"; \
+		docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli cpu 2>&1 | grep -E "Scalar:|Vector:|Speedup:"; \
 	done
-
-# Run hardware analysis
-hw-analyze:
-	@echo "🖥️ Running Hardware Analysis..."
-	docker compose run --rm dev python3 /app/scripts/benchmark_hardware.py -b
 
 # Run Conv2D benchmark
 conv2d: build
 	@echo "🎯 Running Conv2D benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli conv2d
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli conv2d
+
+# Run Dynamic Inference test
+dynamic: build
+	@echo "🌊 Running Dynamic Inference test..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli dynamic
 
 # Run GPU test
 gpu: build
 	@echo "🎮 Running GPU test..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli gpu
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli gpu
 
 # Run GPU benchmark
 gpu-bench: build
 	@echo "🚀 Running GPU benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli gpu-bench
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli gpu-bench
 
 # Run all benchmarks
 bench: build
 	@echo "📊 Running all benchmarks..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli all
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli all
+
+# ==========================================
+# 🐍 ONNX FRONTEND (Python)
+# ==========================================
+
+# Convert ONNX model to Tenzo MLIR
+# Usage: make onnx-convert MODEL=model.onnx [OUT=output.mlir]
+onnx-convert:
+	@echo "🔄 Converting ONNX to Tenzo MLIR..."
+	@if [ -d ".venv" ]; then \
+		.venv/bin/python3 tenzo-frontend/onnx_to_mlir.py $(MODEL) -o $(if $(OUT),$(OUT),output.mlir); \
+	else \
+		python3 tenzo-frontend/onnx_to_mlir.py $(MODEL) -o $(if $(OUT),$(OUT),output.mlir); \
+	fi
+
+# Run ONNX frontend tests
+onnx-test:
+	@echo "🧪 Running ONNX Frontend test..."
+	@if [ -d ".venv" ]; then \
+		.venv/bin/python3 tenzo-frontend/test_simple_mlp.py; \
+	else \
+		python3 tenzo-frontend/test_simple_mlp.py; \
+	fi
+
+# Setup Python environment
+frontend-setup:
+	@echo "📦 Setting up ONNX frontend dependencies..."
+	python3 -m venv .venv
+	.venv/bin/pip install -r tenzo-frontend/requirements.txt
+
+# ==========================================
+# 🛠 UTILITIES
+# ==========================================
+
+# Configure CMake
+configure:
+	@echo "⚙️ Configuring CMake..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev cmake -B/app/cmake-build-debug -S/app -GNinja -DCMAKE_BUILD_TYPE=Debug
+
+# Clean build
+clean:
+	@echo "🧹 Cleaning build directory..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev rm -rf /app/cmake-build-debug/*
+
+# Run hardware analysis
+hw-analyze:
+	@echo "🖥️ Running Hardware Analysis..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev python3 /app/scripts/benchmark_hardware.py -b
 
 # Show version
 version: build
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli version
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli version
 
 # Build Docker image
 docker-build:
 	@echo "🐳 Building Docker image..."
 	docker compose build dev
 
-# Interactive development shell (fastest for iterating)
+# Interactive development shell
 dev:
 	@echo "🚀 Starting interactive dev shell..."
-	@echo "   Inside the shell, use:"
-	@echo "   ninja tenzo-cli && ./tenzo-cli cpu"
-	@docker compose run --rm dev bash
+	@docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash
 
-# Start docker shell (legacy)
 docker-shell: dev
 
 # Generate compile_commands.json for IDE
@@ -107,7 +155,7 @@ format:
 	@echo "✨ Formatting code..."
 	find src -name '*.cpp' -o -name '*.h' | xargs clang-format -i
 
-# Watch mode - rebuild on changes
+# Watch mode
 watch:
 	@echo "👀 Watching for changes..."
 	@while true; do \
@@ -119,18 +167,13 @@ help:
 	@echo "╔════════════════════════════════════════════════════╗"
 	@echo "║          Tenzo Compiler Build System               ║"
 	@echo "╠════════════════════════════════════════════════════╣"
-	@echo "║  make build       - Build the compiler             ║"
+	@echo "║  make build       - Віддалена збірка (Hetzner)║"
+	@echo "║  make build-local - Локальна збірка (в Docker)     ║"
 	@echo "║  make test        - Run all tests                  ║"
 	@echo "║  make cpu         - Run CPU MatMul benchmark       ║"
 	@echo "║  make large       - Run large matrix (768x768)     ║"
-	@echo "║  make parallel    - Run parallel benchmark         ║"
-	@echo "║  make stability   - Run 3x stability test          ║"
-	@echo "║  make conv2d      - Run Conv2D benchmark           ║"
 	@echo "║  make gpu         - Run GPU pipeline test          ║"
-	@echo "║  make hw-analyze  - Hardware analysis + benchmark  ║"
-	@echo "║  make bench       - Run all benchmarks             ║"
-	@echo "║  make clean       - Clean build directory          ║"
-	@echo "║  make docker-shell- Start interactive shell        ║"
-	@echo "║  make help        - Show this help                 ║"
 	@echo "╚════════════════════════════════════════════════════╝"
 
+stop-cloud:
+	hcloud server delete tenzo-build-node

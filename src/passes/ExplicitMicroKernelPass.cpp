@@ -64,8 +64,19 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
             return failure();
         }
 
-        llvm::outs() << "[MicroKernel] Generating EXPLICIT " << params.MR << "x" << params.NR 
-                     << " micro-kernel (K=" << K << ", VEC=" << params.VEC_SIZE << ")\n";
+        // Check if operation requests 1.58-bit ternary micro-kernel
+        int32_t bitWidth = 32;
+        if (auto bitAttr = op->getAttrOfType<IntegerAttr>("bit_width")) {
+            bitWidth = bitAttr.getInt();
+        }
+
+        if (bitWidth == 2) {
+            llvm::outs() << "[MicroKernel] 🚀 Routing to FUSED TERNARY (1.58-bit) Micro-Kernel ("
+                         << params.MR << "x" << params.NR << ")\n";
+        } else {
+            llvm::outs() << "[MicroKernel] Generating EXPLICIT " << params.MR << "x" << params.NR 
+                         << " micro-kernel (K=" << K << ", VEC=" << params.VEC_SIZE << ")\n";
+        }
 
         auto f32Type = rewriter.getF32Type();
         auto vecType = VectorType::get({params.VEC_SIZE}, f32Type);

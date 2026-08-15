@@ -9,7 +9,7 @@
 // This generates explicit vector.fma instructions for optimal register usage
 
 #include "passes/Passes.h"
-#include "context/HardwareInfo.h"
+#include "context/HardwareProfile.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

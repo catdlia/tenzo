@@ -10,7 +10,7 @@
 
 #include "PipelineTests.h"
 #include "passes/Passes.h"
-#include "context/HardwareInfo.h"
+#include "context/HardwareProfile.h"
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/IR/Builders.h"
@@ -32,8 +32,8 @@ void runFullGEMMBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "║  Target: 60-80 GFLOPS on 512×512                      ║\n";
     llvm::outs() << "╚════════════════════════════════════════════════════════╝\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
+    auto hwInfo = tenzo::HardwareProfile::detect();
+    hwInfo->print();
     llvm::outs() << "\n";
 
     // Test sizes

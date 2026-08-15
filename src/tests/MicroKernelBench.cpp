@@ -3,7 +3,7 @@
 
 #include "PipelineTests.h"
 #include "passes/Passes.h"
-#include "context/HardwareInfo.h"
+#include "context/HardwareProfile.h"
 #include "dialect/TenzoDialect.h"
 
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
@@ -31,8 +31,8 @@ void runMicroKernelBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "║  Pure computational performance test           ║\n";
     llvm::outs() << "╚════════════════════════════════════════════════╝\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
+    auto hwInfo = tenzo::HardwareProfile::detect();
+    hwInfo->print();
     llvm::outs() << "\n";
 
     // Test exact micro-kernel size: 6x16 with K=32
@@ -89,7 +89,7 @@ void runMicroKernelBenchmark(mlir::MLIRContext &context) {
     addTenzoBufferizationPasses(pm);
 
     // CRITICAL: Use Affine path with perfect unrolling for 6x16
-    HardwareInfo::TileSizes microTiles;
+    tenzo::TileSizes microTiles;
     microTiles.M = 6;
     microTiles.N = 16;
     microTiles.K = 4;
@@ -146,7 +146,7 @@ void runMicroKernelBenchmark(mlir::MLIRContext &context) {
     double totalOps = 2.0 * 6 * 16 * 32 * ITERATIONS;
     double gflops = (totalOps / (totalMs / 1000.0)) / 1e9;
 
-    double theoretical = hwInfo.getTheoreticalPeakGFLOPS();
+    double theoretical = hwInfo->getTheoreticalPeakGFLOPS();
     double efficiency = (gflops / theoretical) * 100.0;
 
     llvm::outs() << "\n╔════════════════════════════════════════════════╗\n";

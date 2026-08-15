@@ -5,6 +5,8 @@
 #include "mlir/IR/BuiltinTypes.h"            // Щоб знати, що таке TensorType
 #include "mlir/Interfaces/SideEffectInterfaces.h" // Щоб знати про Pure/SideEffects
 #include "mlir/Interfaces/InferTypeOpInterface.h" // Щоб знати про InferTypeOpInterface
+#include "mlir/Bytecode/BytecodeOpInterface.h"
+#include "mlir/IR/OpImplementation.h"
 // ---------------------------
 
 #include "TenzoDialect.h.inc"

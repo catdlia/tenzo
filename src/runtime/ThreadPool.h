@@ -8,7 +8,7 @@
 #include <functional>
 #include <atomic>
 #include <future>
-#include "context/HardwareInfo.h"
+#include "context/HardwareProfile.h"
 
 namespace tenzo {
 
@@ -28,7 +28,15 @@ public:
     void executeSplit(const HeterogeneousWorkSplit& split, 
                       std::function<void(const HeterogeneousWorkSplit::ThreadWork&)> task);
 
+    /// Parallel for-loop: splits [start, end) into chunks aligned to grainSize,
+    /// distributes across worker threads, and waits for completion.
+    /// The callback receives (chunkStart, chunkEnd) for each chunk.
+    /// This is the primary API for GEMM M-loop parallelization.
+    void parallelFor(int start, int end, int grainSize,
+                     std::function<void(int, int)> body);
+
     int size() const { return (int)workers.size(); }
+    size_t activeThreadCount() const { return workers.size(); }
 
 private:
     struct Task {

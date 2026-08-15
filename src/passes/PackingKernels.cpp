@@ -51,7 +51,7 @@ constexpr int64_t VEC_SIZE = 8;  // AVX2 vector size
 // Transform B[K][N] (row-major) → B_packed (panel format for NR=16)
 // Uses vector::TransferReadOp with padding_value for automatic OOB handling
 //
-func::FuncOp generatePackBFunction(OpBuilder &builder, Location loc, MLIRContext *ctx) {
+func::FuncOp generatePackBFunction(OpBuilder &builder, Location loc, MLIRContext *ctx, AffineMap routingMap = {}) {
     auto f32Type = builder.getF32Type();
     auto indexType = builder.getIndexType();
 
@@ -102,13 +102,14 @@ func::FuncOp generatePackBFunction(OpBuilder &builder, Location loc, MLIRContext
                     Value kTimesNR = b.create<arith::MulIOp>(loc, k, cNR);
                     Value dstOffset = b.create<arith::AddIOp>(loc, dstBase, kTimesNR);
 
-                    // Use transfer_read with padding - automatically handles OOB with zeros
+                    // Use transfer_read with padding and optional routing map for Implicit Shuffle
+                    auto map = routingMap ? routingMap : b.getMultiDimIdentityMap(2);
                     Value srcVec0 = b.create<vector::TransferReadOp>(
-                        loc, vecType, src, ValueRange{k, jStart}, zeroF32);
+                        loc, vecType, src, ValueRange{k, jStart}, zeroF32, map);
 
                     Value jStartPlus8 = b.create<arith::AddIOp>(loc, jStart, cVecSize);
                     Value srcVec1 = b.create<vector::TransferReadOp>(
-                        loc, vecType, src, ValueRange{k, jStartPlus8}, zeroF32);
+                        loc, vecType, src, ValueRange{k, jStartPlus8}, zeroF32, map);
 
                     // Store to packed buffer
                     b.create<vector::TransferWriteOp>(loc, srcVec0, dst, ValueRange{dstOffset});
@@ -131,7 +132,7 @@ func::FuncOp generatePackBFunction(OpBuilder &builder, Location loc, MLIRContext
 // Transform A[M][K] (row-major) → A_packed (panel format for MR=6)
 // Uses arith::SelectOp for conditional padding (no complex scf::IfOp)
 //
-func::FuncOp generatePackAFunction(OpBuilder &builder, Location loc, MLIRContext *ctx) {
+func::FuncOp generatePackAFunction(OpBuilder &builder, Location loc, MLIRContext *ctx, AffineMap routingMap = {}) {
     auto f32Type = builder.getF32Type();
     auto indexType = builder.getIndexType();
 

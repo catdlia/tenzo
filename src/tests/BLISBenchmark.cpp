@@ -3,7 +3,7 @@
 
 #include "PipelineTests.h"
 #include "passes/Passes.h"
-#include "context/HardwareInfo.h"
+#include "context/HardwareProfile.h"
 #include "dialect/TenzoDialect.h"
 
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
@@ -32,8 +32,8 @@ void runBLISBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "║  Target: 40+ GFLOPS single-threaded               ║\n";
     llvm::outs() << "╚════════════════════════════════════════════════════╝\n\n";
 
-    auto hwInfo = HardwareInfo::detect();
-    hwInfo.print();
+    auto hwInfo = tenzo::HardwareProfile::detect();
+    hwInfo->print();
     llvm::outs() << "\n";
 
     // Test with 512x512 - divisible by 6x16
@@ -102,7 +102,7 @@ void runBLISBenchmark(mlir::MLIRContext &context) {
 
     // PHASE 2: Optimized Affine Path (6x16 unroll)
     llvm::outs() << "Applying GotoBLAS-style optimizations...\n";
-    HardwareInfo::TileSizes tiles;
+    tenzo::TileSizes tiles;
     tiles.M = 6;
     tiles.N = 16;
     tiles.K = 4;
@@ -163,7 +163,7 @@ void runBLISBenchmark(mlir::MLIRContext &context) {
     double totalOps = 2.0 * SIZE * SIZE * SIZE * ITERATIONS;
     double gflops = (totalOps / (totalMs / 1000.0)) / 1e9;
 
-    double theoretical = hwInfo.getTheoreticalPeakGFLOPS();
+    double theoretical = hwInfo->getTheoreticalPeakGFLOPS();
     double efficiency = (gflops / theoretical) * 100.0;
 
     double expected = SIZE * 2.0 * 3.0;

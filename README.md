@@ -1,108 +1,99 @@
 # ⚡ Tenzo Compiler
 
-> **Heterogeneous AI Compiler built on MLIR/LLVM** - Write once, vectorize everywhere, dispatch anywhere.(https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+> **Open-source heterogeneous AI compiler built on MLIR/LLVM** — Write once, compile for any hardware.
 
-## 🎯 Overview
+## 💡 Why Tenzo?
 
-Tenzo is an experimental, high-performance Deep Learning compiler leveraging the **MLIR (Multi-Level Intermediate Representation)** framework. It bridges the gap between high-level neural network mathematics and raw hardware execution (CPU/iGPU).
+There is no open-source compiler for tensor computations that truly targets **all hardware**. TensorRT is NVIDIA-only. CoreML is Apple-only. XLA is married to TPUs. OpenVINO is Intel-only. Every solution is either proprietary, vendor-locked, or server-oriented.
 
-Unlike standard interpreters, Tenzo actively transforms compute graphs into highly optimized machine code by utilizing **GotoBLAS/BLIS-style cache blocking**, explicit AVX2/FMA vectorization, and Vulkan SPIR-V generation.
+**Tenzo** uses MLIR/LLVM as a universal backend to generate optimal native code for **any target**, with a specialized focus on heavily quantized Large Language Models (like the 1.58-bit BitNet architectures). The compiler detects the hardware, selects the optimal lowering strategy (register allocation, SIMD width), and generates code that rivals hand-tuned libraries.
 
-### ✨ Key Technical Features
-- **Custom MLIR Dialect (`tenzo`)**: High-level graph representation (`tenzo.matmul`, `tenzo.conv2d`, `tenzo.relu`).
-- **Aggressive CPU Optimization**: 5-loop GotoBLAS cache-blocking architecture with memory packing for L1/L2/L3 cache efficiency.
-- **Hardware-Aware Vectorization**: Explicit 6x16 micro-kernels targeting AVX2 YMM registers with zero spilling.
-- **Operator Fusion**: Fuses bias and activation functions (e.g., MatMul + Bias + ReLU) directly into the AVX2 micro-kernel registers, eliminating memory roundtrips.
-- **Heterogeneous Execution**: Path to lower Linalg operations to GPU Dialect and serialize to `spirv.module` for Vulkan execution.
+### ✨ Key Features
+- **Custom MLIR Dialect** (`tenzo.bitlinear_tl1`, `tenzo.rope`, `tenzo.rms_norm`) — high-level LLM tensor IR.
+- **Zero-Allocation Bufferization** — in-place memory reuse keeping dynamic memory allocations completely out of the inference hot loop.
+- **Explicit AVX2 micro-kernels** — e.g. `vpshufb` 256-bit SIMD kernel for BitNet with unroll x2 and **zero register spilling**.
+- **Quantization Support** — BitNet 1.58B ternary weights (`tl1_pack`), `lm_head` Q8 (`i8`) quantization.
+- **Operator Fusion & Hardware auto-detection** — CPU topology, cache hierarchy, SIMD capabilities.
 
-## 📊 Performance (MatMul 512x512)
+## 📊 Performance (BitNet 1.58B 2B model, 30 Layers)
+*Benchmarked on Intel Core i3-1215U (Alder Lake, 15W, 2 P-Cores).*
 
-Tested on Intel Alder Lake (i3-1215U) under ideal thermal conditions.
+| Configuration | Model Size | Decode Speed | Note |
+|---------------|------------|--------------|------|
+| **Baseline (F32/F16)** | ~4.0 GB | OOM / N/A | Exceeds device memory |
+| **BitNet Q8 + TL1 (2 Threads)** | **851 MB** | **~2.55 tok/sec** | **Fully in-register AVX2 `vpshufb` decoding (Optimal)** |
+| BitNet Q8 + TL1 (4 Threads SMT) | 851 MB | ~1.91 tok/sec | SMT degrades performance due to L1/L2 cache contention |
 
-| Approach | Environment | Throughput | Note |
-|----------|-------------|------------|------|
-| **LLVM -O3 (Scalar)** | Single-core | ~2.3 GFLOPS | Standard loop compilation |
-| **OpenBLAS (Numpy)** | Single-core | ~45.7 GFLOPS | Highly optimized assembly |
-| **Tenzo (MLIR E2E)** | Single-core | **~60.3 GFLOPS** | Auto-generated AVX2 micro-kernel + Cache Blocking |
-| **Tenzo (Isolated)** | L1 Cache | **124.4 GFLOPS** | Peak micro-kernel efficiency |
-| **Tenzo Parallel** | 8 Instances | **~225.2 GFLOPS** | Thread-bound parallel scaling |
-
-*Note: Tenzo outperforms OpenBLAS (+31.9% in single-threaded) by exploiting perfect register allocation, zero-overhead packing, and exact L1/L2 tile sizing.*
-
-## 🏗️ Architecture Stack
+## 🏗️ Architecture
 
 ```text
-   tenzo.matmul, tenzo.conv2d, tenzo.add
-        │
-        ▼   Fusion Pass (e.g., MatMul + ReLU -> FusedMatMulRelu)
-        │
-        ▼   Linalg Lowering -> Bufferization -> MemRef
-        │
-    ┌───┴──────────────────────────────┐
-    ▼                                  ▼
-1. GotoBLAS Packing               1. Linalg to Parallel Loops
-2. 5-Loop Cache Blocking          2. SCF to GPU Dialect
-3. 6x16 Micro-kernel unrolling    3. GPU to SPIR-V Dialect
-4. LLVM IR Lowering               4. Binary Serialization
-    │                                  │
-    ▼                                  ▼
-LLVM JIT Engine                   Vulkan Compute Pipeline
+       PyTorch / HuggingFace Model
+                 │
+   tenzo-frontend (Weight Extraction & tl1_pack)
+                 │
+   tenzo.bitlinear_tl1 / tenzo.rope / tenzo.matmul_q8
+                 │
+         Fusion + Graph Opt
+                 │
+    Linalg → Zero-Alloc Bufferization → MemRef
+                 │
+    ┌────┬───────┼───────┬──────────┐
+    ▼    ▼       ▼       ▼          ▼
+  x86  ARM   RISC-V   CUDA    Vulkan/SPIR-V
+  AVX2 NEON  V-ext    PTX     (iGPU/AMD)
+    │    │       │       │          │
+    └────┴───────┴───────┴──────────┘
+         Hardware Auto-Detection
+         → Optimal tiling, blocking
+         → Register mapping (Zero-spill)
 ```
+
+## 📍 Current State
+
+**Working:** Full x86 AVX2 pipeline (DSL → LLVM JIT), operator fusion, BitNet 1.58B autoregressive generation, zero-allocation bufferization, OpenMP multithreading.
+**Not yet:** Multi-target backends, standalone inference runtime beyond CLI, K/V Cache quantization.
+
+See [PROJECT_STATUS.md](PROJECT_STATUS.md) for detailed component inventory and gap analysis.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose (Highly recommended for reproducible LLVM 18 environments)
-- *Optional:* Native LLVM/MLIR 18 and Vulkan SDK.
+- Docker & Docker Compose
+- `uv` (Python package manager)
 
-### Build & Run via Docker
-
+### 1. Build the Compiler
 ```bash
-# 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/tenzo.git
-cd tenzo
-
-# 2. Enter the development container
-docker compose run --rm -it -v $(pwd):/app -w /app dev bash
-
-# 3. Build the compiler inside the container
-mkdir -p build_e2e && cd build_e2e
-cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
-ninja tenzo-cli
-
-# 4. Run the End-to-End GEMM Benchmark
-./tenzo-cli gemm-e2e
+make build-local   # Compile locally in Docker
 ```
 
-### Command Line Interface
+### 2. Export Model (BitNet 1.58B)
 ```bash
-./tenzo-cli cpu           # Run standard CPU MatMul benchmark
-./tenzo-cli microkernel   # Run pure 6x16 micro-kernel performance test
-./tenzo-cli gemm-e2e      # Run full 5-loop packed GEMM benchmark
-./tenzo-cli conv2d        # Run Conv2D (NHWC) test
-./tenzo-cli gpu           # Run GPU/SPIR-V pipeline test
+uv run python3 tenzo-frontend/export_bitnet.py --quant-mode tl1_pack --num-layers 30 --output-dir export_output_bitnet
 ```
 
-## 📂 Project Structure
+### 3. Run Inference
+```bash
+docker compose run --rm -e OMP_NUM_THREADS=2 -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli generate -m /app/export_output_bitnet -n 30
+```
 
-- `src/dialect/`: Definition of the `tenzo` MLIR dialect (ODS/TableGen).
-- `src/passes/`: Core compiler optimizations.
-  - `PackingKernels.cpp`: Memory layout transformations (Row-major to Block-panel).
-  - `MacroKernelPass.cpp`: Cache-blocking loop nest generation.
-  - `ExplicitMicroKernelPass.cpp`: AVX2 FMA instruction generation.
-  - `gpu/GPULowering.cpp`: SPIR-V conversion pipeline.
-- `src/runtime/`: Minimal Vulkan compute wrapper.
-- `src/tests/`: Benchmarks and E2E validation.
+## 📂 Structure
+
+| Directory | Purpose |
+|-----------|---------|
+| `src/dialect/` | Tenzo MLIR dialect (ODS/TableGen) |
+| `src/passes/` | Compiler passes: fusion, lowering, zero-alloc bufferize, AVX2 micro-kernels |
+| `src/context/` | Hardware detection, auto-tuning |
+| `src/runtime/` | Tokenizer, KVCacheManager, OpenMP execution |
+| `src/tests/` | Benchmarks and E2E validation |
+| `tenzo-frontend/` | PyTorch exporters (`export_bitnet.py`) |
 
 ## 🗺️ Roadmap
 
-- End-to-End Linalg to LLVM pipeline.
-- GotoBLAS micro-kernel architecture & packing.
-- AVX2 explicit vectorization (124 GFLOPS peak).
-- Intra-operation Multithreading (OpenMP parallelization of macro-kernel).
-- Conv2D optimization via `im2col` + GEMM.
-- Complete Vulkan Runtime integration for MatMul.
-- Quantization (INT8) using AVX-VNNI.
+- [x] End-to-end MLIR compilation pipeline (x86 AVX2)
+- [x] BitNet 1.58B LLM Generation with `vpshufb` AVX2 kernel (Zero Spill)
+- [x] Zero-Allocation MLIR Bufferization
+- [ ] **K/V Cache Quantization** — INT8/INT4 context window
+- [ ] **Multi-target backends** — ARM/NEON, RISC-V, CUDA/NVPTX, AMD/ROCm
 
 ## 📜 License
 MIT License
