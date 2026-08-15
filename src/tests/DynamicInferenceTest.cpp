@@ -52,7 +52,7 @@ void runDynamicInferenceTest(MLIRContext& context) {
     
     addTenzoToLinalgPass(pm);
     addTenzoBufferizationPasses(pm);
-    addTenzoToLLVMPasses(pm);
+    addTenzoToLLVMPasses(pm, /*enableVectorization=*/false, {8, 16, 4}, /*enableParallel=*/true);
 
     if (failed(pm.run(module))) {
         llvm::errs() << "Compilation failed\n";

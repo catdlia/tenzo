@@ -131,6 +131,95 @@ struct PostBufferLinalgTilingPass
   }
 };
 
+struct ConvertOuterForToParallelPattern : public OpRewritePattern<scf::ForOp> {
+    using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(scf::ForOp forOp, PatternRewriter &rewriter) const override {
+        // Convert marked loops OR memref loops (no results) with step = 128 (N loop)
+        bool shouldParallelize = forOp->hasAttr("tenzo.parallelize");
+        // No automatic parallelization based on step.
+        if (!shouldParallelize)
+            return failure();
+
+        Location loc = forOp.getLoc();
+        auto parallelOp = rewriter.create<scf::ParallelOp>(
+            loc,
+            ValueRange{forOp.getLowerBound()},
+            ValueRange{forOp.getUpperBound()},
+            ValueRange{forOp.getStep()});
+
+        Block *parallelBody = parallelOp.getBody();
+        Block *forBody = forOp.getBody();
+
+        // Replace induction var usage
+        rewriter.replaceAllUsesWith(forOp.getInductionVar(), parallelBody->getArgument(0));
+
+        // Erase the scf.yield at the end of forBody
+        if (!forBody->empty() && isa<scf::YieldOp>(forBody->back())) {
+            rewriter.eraseOp(&forBody->back());
+        }
+
+        // Move all operations safely from forBody into parallelBody BEFORE its terminator
+        parallelBody->getOperations().splice(parallelBody->getTerminator()->getIterator(), forBody->getOperations());
+
+        rewriter.eraseOp(forOp);
+        return success();
+    }
+};
+
+struct ParallelizeMemRefLoopsPass
+    : public PassWrapper<ParallelizeMemRefLoopsPass, OperationPass<func::FuncOp>> {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ParallelizeMemRefLoopsPass)
+
+    void runOnOperation() override {
+        func::FuncOp func = getOperation();
+
+        // 1. Convert marked scf.for loops to scf.parallel
+        RewritePatternSet patterns(&getContext());
+        patterns.add<ConvertOuterForToParallelPattern>(&getContext());
+        (void)applyPatternsGreedily(func, std::move(patterns));
+
+        // 2. Inline and eliminate ALL memref.alloca_scope ops so OpenMP lowering never fails block verification
+        func.walk([](memref::AllocaScopeOp scopeOp) {
+            if (scopeOp.getRegion().empty()) return;
+            Block &body = scopeOp.getRegion().front();
+            Operation *term = body.getTerminator();
+
+            for (Operation &op : llvm::make_early_inc_range(body.without_terminator())) {
+                op.moveBefore(scopeOp);
+            }
+
+            if (scopeOp.getNumResults() > 0 && term->getNumOperands() == scopeOp.getNumResults()) {
+                scopeOp.replaceAllUsesWith(term->getOperands());
+            }
+            scopeOp.erase();
+        });
+    }
+};
+
+struct EliminateAllocaScopesPass
+    : public PassWrapper<EliminateAllocaScopesPass, OperationPass<func::FuncOp>> {
+    MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(EliminateAllocaScopesPass)
+
+    void runOnOperation() override {
+        func::FuncOp func = getOperation();
+        func.walk([](memref::AllocaScopeOp scopeOp) {
+            if (scopeOp.getRegion().empty()) return;
+            Block &body = scopeOp.getRegion().front();
+            Operation *term = body.getTerminator();
+
+            for (Operation &op : llvm::make_early_inc_range(body.without_terminator())) {
+                op.moveBefore(scopeOp);
+            }
+
+            if (scopeOp.getNumResults() > 0 && term->getNumOperands() == scopeOp.getNumResults()) {
+                scopeOp.replaceAllUsesWith(term->getOperands());
+            }
+            scopeOp.erase();
+        });
+    }
+};
+
 } // namespace
 
 namespace tenzo {
@@ -322,6 +411,18 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm, bool enableVectorization,
   // Vector -> SCF (handles remaining vector.transfer ops)
   pm.addPass(mlir::createConvertVectorToSCFPass());
 
+  // Parallelize outer loops marked with tenzo.parallelize
+  pm.addPass(mlir::createLoopInvariantCodeMotionPass());
+  pm.addPass(mlir::createCSEPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(std::make_unique<ParallelizeMemRefLoopsPass>());
+
+  // SCF -> OpenMP (lowers any scf.parallel to omp.parallel)
+  pm.addPass(mlir::createConvertSCFToOpenMPPass());
+
+  // Eliminate any memref.alloca_scope generated inside OpenMP constructs
+  pm.addNestedPass<func::FuncOp>(std::make_unique<EliminateAllocaScopesPass>());
+
   // SCF -> Control Flow
   pm.addPass(mlir::createSCFToControlFlowPass());
 
@@ -363,11 +464,15 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm, bool enableVectorization,
   // Control Flow -> LLVM
   pm.addPass(mlir::createConvertControlFlowToLLVMPass());
 
+  // OpenMP -> LLVM
+  pm.addPass(mlir::createConvertOpenMPToLLVMPass());
+
   // Final type reconciliation and redundant lowering to catch anything left
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
   pm.addPass(mlir::createConvertMathToLLVMPass());
   pm.addPass(mlir::createArithToLLVMConversionPass());
   pm.addPass(mlir::createConvertIndexToLLVMPass());
+  pm.addPass(mlir::createUBToLLVMConversionPass());
   pm.addPass(mlir::createReconcileUnrealizedCastsPass());
 }
 

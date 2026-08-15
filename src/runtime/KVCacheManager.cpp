@@ -7,32 +7,35 @@ namespace runtime {
 KVCacheManager::KVCacheManager(int max_seq_len, int num_layers, int embed_dim, int num_heads)
     : max_seq_len(max_seq_len), num_layers(num_layers), embed_dim(embed_dim), current_seq_len(0) {
     
-    size_t total_elements = static_cast<size_t>(num_layers) * max_seq_len * embed_dim;
-    k_buffer.resize(total_elements, 0.0f);
-    v_buffer.resize(total_elements, 0.0f);
+    size_t layer_elements = static_cast<size_t>(max_seq_len) * embed_dim;
+    k_buffers.resize(num_layers, std::vector<float>(layer_elements, 0.0f));
+    v_buffers.resize(num_layers, std::vector<float>(layer_elements, 0.0f));
 
     std::vector<int64_t> shape;
     if (num_heads > 1) {
         int head_dim = embed_dim / num_heads;
-        shape = {num_layers, num_heads, max_seq_len, head_dim};
+        shape = {1, num_heads, max_seq_len, head_dim};
     } else {
-        shape = {num_layers, max_seq_len, embed_dim};
+        shape = {1, max_seq_len, embed_dim};
     }
-    k_tensor = new Tensor(shape, k_buffer.data());
-    v_tensor = new Tensor(shape, v_buffer.data());
+
+    for (int l = 0; l < num_layers; ++l) {
+        k_tensors.push_back(new Tensor(shape, k_buffers[l].data()));
+        v_tensors.push_back(new Tensor(shape, v_buffers[l].data()));
+    }
 }
 
 KVCacheManager::~KVCacheManager() {
-    // k_tensor and v_tensor don't own the data, so they just get deleted
-    delete k_tensor;
-    delete v_tensor;
+    for (auto* t : k_tensors) delete t;
+    for (auto* t : v_tensors) delete t;
 }
 
 void KVCacheManager::reset() {
     current_seq_len = 0;
-    // We don't strictly need to zero out the buffers, but doing so could prevent NaN propagation if bugs exist
-    std::fill(k_buffer.begin(), k_buffer.end(), 0.0f);
-    std::fill(v_buffer.begin(), v_buffer.end(), 0.0f);
+    for (int l = 0; l < num_layers; ++l) {
+        std::fill(k_buffers[l].begin(), k_buffers[l].end(), 0.0f);
+        std::fill(v_buffers[l].begin(), v_buffers[l].end(), 0.0f);
+    }
 }
 
 void KVCacheManager::increment_seq_len(int n) {
@@ -42,12 +45,18 @@ void KVCacheManager::increment_seq_len(int n) {
     }
 }
 
-Tensor* KVCacheManager::get_k_cache() {
-    return k_tensor;
+Tensor* KVCacheManager::get_k_cache(int layer_idx) {
+    if (layer_idx < 0 || layer_idx >= num_layers) {
+        throw std::out_of_range("Invalid layer index in get_k_cache");
+    }
+    return k_tensors[layer_idx];
 }
 
-Tensor* KVCacheManager::get_v_cache() {
-    return v_tensor;
+Tensor* KVCacheManager::get_v_cache(int layer_idx) {
+    if (layer_idx < 0 || layer_idx >= num_layers) {
+        throw std::out_of_range("Invalid layer index in get_v_cache");
+    }
+    return v_tensors[layer_idx];
 }
 
 } // namespace runtime

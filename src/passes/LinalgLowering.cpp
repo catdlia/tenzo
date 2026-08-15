@@ -1,3 +1,7 @@
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "passes/Passes.h"
 #include "dialect/TenzoDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -548,7 +552,6 @@ struct MatMulLoweringToLinalg : public OpConversionPattern<tenzo::MatMulOp> {
 
         if (lhsType.getRank() == 3 && rhsType.getRank() == 2) {
             // 3D x 2D MatMul: [B, S, K] x [N, K] -> [B, S, N]
-            // Iterators: d0=B (parallel), d1=S (parallel), d2=N (parallel), d3=K (reduction)
             auto d0 = rewriter.getAffineDimExpr(0);
             auto d1 = rewriter.getAffineDimExpr(1);
             auto d2 = rewriter.getAffineDimExpr(2);
@@ -588,6 +591,79 @@ struct MatMulLoweringToLinalg : public OpConversionPattern<tenzo::MatMulOp> {
             ValueRange{adaptor.getLhs(), adaptor.getRhs()},
             ValueRange{filledTensor.getResult(0)});
 
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
+// tenzo.matmul_q8 -> scf.parallel
+//===----------------------------------------------------------------------===//
+struct MatMulQ8Lowering : public OpConversionPattern<tenzo::MatMulQ8Op> {
+    using OpConversionPattern<tenzo::MatMulQ8Op>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::MatMulQ8Op op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+        auto rhsType = mlir::cast<RankedTensorType>(adaptor.getRhsQ().getType());
+
+        // Create zero-initialized output tensor
+        auto zero = rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(elemType));
+        auto emptyTensor = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType);
+        auto filledTensor = rewriter.create<linalg::FillOp>(loc, ValueRange{zero}, ValueRange{emptyTensor});
+        
+        Value resultMemref = rewriter.create<bufferization::ToBufferOp>(
+            loc, MemRefType::get(resultType.getShape(), rewriter.getF32Type()), filledTensor.getResult(0));
+
+        int64_t N = rhsType.getShape()[0];
+        int64_t K = rhsType.getShape()[1];
+
+        auto c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+        auto cN = rewriter.create<arith::ConstantIndexOp>(loc, N);
+        auto c1 = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+        auto cK = rewriter.create<arith::ConstantIndexOp>(loc, K);
+
+        rewriter.create<scf::ParallelOp>(loc, ValueRange{c0}, ValueRange{cN}, ValueRange{c1}, ValueRange{},
+            [&](OpBuilder &b, Location loc, ValueRange ivs, ValueRange regionArgs) {
+                Value n = ivs[0];
+                auto c0_f32 = b.create<arith::ConstantOp>(loc, b.getF32FloatAttr(0.0));
+                
+                auto kLoop = b.create<scf::ForOp>(
+                    loc, c0, cK, c1, ValueRange{c0_f32},
+                    [&](OpBuilder &b, Location loc, Value iv, ValueRange iterArgs) {
+                        Value k = iv;
+                        Value sum = iterArgs[0];
+
+                        // Load activation f32
+                        Value actVal = b.create<tensor::ExtractOp>(loc, adaptor.getLhs(), ValueRange{c0, c0, k});
+                        
+                        // Load weight i8
+                        Value wVal = b.create<tensor::ExtractOp>(loc, adaptor.getRhsQ(), ValueRange{n, k});
+                        
+                        // Convert i8 to f32
+                        Value wExt = b.create<arith::ExtSIOp>(loc, b.getI32Type(), wVal);
+                        Value wF32 = b.create<arith::SIToFPOp>(loc, b.getF32Type(), wExt);
+
+                        Value mul = b.create<arith::MulFOp>(loc, actVal, wF32);
+                        Value newSum = b.create<arith::AddFOp>(loc, sum, mul);
+
+                        b.create<scf::YieldOp>(loc, newSum);
+                    });
+
+                Value finalSum = kLoop.getResult(0);
+
+                // Load scale
+                Value scale = b.create<tensor::ExtractOp>(loc, adaptor.getRhsScales(), ValueRange{n});
+                Value scaledSum = b.create<arith::MulFOp>(loc, finalSum, scale);
+
+                b.create<memref::StoreOp>(loc, scaledSum, resultMemref, ValueRange{c0, c0, n});
+                b.create<scf::ReduceOp>(loc);
+            });
+
+        Value newResultTensor = rewriter.create<bufferization::ToTensorOp>(
+            loc, resultType, resultMemref, /*restrict=*/true);
+        rewriter.replaceOp(op, newResultTensor);
         return success();
     }
 };
@@ -973,12 +1049,34 @@ struct RMSNormLoweringToLinalg : public OpConversionPattern<tenzo::RMSNormOp> {
             }
         ).getResult(0);
 
-        // Step 2: Normalize and scale elementwise
+        // Step 2: Compute RMS per row (var = sSq / dSize + eps, rms = 1 / sqrt(var))
+        Value emptyRms = rewriter.create<tensor::EmptyOp>(loc, redShape, elemType);
+        SmallVector<AffineMap, 2> rmsMaps = {
+            rewriter.getMultiDimIdentityMap(rank - 1),
+            rewriter.getMultiDimIdentityMap(rank - 1)
+        };
+        SmallVector<utils::IteratorType> rmsIterators(rank - 1, utils::IteratorType::parallel);
+
+        Value rmsTensor = rewriter.create<linalg::GenericOp>(
+            loc, redType, ValueRange{sumSq}, ValueRange{emptyRms},
+            rmsMaps, rmsIterators,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                Value sSq = args[0];
+                Value meanSq = b.create<arith::DivFOp>(l, sSq, dSizeConst);
+                Value var = b.create<arith::AddFOp>(l, meanSq, epsConst);
+                Value sqrtVar = b.create<math::SqrtOp>(l, var);
+                Value one = b.create<arith::ConstantOp>(l, rewriter.getFloatAttr(elemType, 1.0));
+                Value rms = b.create<arith::DivFOp>(l, one, sqrtVar);
+                b.create<linalg::YieldOp>(l, rms);
+            }
+        ).getResult(0);
+
+        // Step 3: Normalize and scale elementwise
         AffineMap weightMap = AffineMap::get(rank, 0, {rewriter.getAffineDimExpr(rank - 1)}, rewriter.getContext());
 
         SmallVector<AffineMap, 4> normMaps = {
             rewriter.getMultiDimIdentityMap(rank),
-            redOutMap,
+            redOutMap, // this maps [B, Seq, D] -> [B, Seq] for rmsTensor
             weightMap,
             rewriter.getMultiDimIdentityMap(rank)
         };
@@ -987,19 +1085,16 @@ struct RMSNormLoweringToLinalg : public OpConversionPattern<tenzo::RMSNormOp> {
 
         rewriter.replaceOpWithNewOp<linalg::GenericOp>(
             op, resultType,
-            ValueRange{input, sumSq, weight}, ValueRange{emptyOut},
+            ValueRange{input, rmsTensor, weight}, ValueRange{emptyOut},
             normMaps, normIterators,
             [&](OpBuilder &b, Location l, ValueRange args) {
                 Value x = args[0];
-                Value sSq = args[1];
+                Value rms = args[1];
                 Value w = args[2];
 
-                Value meanSq = b.create<arith::DivFOp>(l, sSq, dSizeConst);
-                Value meanSqEps = b.create<arith::AddFOp>(l, meanSq, epsConst);
-                Value rsqrt = b.create<math::RsqrtOp>(l, meanSqEps);
-
-                Value normX = b.create<arith::MulFOp>(l, x, rsqrt);
+                Value normX = b.create<arith::MulFOp>(l, x, rms);
                 Value res = b.create<arith::MulFOp>(l, normX, w);
+
                 b.create<linalg::YieldOp>(l, res);
             }
         );
@@ -1014,7 +1109,8 @@ struct EmbeddingLoweringToLinalg : public OpConversionPattern<tenzo::EmbeddingOp
                                 ConversionPatternRewriter &rewriter) const override {
         auto loc = op.getLoc();
         Value indices = adaptor.getIndices();
-        Value weight = adaptor.getWeight();
+        Value weight_q = adaptor.getWeightQ();
+        Value scales = adaptor.getScales();
 
         auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
         auto elemType = resultType.getElementType();
@@ -1040,7 +1136,13 @@ struct EmbeddingLoweringToLinalg : public OpConversionPattern<tenzo::EmbeddingOp
                 Value tokenIdx = b.create<arith::IndexCastOp>(l, b.getIndexType(), tokenI32);
                 Value dIdx = b.create<linalg::IndexOp>(l, rank - 1);
 
-                Value embVal = b.create<tensor::ExtractOp>(l, weight, ValueRange{tokenIdx, dIdx});
+                Value embValQ = b.create<tensor::ExtractOp>(l, weight_q, ValueRange{tokenIdx, dIdx});
+                Value embValQExt = b.create<arith::ExtSIOp>(l, b.getI32Type(), embValQ);
+                Value embValQF32 = b.create<arith::SIToFPOp>(l, b.getF32Type(), embValQExt);
+                
+                Value scale = b.create<tensor::ExtractOp>(l, scales, ValueRange{tokenIdx});
+                Value embVal = b.create<arith::MulFOp>(l, embValQF32, scale);
+                
                 b.create<linalg::YieldOp>(l, embVal);
             }
         );
@@ -1050,13 +1152,672 @@ struct EmbeddingLoweringToLinalg : public OpConversionPattern<tenzo::EmbeddingOp
 
 } // namespace
 
+
+struct BitLinearTL1PackLoweringToLinalg : public OpConversionPattern<tenzo::BitLinearTL1PackOp> {
+    using OpConversionPattern<tenzo::BitLinearTL1PackOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::BitLinearTL1PackOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value act = adaptor.getInput();
+        Value weights = adaptor.getWeights(); // [N_blocks, K/2, 32]
+        auto actType = mlir::cast<RankedTensorType>(act.getType());
+        auto wType = mlir::cast<RankedTensorType>(weights.getType());
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        if (actType.getRank() != 3 || wType.getRank() != 3 || resultType.getRank() != 3) return failure();
+
+        int64_t K = actType.getShape()[2];
+        int64_t N = resultType.getShape()[2];
+        int64_t n_blocks = wType.getShape()[0];
+        int64_t K_half = wType.getShape()[1];
+        if (K % 2 != 0 || K_half * 2 != K || wType.getShape()[2] != 32 || n_blocks * 64 != N) return failure();
+
+        Value scaleF;
+        if (op.getScale()) {
+            scaleF = adaptor.getScale();
+            if (auto sType = mlir::dyn_cast<RankedTensorType>(scaleF.getType())) {
+                Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+                SmallVector<Value> sIdxs(sType.getRank(), zeroIdx);
+                scaleF = rewriter.create<tensor::ExtractOp>(loc, scaleF, sIdxs);
+            }
+        } else {
+            scaleF = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, 1.0));
+        }
+
+        Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+        Value oneIdx = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+        Value ubK = rewriter.create<arith::ConstantIndexOp>(loc, K);
+        Value c128Idx = rewriter.create<arith::ConstantIndexOp>(loc, 128);
+
+        Value dimB = rewriter.create<tensor::DimOp>(loc, act, 0);
+        Value dimS = rewriter.create<tensor::DimOp>(loc, act, 1);
+
+        auto vector128f32 = VectorType::get({128}, rewriter.getF32Type());
+        Value zero128f32 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vector128f32, rewriter.getF32FloatAttr(0.0f)));
+
+        Value rhsMemref = rewriter.create<bufferization::ToBufferOp>(loc, MemRefType::get(wType.getShape(), rewriter.getI8Type()), weights);
+        Value outMemref = rewriter.create<memref::AllocOp>(loc, MemRefType::get(resultType.getShape(), elemType));
+        
+        // LUT memory
+        auto vec32i8 = VectorType::get({32}, rewriter.getI8Type());
+        Value lutMemref = rewriter.create<memref::AllocOp>(loc, MemRefType::get({K_half}, vec32i8));
+        Value zeros32i8 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vec32i8, rewriter.getI8IntegerAttr(0)));
+        Value lhsMemref = rewriter.create<memref::AllocOp>(loc, MemRefType::get({K}, rewriter.getI16Type()));
+
+        auto module = op->getParentOfType<ModuleOp>();
+        if (!module.lookupSymbol("llvm.x86.avx2.pshuf.b")) {
+            OpBuilder moduleBuilder(module.getBodyRegion());
+            auto funcOp = moduleBuilder.create<func::FuncOp>(loc, "llvm.x86.avx2.pshuf.b", 
+                rewriter.getFunctionType({vec32i8, vec32i8}, {vec32i8}));
+            funcOp.setPrivate();
+        }
+
+        auto vec32i16 = VectorType::get({32}, rewriter.getI16Type());
+        auto vec16i16 = VectorType::get({16}, rewriter.getI16Type());
+        auto vec32i32 = VectorType::get({32}, rewriter.getI32Type());
+        auto vec32f32 = VectorType::get({32}, rewriter.getF32Type());
+
+        Value zero32i32 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vec32i32, rewriter.getI32IntegerAttr(0)));
+        Value zero32i16 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vec32i16, rewriter.getI16IntegerAttr(0)));
+        Value zeroI8Scalar = rewriter.create<arith::ConstantOp>(loc, rewriter.getI8IntegerAttr(0));
+
+        Value c2 = rewriter.create<arith::ConstantIndexOp>(loc, 2);
+        Value cn_blocks = rewriter.create<arith::ConstantIndexOp>(loc, n_blocks);
+        Value ck_half = rewriter.create<arith::ConstantIndexOp>(loc, K_half);
+
+        rewriter.create<scf::ForOp>(loc, zeroIdx, dimB, oneIdx, ValueRange{}, [&](OpBuilder &bB, Location locB, Value bIdx, ValueRange argsB) {
+            bB.create<scf::ForOp>(locB, zeroIdx, dimS, oneIdx, ValueRange{}, [&](OpBuilder &bS, Location locS, Value sIdx, ValueRange argsS) {
+
+                // 1. Max Abs
+                Value maxVec = bS.create<scf::ForOp>(
+                    locS, zeroIdx, ubK, c128Idx, ValueRange{zero128f32},
+                    [&](OpBuilder &b, Location l, Value kIV, ValueRange iterK) {
+                        Value padF32 = b.create<arith::ConstantOp>(l, b.getF32FloatAttr(0.0f));
+                        bool inBounds[] = {true};
+                        Value v = b.create<vector::TransferReadOp>(l, vector128f32, act, ValueRange{bIdx, sIdx, kIV}, padF32, inBounds);
+                        Value absV = b.create<math::AbsFOp>(l, v);
+                        Value newMax = b.create<arith::MaximumFOp>(l, absV, iterK[0]);
+                        b.create<scf::YieldOp>(l, ValueRange{newMax});
+                    }).getResult(0);
+
+                Value maxAbs = bS.create<vector::ReductionOp>(locS, vector::CombiningKind::MAXIMUMF, maxVec);
+                Value eps = bS.create<arith::ConstantOp>(locS, bS.getFloatAttr(elemType, 1e-5f));
+                Value safeMaxAbs = bS.create<arith::MaximumFOp>(locS, maxAbs, eps);
+
+                Value c31F = bS.create<arith::ConstantOp>(locS, bS.getFloatAttr(elemType, 31.0f));
+                Value scaleAct = bS.create<arith::DivFOp>(locS, c31F, safeMaxAbs);
+                Value invScaleAct = bS.create<arith::DivFOp>(locS, safeMaxAbs, c31F);
+                Value totalScale = bS.create<arith::MulFOp>(locS, invScaleAct, scaleF);
+
+                Value scaleActVec = bS.create<vector::SplatOp>(locS, vector128f32, scaleAct);
+                auto vector128i16 = VectorType::get({128}, bS.getI16Type());
+
+                // 2. Quantize
+                bS.create<scf::ForOp>(
+                    locS, zeroIdx, ubK, c128Idx, ValueRange{},
+                    [&](OpBuilder &b, Location l, Value kIV, ValueRange iterK) {
+                        Value padF32 = b.create<arith::ConstantOp>(l, b.getF32FloatAttr(0.0f));
+                        bool inBounds[] = {true};
+                        Value vF32 = b.create<vector::TransferReadOp>(l, vector128f32, act, ValueRange{bIdx, sIdx, kIV}, padF32, inBounds);
+                        Value vScaled = b.create<arith::MulFOp>(l, vF32, scaleActVec);
+                        auto vector128i32 = VectorType::get({128}, b.getI32Type());
+                        Value vI32 = b.create<arith::FPToSIOp>(l, vector128i32, vScaled);
+                        Value vI16 = b.create<arith::TruncIOp>(l, vector128i16, vI32);
+                        b.create<vector::TransferWriteOp>(l, vI16, lhsMemref, ValueRange{kIV});
+                        b.create<scf::YieldOp>(l);
+                    });
+
+                // 3. LUT Gen
+                bS.create<scf::ForOp>(locS, zeroIdx, ck_half, oneIdx, ValueRange{}, 
+                    [&](OpBuilder &b, Location l, Value k_half_idx, ValueRange args) {
+                        Value k_even_idx = b.create<arith::MulIOp>(l, k_half_idx, c2);
+                        Value k_odd_idx = b.create<arith::AddIOp>(l, k_even_idx, oneIdx);
+                        
+                        Value a0_i16 = b.create<memref::LoadOp>(l, lhsMemref, ValueRange{k_even_idx});
+                        Value a1_i16 = b.create<memref::LoadOp>(l, lhsMemref, ValueRange{k_odd_idx});
+                        
+                        Value a0_i32 = b.create<arith::ExtSIOp>(l, b.getI32Type(), a0_i16);
+                        Value a1_i32 = b.create<arith::ExtSIOp>(l, b.getI32Type(), a1_i16);
+                        
+                        Value lut_vec = zeros32i8;
+                        int w0_vals[] = {-1, 0, 1};
+                        int w1_vals[] = {-1, 0, 1};
+                        
+                        for (int i = 0; i < 3; ++i) {
+                            for (int j = 0; j < 3; ++j) {
+                                int w0 = w0_vals[i];
+                                int w1 = w1_vals[j];
+                                int idx = (w0 + 1) | ((w1 + 1) << 2);
+
+                                Value sum_i32;
+                                if (w0 == 0 && w1 == 0) {
+                                    sum_i32 = b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0));
+                                } else if (w0 == 0) {
+                                    sum_i32 = (w1 == 1) ? a1_i32 : b.create<arith::SubIOp>(l, b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0)), a1_i32);
+                                } else if (w1 == 0) {
+                                    sum_i32 = (w0 == 1) ? a0_i32 : b.create<arith::SubIOp>(l, b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0)), a0_i32);
+                                } else {
+                                    Value term0 = (w0 == 1) ? a0_i32 : b.create<arith::SubIOp>(l, b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0)), a0_i32);
+                                    Value term1 = (w1 == 1) ? a1_i32 : b.create<arith::SubIOp>(l, b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0)), a1_i32);
+                                    sum_i32 = b.create<arith::AddIOp>(l, term0, term1);
+                                }
+                                
+                                Value val_i8 = b.create<arith::TruncIOp>(l, b.getI8Type(), sum_i32);
+                                lut_vec = b.create<vector::InsertElementOp>(l, val_i8, lut_vec, b.create<arith::ConstantIndexOp>(l, idx));
+                                lut_vec = b.create<vector::InsertElementOp>(l, val_i8, lut_vec, b.create<arith::ConstantIndexOp>(l, idx + 16));
+                            }
+                        }
+                        b.create<memref::StoreOp>(l, lut_vec, lutMemref, ValueRange{k_half_idx});
+                        b.create<scf::YieldOp>(l);
+                    });
+
+                // 4. Dot Product
+                Value c0F_i8_vec = bS.create<arith::ConstantOp>(locS, DenseElementsAttr::get(vec32i8, bS.getI8IntegerAttr(0x0F)));
+                Value c4_i16_vec = bS.create<arith::ConstantOp>(locS, DenseElementsAttr::get(vec16i16, bS.getI16IntegerAttr(4)));
+
+                bS.create<scf::ParallelOp>(locS, ValueRange{zeroIdx}, ValueRange{cn_blocks}, ValueRange{oneIdx}, ValueRange{},
+                    [&](OpBuilder &b, Location loc2, ValueRange ivs, ValueRange nArgs) {
+                        Value n_block_idx = ivs[0];
+                        Value c256 = b.create<arith::ConstantIndexOp>(loc2, 256);
+
+                        auto kLoop = b.create<scf::ForOp>(loc2, zeroIdx, ck_half, c256, ValueRange{zero32i32, zero32i32},
+                            [&](OpBuilder &b2, Location loc3, Value k_outer, ValueRange accs_i32) {
+                                Value nextK = b2.create<arith::AddIOp>(loc3, k_outer, c256);
+                                Value isEnd = b2.create<arith::CmpIOp>(loc3, arith::CmpIPredicate::sgt, nextK, ck_half);
+                                Value k_end = b2.create<arith::SelectOp>(loc3, isEnd, ck_half, nextK);
+                                
+                                Value c2 = b2.create<arith::ConstantIndexOp>(loc3, 2);
+                                auto kInnerLoop = b2.create<scf::ForOp>(loc3, k_outer, k_end, c2, ValueRange{zero32i16, zero32i16},
+                                    [&](OpBuilder &b3, Location loc4, Value k_micro_idx, ValueRange accs_i16) {
+                                        Value acc_low_i16 = accs_i16[0];
+                                        Value acc_high_i16 = accs_i16[1];
+                                        
+                                        Value k_micro_plus_1 = b3.create<arith::AddIOp>(loc4, k_micro_idx, oneIdx);
+                                        
+                                        Value lut_k0 = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{k_micro_idx});
+                                        Value lut_k1 = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{k_micro_plus_1});
+
+                                        bool inB[] = {true};
+                                        ArrayRef<bool> inBounds1D(inB);
+                                        Value w_k0 = b3.create<vector::TransferReadOp>(loc4, vec32i8, rhsMemref, ValueRange{n_block_idx, k_micro_idx, zeroIdx}, zeroI8Scalar, inBounds1D);
+                                        Value w_k1 = b3.create<vector::TransferReadOp>(loc4, vec32i8, rhsMemref, ValueRange{n_block_idx, k_micro_plus_1, zeroIdx}, zeroI8Scalar, inBounds1D);
+
+                                        auto process_w = [&](Value w_bytes, Value lut_vec, Value &res_low_16, Value &res_high_16) {
+                                            Value idx_low = b3.create<arith::AndIOp>(loc4, w_bytes, c0F_i8_vec);
+                                            Value w_bytes_as_i16 = b3.create<vector::BitCastOp>(loc4, vec16i16, w_bytes);
+                                            Value w_bytes_shr4_i16 = b3.create<arith::ShRUIOp>(loc4, w_bytes_as_i16, c4_i16_vec);
+                                            Value w_bytes_shr4 = b3.create<vector::BitCastOp>(loc4, vec32i8, w_bytes_shr4_i16);
+                                            Value idx_high = b3.create<arith::AndIOp>(loc4, w_bytes_shr4, c0F_i8_vec);
+
+                                            Value res_low_w = b3.create<func::CallOp>(loc4, "llvm.x86.avx2.pshuf.b", TypeRange{vec32i8}, ValueRange{lut_vec, idx_low}).getResult(0);
+                                            Value res_high_w = b3.create<func::CallOp>(loc4, "llvm.x86.avx2.pshuf.b", TypeRange{vec32i8}, ValueRange{lut_vec, idx_high}).getResult(0);
+                                            
+                                            res_low_16 = b3.create<arith::ExtSIOp>(loc4, vec32i16, res_low_w);
+                                            res_high_16 = b3.create<arith::ExtSIOp>(loc4, vec32i16, res_high_w);
+                                        };
+
+                                        Value res_low_k0_16, res_high_k0_16;
+                                        process_w(w_k0, lut_k0, res_low_k0_16, res_high_k0_16);
+                                        
+                                        Value res_low_k1_16, res_high_k1_16;
+                                        process_w(w_k1, lut_k1, res_low_k1_16, res_high_k1_16);
+
+                                        Value sum_low_16 = b3.create<arith::AddIOp>(loc4, res_low_k0_16, res_low_k1_16);
+                                        Value sum_high_16 = b3.create<arith::AddIOp>(loc4, res_high_k0_16, res_high_k1_16);
+
+                                        Value next_acc_low_i16 = b3.create<arith::AddIOp>(loc4, acc_low_i16, sum_low_16);
+                                        Value next_acc_high_i16 = b3.create<arith::AddIOp>(loc4, acc_high_i16, sum_high_16);
+
+                                        b3.create<scf::YieldOp>(loc4, ValueRange{next_acc_low_i16, next_acc_high_i16});
+                                    });
+                                
+                                Value block_acc_low_i32 = b2.create<arith::ExtSIOp>(loc3, vec32i32, kInnerLoop.getResult(0));
+                                Value block_acc_high_i32 = b2.create<arith::ExtSIOp>(loc3, vec32i32, kInnerLoop.getResult(1));
+
+                                Value next_acc_low = b2.create<arith::AddIOp>(loc3, accs_i32[0], block_acc_low_i32);
+                                Value next_acc_high = b2.create<arith::AddIOp>(loc3, accs_i32[1], block_acc_high_i32);
+
+                                b2.create<scf::YieldOp>(loc3, ValueRange{next_acc_low, next_acc_high});
+                            });
+
+                        Value totalScaleVec = b.create<vector::BroadcastOp>(loc2, vec32f32, totalScale);
+                        Value c32Idx = b.create<arith::ConstantIndexOp>(loc2, 32);
+                        Value c64Idx = b.create<arith::ConstantIndexOp>(loc2, 64);
+
+                        auto write_out = [&](OpBuilder &b1, Location l1, Value acc_low_i32, Value acc_high_i32, int output_offset_within_block) {
+                            Value out_offset = b1.create<arith::AddIOp>(l1, b1.create<arith::MulIOp>(l1, n_block_idx, c64Idx), b1.create<arith::ConstantIndexOp>(l1, output_offset_within_block));
+                            Value sum_val_f32 = b1.create<arith::SIToFPOp>(l1, vec32f32, acc_low_i32);
+                            Value final_f32 = b1.create<arith::MulFOp>(l1, sum_val_f32, totalScaleVec);
+                            b1.create<vector::TransferWriteOp>(l1, final_f32, outMemref, ValueRange{bIdx, sIdx, out_offset});
+
+                            Value out_offset_high = b1.create<arith::AddIOp>(l1, out_offset, c32Idx);
+                            Value sum_val_high_f32 = b1.create<arith::SIToFPOp>(l1, vec32f32, acc_high_i32);
+                            Value final_f32_high = b1.create<arith::MulFOp>(l1, sum_val_high_f32, totalScaleVec);
+                            b1.create<vector::TransferWriteOp>(l1, final_f32_high, outMemref, ValueRange{bIdx, sIdx, out_offset_high});
+                        };
+
+                        write_out(b, loc2, kLoop.getResult(0), kLoop.getResult(1), 0);
+
+                        b.create<scf::ReduceOp>(loc2);
+                    });
+                bS.create<scf::YieldOp>(locS);
+            });
+            bB.create<scf::YieldOp>(locB);
+        });
+
+        rewriter.create<memref::DeallocOp>(loc, lutMemref);
+        
+        Value finalTensor = rewriter.create<bufferization::ToTensorOp>(loc, resultType, outMemref);
+        rewriter.replaceOp(op, finalTensor);
+
+        rewriter.create<memref::DeallocOp>(loc, lhsMemref);
+
+        return success();
+    }
+};
+
+struct BitLinearTL1LoweringToLinalg : public OpConversionPattern<tenzo::BitLinearTL1Op> {
+    using OpConversionPattern<tenzo::BitLinearTL1Op>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::BitLinearTL1Op op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        // Fallback for non-packed version, implemented exactly the same but using different unpacking logic.
+        // It's not the primary execution path in the current model but kept for compatibility.
+        auto loc = op.getLoc();
+        Value act = adaptor.getInput();
+        Value weights = adaptor.getWeights(); // [N_blocks, K/2, 32]
+        auto actType = mlir::cast<RankedTensorType>(act.getType());
+        auto wType = mlir::cast<RankedTensorType>(weights.getType());
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        if (actType.getRank() != 3 || wType.getRank() != 3 || resultType.getRank() != 3) return failure();
+
+        int64_t K = actType.getShape()[2];
+        int64_t N = resultType.getShape()[2];
+        int64_t n_blocks = wType.getShape()[0];
+        int64_t K_half = wType.getShape()[1];
+        if (K % 2 != 0 || K_half * 2 != K || wType.getShape()[2] != 32 || n_blocks * 64 != N) return failure();
+
+        Value scaleF;
+        if (op.getScale()) {
+            scaleF = adaptor.getScale();
+            if (auto sType = mlir::dyn_cast<RankedTensorType>(scaleF.getType())) {
+                Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+                SmallVector<Value> sIdxs(sType.getRank(), zeroIdx);
+                scaleF = rewriter.create<tensor::ExtractOp>(loc, scaleF, sIdxs);
+            }
+        } else {
+            scaleF = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, 1.0));
+        }
+
+        Value zeroIdx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+        Value oneIdx = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+        Value ubK = rewriter.create<arith::ConstantIndexOp>(loc, K);
+        Value c128Idx = rewriter.create<arith::ConstantIndexOp>(loc, 128);
+
+        Value dimB = rewriter.create<tensor::DimOp>(loc, act, 0);
+        Value dimS = rewriter.create<tensor::DimOp>(loc, act, 1);
+
+        auto vector128f32 = VectorType::get({128}, rewriter.getF32Type());
+        Value zero128f32 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vector128f32, rewriter.getF32FloatAttr(0.0f)));
+
+        Value rhsMemref = rewriter.create<bufferization::ToBufferOp>(loc, MemRefType::get(wType.getShape(), rewriter.getI8Type()), weights);
+        Value outMemref = rewriter.create<memref::AllocOp>(loc, MemRefType::get(resultType.getShape(), elemType));
+        
+        // LUT memory
+        auto vec32i8 = VectorType::get({32}, rewriter.getI8Type());
+        Value lutMemref = rewriter.create<memref::AllocOp>(loc, MemRefType::get({K_half}, vec32i8));
+        Value zeros32i8 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vec32i8, rewriter.getI8IntegerAttr(0)));
+        Value lhsMemref = rewriter.create<memref::AllocOp>(loc, MemRefType::get({K}, rewriter.getI16Type()));
+
+        auto module = op->getParentOfType<ModuleOp>();
+        if (!module.lookupSymbol("llvm.x86.avx2.pshuf.b")) {
+            OpBuilder moduleBuilder(module.getBodyRegion());
+            auto funcOp = moduleBuilder.create<func::FuncOp>(loc, "llvm.x86.avx2.pshuf.b", 
+                rewriter.getFunctionType({vec32i8, vec32i8}, {vec32i8}));
+            funcOp.setPrivate();
+        }
+
+        auto vec32i16 = VectorType::get({32}, rewriter.getI16Type());
+        auto vec16i16 = VectorType::get({16}, rewriter.getI16Type());
+        auto vec32i32 = VectorType::get({32}, rewriter.getI32Type());
+        auto vec32f32 = VectorType::get({32}, rewriter.getF32Type());
+
+        Value zero32i32 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vec32i32, rewriter.getI32IntegerAttr(0)));
+        Value zero32i16 = rewriter.create<arith::ConstantOp>(loc, DenseElementsAttr::get(vec32i16, rewriter.getI16IntegerAttr(0)));
+        Value zeroI8Scalar = rewriter.create<arith::ConstantOp>(loc, rewriter.getI8IntegerAttr(0));
+
+        Value c2 = rewriter.create<arith::ConstantIndexOp>(loc, 2);
+        Value cn_blocks = rewriter.create<arith::ConstantIndexOp>(loc, n_blocks);
+        Value ck_half = rewriter.create<arith::ConstantIndexOp>(loc, K_half);
+
+        rewriter.create<scf::ForOp>(loc, zeroIdx, dimB, oneIdx, ValueRange{}, [&](OpBuilder &bB, Location locB, Value bIdx, ValueRange argsB) {
+            bB.create<scf::ForOp>(locB, zeroIdx, dimS, oneIdx, ValueRange{}, [&](OpBuilder &bS, Location locS, Value sIdx, ValueRange argsS) {
+
+                // 1. Max Abs
+                Value maxVec = bS.create<scf::ForOp>(
+                    locS, zeroIdx, ubK, c128Idx, ValueRange{zero128f32},
+                    [&](OpBuilder &b, Location l, Value kIV, ValueRange iterK) {
+                        Value padF32 = b.create<arith::ConstantOp>(l, b.getF32FloatAttr(0.0f));
+                        bool inBounds[] = {true};
+                        Value v = b.create<vector::TransferReadOp>(l, vector128f32, act, ValueRange{bIdx, sIdx, kIV}, padF32, inBounds);
+                        Value absV = b.create<math::AbsFOp>(l, v);
+                        Value newMax = b.create<arith::MaximumFOp>(l, absV, iterK[0]);
+                        b.create<scf::YieldOp>(l, ValueRange{newMax});
+                    }).getResult(0);
+
+                Value maxAbs = bS.create<vector::ReductionOp>(locS, vector::CombiningKind::MAXIMUMF, maxVec);
+                Value eps = bS.create<arith::ConstantOp>(locS, bS.getFloatAttr(elemType, 1e-5f));
+                Value safeMaxAbs = bS.create<arith::MaximumFOp>(locS, maxAbs, eps);
+
+                Value c63F = bS.create<arith::ConstantOp>(locS, bS.getFloatAttr(elemType, 63.0f));
+                Value scaleAct = bS.create<arith::DivFOp>(locS, c63F, safeMaxAbs);
+                Value invScaleAct = bS.create<arith::DivFOp>(locS, safeMaxAbs, c63F);
+                Value totalScale = bS.create<arith::MulFOp>(locS, invScaleAct, scaleF);
+
+                Value scaleActVec = bS.create<vector::SplatOp>(locS, vector128f32, scaleAct);
+                auto vector128i16 = VectorType::get({128}, bS.getI16Type());
+
+                // 2. Quantize
+                bS.create<scf::ForOp>(
+                    locS, zeroIdx, ubK, c128Idx, ValueRange{},
+                    [&](OpBuilder &b, Location l, Value kIV, ValueRange iterK) {
+                        Value padF32 = b.create<arith::ConstantOp>(l, b.getF32FloatAttr(0.0f));
+                        bool inBounds[] = {true};
+                        Value vF32 = b.create<vector::TransferReadOp>(l, vector128f32, act, ValueRange{bIdx, sIdx, kIV}, padF32, inBounds);
+                        Value vScaled = b.create<arith::MulFOp>(l, vF32, scaleActVec);
+                        auto vector128i32 = VectorType::get({128}, b.getI32Type());
+                        Value vI32 = b.create<arith::FPToSIOp>(l, vector128i32, vScaled);
+                        Value vI16 = b.create<arith::TruncIOp>(l, vector128i16, vI32);
+                        b.create<vector::TransferWriteOp>(l, vI16, lhsMemref, ValueRange{kIV});
+                        b.create<scf::YieldOp>(l);
+                    });
+
+                // 3. LUT Gen
+                bS.create<scf::ForOp>(locS, zeroIdx, ck_half, oneIdx, ValueRange{}, 
+                    [&](OpBuilder &b, Location l, Value k_half_idx, ValueRange args) {
+                        Value k_even_idx = b.create<arith::MulIOp>(l, k_half_idx, c2);
+                        Value k_odd_idx = b.create<arith::AddIOp>(l, k_even_idx, oneIdx);
+                        
+                        Value a0_i16 = b.create<memref::LoadOp>(l, lhsMemref, ValueRange{k_even_idx});
+                        Value a1_i16 = b.create<memref::LoadOp>(l, lhsMemref, ValueRange{k_odd_idx});
+                        
+                        Value a0_i32 = b.create<arith::ExtSIOp>(l, b.getI32Type(), a0_i16);
+                        Value a1_i32 = b.create<arith::ExtSIOp>(l, b.getI32Type(), a1_i16);
+                        
+                        Value lut_vec = zeros32i8;
+                        int w_vals[] = {-1, 0, 1};
+                        
+                        for (int i = 0; i < 3; ++i) {
+                            int w = w_vals[i];
+                            
+                            Value term_a0;
+                            if (w == 1) term_a0 = a0_i32;
+                            else if (w == 0) term_a0 = b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0));
+                            else term_a0 = b.create<arith::SubIOp>(l, b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0)), a0_i32);
+                            Value val_a0_i8 = b.create<arith::TruncIOp>(l, b.getI8Type(), term_a0);
+                            
+                            Value term_a1;
+                            if (w == 1) term_a1 = a1_i32;
+                            else if (w == 0) term_a1 = b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0));
+                            else term_a1 = b.create<arith::SubIOp>(l, b.create<arith::ConstantOp>(l, b.getI32IntegerAttr(0)), a1_i32);
+                            Value val_a1_i8 = b.create<arith::TruncIOp>(l, b.getI8Type(), term_a1);
+                            
+                            int idx_a0 = w + 1;
+                            int idx_a1 = (w + 1) + 8;
+                            
+                            lut_vec = b.create<vector::InsertElementOp>(l, val_a0_i8, lut_vec, b.create<arith::ConstantIndexOp>(l, idx_a0));
+                            lut_vec = b.create<vector::InsertElementOp>(l, val_a0_i8, lut_vec, b.create<arith::ConstantIndexOp>(l, idx_a0 + 16));
+                            
+                            lut_vec = b.create<vector::InsertElementOp>(l, val_a1_i8, lut_vec, b.create<arith::ConstantIndexOp>(l, idx_a1));
+                            lut_vec = b.create<vector::InsertElementOp>(l, val_a1_i8, lut_vec, b.create<arith::ConstantIndexOp>(l, idx_a1 + 16));
+                        }
+                        b.create<memref::StoreOp>(l, lut_vec, lutMemref, ValueRange{k_half_idx});
+                        b.create<scf::YieldOp>(l);
+                    });
+
+                // 4. Dot Product
+                Value c03_i8_vec = bS.create<arith::ConstantOp>(locS, DenseElementsAttr::get(vec32i8, bS.getI8IntegerAttr(0x03)));
+                Value c08_i8_vec = bS.create<arith::ConstantOp>(locS, DenseElementsAttr::get(vec32i8, bS.getI8IntegerAttr(0x08)));
+                Value c2_i8_vec = bS.create<arith::ConstantOp>(locS, DenseElementsAttr::get(vec32i8, bS.getI8IntegerAttr(2)));
+                Value c4_i8_vec = bS.create<arith::ConstantOp>(locS, DenseElementsAttr::get(vec32i8, bS.getI8IntegerAttr(4)));
+                Value c6_i8_vec = bS.create<arith::ConstantOp>(locS, DenseElementsAttr::get(vec32i8, bS.getI8IntegerAttr(6)));
+
+                bS.create<scf::ParallelOp>(locS, ValueRange{zeroIdx}, ValueRange{cn_blocks}, ValueRange{oneIdx}, ValueRange{},
+                    [&](OpBuilder &b, Location loc2, ValueRange ivs, ValueRange nArgs) {
+                        Value n_block_idx = ivs[0];
+                        Value c256 = b.create<arith::ConstantIndexOp>(loc2, 256);
+
+                        auto kLoop = b.create<scf::ForOp>(loc2, zeroIdx, ck_half, c256, ValueRange{zero32i32, zero32i32},
+                            [&](OpBuilder &b2, Location loc3, Value k_outer, ValueRange accs_i32) {
+                                Value nextK = b2.create<arith::AddIOp>(loc3, k_outer, c256);
+                                Value isEnd = b2.create<arith::CmpIOp>(loc3, arith::CmpIPredicate::sgt, nextK, ck_half);
+                                Value k_end = b2.create<arith::SelectOp>(loc3, isEnd, ck_half, nextK);
+                                
+                                auto kInnerLoop = b2.create<scf::ForOp>(loc3, k_outer, k_end, c2, ValueRange{zero32i16, zero32i16},
+                                    [&](OpBuilder &b3, Location loc4, Value k_micro_idx, ValueRange accs_i16) {
+                                        Value acc_low_i16 = accs_i16[0];
+                                        Value acc_high_i16 = accs_i16[1];
+                                        
+                                        Value k_micro_plus_1 = b3.create<arith::AddIOp>(loc4, k_micro_idx, oneIdx);
+                                        
+                                        Value lut_k0 = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{k_micro_idx});
+                                        Value lut_k1 = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{k_micro_plus_1});
+
+                                        bool inB[] = {true};
+                                        ArrayRef<bool> inBounds1D(inB);
+                                        Value w_k0 = b3.create<vector::TransferReadOp>(loc4, vec32i8, rhsMemref, ValueRange{n_block_idx, k_micro_idx, zeroIdx}, zeroI8Scalar, inBounds1D);
+                                        Value w_k1 = b3.create<vector::TransferReadOp>(loc4, vec32i8, rhsMemref, ValueRange{n_block_idx, k_micro_plus_1, zeroIdx}, zeroI8Scalar, inBounds1D);
+
+                                        auto process_w = [&](Value w_bytes, Value lut_vec, Value &res_low_16, Value &res_high_16) {
+                                            Value idx_low_w0 = b3.create<arith::AndIOp>(loc4, w_bytes, c03_i8_vec);
+                                            Value w_bytes_shr2 = b3.create<arith::ShRUIOp>(loc4, w_bytes, c2_i8_vec);
+                                            Value idx_low_w1 = b3.create<arith::OrIOp>(loc4, b3.create<arith::AndIOp>(loc4, w_bytes_shr2, c03_i8_vec), c08_i8_vec);
+                                            
+                                            Value w_bytes_shr4 = b3.create<arith::ShRUIOp>(loc4, w_bytes, c4_i8_vec);
+                                            Value idx_high_w0 = b3.create<arith::AndIOp>(loc4, w_bytes_shr4, c03_i8_vec);
+                                            Value w_bytes_shr6 = b3.create<arith::ShRUIOp>(loc4, w_bytes, c6_i8_vec);
+                                            Value idx_high_w1 = b3.create<arith::OrIOp>(loc4, b3.create<arith::AndIOp>(loc4, w_bytes_shr6, c03_i8_vec), c08_i8_vec);
+
+                                            Value res_low_w0 = b3.create<func::CallOp>(loc4, "llvm.x86.avx2.pshuf.b", TypeRange{vec32i8}, ValueRange{lut_vec, idx_low_w0}).getResult(0);
+                                            Value res_low_w1 = b3.create<func::CallOp>(loc4, "llvm.x86.avx2.pshuf.b", TypeRange{vec32i8}, ValueRange{lut_vec, idx_low_w1}).getResult(0);
+                                            
+                                            Value res_high_w0 = b3.create<func::CallOp>(loc4, "llvm.x86.avx2.pshuf.b", TypeRange{vec32i8}, ValueRange{lut_vec, idx_high_w0}).getResult(0);
+                                            Value res_high_w1 = b3.create<func::CallOp>(loc4, "llvm.x86.avx2.pshuf.b", TypeRange{vec32i8}, ValueRange{lut_vec, idx_high_w1}).getResult(0);
+                                            
+                                            Value res_low_w0_16 = b3.create<arith::ExtSIOp>(loc4, vec32i16, res_low_w0);
+                                            Value res_low_w1_16 = b3.create<arith::ExtSIOp>(loc4, vec32i16, res_low_w1);
+                                            res_low_16 = b3.create<arith::AddIOp>(loc4, res_low_w0_16, res_low_w1_16);
+                                            
+                                            Value res_high_w0_16 = b3.create<arith::ExtSIOp>(loc4, vec32i16, res_high_w0);
+                                            Value res_high_w1_16 = b3.create<arith::ExtSIOp>(loc4, vec32i16, res_high_w1);
+                                            res_high_16 = b3.create<arith::AddIOp>(loc4, res_high_w0_16, res_high_w1_16);
+                                        };
+
+                                        Value res_low_k0_16, res_high_k0_16;
+                                        process_w(w_k0, lut_k0, res_low_k0_16, res_high_k0_16);
+                                        
+                                        Value res_low_k1_16, res_high_k1_16;
+                                        process_w(w_k1, lut_k1, res_low_k1_16, res_high_k1_16);
+
+                                        Value sum_low_16 = b3.create<arith::AddIOp>(loc4, res_low_k0_16, res_low_k1_16);
+                                        Value sum_high_16 = b3.create<arith::AddIOp>(loc4, res_high_k0_16, res_high_k1_16);
+
+                                        Value next_acc_low_i16 = b3.create<arith::AddIOp>(loc4, acc_low_i16, sum_low_16);
+                                        Value next_acc_high_i16 = b3.create<arith::AddIOp>(loc4, acc_high_i16, sum_high_16);
+
+                                        b3.create<scf::YieldOp>(loc4, ValueRange{next_acc_low_i16, next_acc_high_i16});
+                                    });
+                                
+                                Value block_acc_low_i32 = b2.create<arith::ExtSIOp>(loc3, vec32i32, kInnerLoop.getResult(0));
+                                Value block_acc_high_i32 = b2.create<arith::ExtSIOp>(loc3, vec32i32, kInnerLoop.getResult(1));
+
+                                Value next_acc_low = b2.create<arith::AddIOp>(loc3, accs_i32[0], block_acc_low_i32);
+                                Value next_acc_high = b2.create<arith::AddIOp>(loc3, accs_i32[1], block_acc_high_i32);
+
+                                b2.create<scf::YieldOp>(loc3, ValueRange{next_acc_low, next_acc_high});
+                            });
+
+                        Value totalScaleVec = b.create<vector::BroadcastOp>(loc2, vec32f32, totalScale);
+                        Value c32Idx = b.create<arith::ConstantIndexOp>(loc2, 32);
+                        Value c64Idx = b.create<arith::ConstantIndexOp>(loc2, 64);
+
+                        auto write_out = [&](OpBuilder &b1, Location l1, Value acc_low_i32, Value acc_high_i32, int output_offset_within_block) {
+                            Value out_offset = b1.create<arith::AddIOp>(l1, b1.create<arith::MulIOp>(l1, n_block_idx, c64Idx), b1.create<arith::ConstantIndexOp>(l1, output_offset_within_block));
+                            Value sum_val_f32 = b1.create<arith::SIToFPOp>(l1, vec32f32, acc_low_i32);
+                            Value final_f32 = b1.create<arith::MulFOp>(l1, sum_val_f32, totalScaleVec);
+                            b1.create<vector::TransferWriteOp>(l1, final_f32, outMemref, ValueRange{bIdx, sIdx, out_offset});
+
+                            Value out_offset_high = b1.create<arith::AddIOp>(l1, out_offset, c32Idx);
+                            Value sum_val_high_f32 = b1.create<arith::SIToFPOp>(l1, vec32f32, acc_high_i32);
+                            Value final_f32_high = b1.create<arith::MulFOp>(l1, sum_val_high_f32, totalScaleVec);
+                            b1.create<vector::TransferWriteOp>(l1, final_f32_high, outMemref, ValueRange{bIdx, sIdx, out_offset_high});
+                        };
+
+                        write_out(b, loc2, kLoop.getResult(0), kLoop.getResult(1), 0);
+
+                        b.create<scf::ReduceOp>(loc2);
+                    });
+                bS.create<scf::YieldOp>(locS);
+            });
+            bB.create<scf::YieldOp>(locB);
+        });
+
+        rewriter.create<memref::DeallocOp>(loc, lutMemref);
+        
+        Value finalTensor = rewriter.create<bufferization::ToTensorOp>(loc, resultType, outMemref);
+        rewriter.replaceOp(op, finalTensor);
+
+        rewriter.create<memref::DeallocOp>(loc, lhsMemref);
+
+        return success();
+    }
+};
+struct SiLuLoweringToLinalg : public OpConversionPattern<tenzo::SiLuOp> {
+    using OpConversionPattern<tenzo::SiLuOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::SiLuOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        SmallVector<AffineMap, 2> indexingMaps(
+            2, rewriter.getMultiDimIdentityMap(resultType.getRank()));
+
+        SmallVector<utils::IteratorType, 1> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{adaptor.getInput()},
+            ValueRange{rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType)},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                // silu(x) = x * sigmoid(x) = x / (1 + exp(-x))
+                Value x = args[0];
+                Value negX = b.create<arith::NegFOp>(l, x);
+                Value expNegX = b.create<math::ExpOp>(l, negX);
+                Value one = b.create<arith::ConstantOp>(l, b.getFloatAttr(elemType, 1.0));
+                Value denom = b.create<arith::AddFOp>(l, one, expNegX);
+                Value res = b.create<arith::DivFOp>(l, x, denom);
+                b.create<linalg::YieldOp>(l, res);
+            });
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
+// tenzo.relu2 -> ReLU squared activation: max(0, x)^2
+//===----------------------------------------------------------------------===//
+struct Relu2LoweringToLinalg : public OpConversionPattern<tenzo::Relu2Op> {
+    using OpConversionPattern<tenzo::Relu2Op>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::Relu2Op op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        SmallVector<AffineMap, 2> indexingMaps(
+            2, rewriter.getMultiDimIdentityMap(resultType.getRank()));
+
+        SmallVector<utils::IteratorType, 1> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{adaptor.getInput()},
+            ValueRange{rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType)},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                // relu2(x) = max(0, x)^2
+                Value x = args[0];
+                Value zero = b.create<arith::ConstantOp>(l, b.getZeroAttr(elemType));
+                Value maxVal = b.create<arith::MaximumFOp>(l, x, zero);
+                Value res = b.create<arith::MulFOp>(l, maxVal, maxVal);
+                b.create<linalg::YieldOp>(l, res);
+            });
+        return success();
+    }
+};
+
+// tenzo.mul -> Element-wise multiplication
+//===----------------------------------------------------------------------===//
+struct MulLoweringToLinalg : public OpConversionPattern<tenzo::MulOp> {
+    using OpConversionPattern<tenzo::MulOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::MulOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        SmallVector<AffineMap, 3> indexingMaps(
+            3, rewriter.getMultiDimIdentityMap(resultType.getRank()));
+
+        SmallVector<utils::IteratorType, 1> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{adaptor.getLhs(), adaptor.getRhs()},
+            ValueRange{rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType)},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                Value res = b.create<arith::MulFOp>(l, args[0], args[1]);
+                b.create<linalg::YieldOp>(l, res);
+            });
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
+
 void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns) {
+
+
     patterns.add<FusedLoweringToLinalg>(patterns.getContext());
     patterns.add<AddLoweringToLinalg>(patterns.getContext());
     patterns.add<ReluLoweringToLinalg>(patterns.getContext());
+    patterns.add<Relu2LoweringToLinalg>(patterns.getContext());
+    patterns.add<SiLuLoweringToLinalg>(patterns.getContext());
+    patterns.add<MulLoweringToLinalg>(patterns.getContext());
     patterns.add<AttentionLoweringToLinalg>(patterns.getContext());
     patterns.add<RopeLoweringToLinalg>(patterns.getContext());
     patterns.add<MatMulLoweringToLinalg>(patterns.getContext());
+    patterns.add<MatMulQ8Lowering>(patterns.getContext());
+    patterns.add<BitLinearTL1LoweringToLinalg>(patterns.getContext());
+    patterns.add<BitLinearTL1PackLoweringToLinalg>(patterns.getContext());
     patterns.add<Conv2DLoweringToLinalg>(patterns.getContext());
     patterns.add<QuantizeLoweringToLinalg>(patterns.getContext());
     patterns.add<DequantizeLoweringToLinalg>(patterns.getContext());
@@ -1077,7 +1838,7 @@ struct TenzoToLinalgPass : public PassWrapper<TenzoToLinalgPass, OperationPass<f
         tenzo::populateTenzoToLinalgConversionPatterns(patterns);
 
         ConversionTarget target(*ctx);
-        target.addLegalDialect<linalg::LinalgDialect, arith::ArithDialect, math::MathDialect, tensor::TensorDialect>();
+        target.addLegalDialect<func::FuncDialect, linalg::LinalgDialect, arith::ArithDialect, math::MathDialect, tensor::TensorDialect, scf::SCFDialect, vector::VectorDialect, bufferization::BufferizationDialect, memref::MemRefDialect>();
         target.addIllegalDialect<tenzo::TenzoDialect>();
 
         if (failed(applyPartialConversion(func, target, std::move(patterns)))) {

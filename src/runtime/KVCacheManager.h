@@ -8,7 +8,7 @@ namespace tenzo {
 namespace runtime {
 
 /**
- * Manages the KV-Cache buffers for autoregressive generation.
+ * Manages the per-layer KV-Cache buffers for autoregressive generation.
  */
 class KVCacheManager {
 public:
@@ -24,9 +24,11 @@ public:
     // Increment the sequence length after processing tokens
     void increment_seq_len(int n = 1);
 
-    // Get the entire K and V cache tensors
-    Tensor* get_k_cache();
-    Tensor* get_v_cache();
+    // Get K and V cache tensors for a specific layer
+    Tensor* get_k_cache(int layer_idx = 0);
+    Tensor* get_v_cache(int layer_idx = 0);
+
+    int get_num_layers() const { return num_layers; }
 
 private:
     int max_seq_len;
@@ -34,11 +36,11 @@ private:
     int embed_dim;
     int current_seq_len;
 
-    std::vector<float> k_buffer;
-    std::vector<float> v_buffer;
+    std::vector<std::vector<float>> k_buffers;
+    std::vector<std::vector<float>> v_buffers;
     
-    Tensor* k_tensor;
-    Tensor* v_tensor;
+    std::vector<Tensor*> k_tensors;
+    std::vector<Tensor*> v_tensors;
 };
 
 } // namespace runtime

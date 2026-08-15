@@ -66,10 +66,39 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
         return;
     }
 
+    // Extract model topology metadata BEFORE passes transform the function signature
+    int num_heads = 5;
+    int num_layers = 1;
+    int64_t vocab_size_i64 = 128;
+    {
+        auto mainFunc = module->lookupSymbol<func::FuncOp>("main");
+        if (mainFunc) {
+            size_t num_inputs = mainFunc.getFunctionType().getNumInputs();
+            // Signature: (token, weights, k0, v0, ..., kN, vN, seq_pos)
+            // num_inputs = 3 + 2*num_layers
+            if (num_inputs >= 5) {
+                num_layers = static_cast<int>((num_inputs - 3) / 2);
+            }
+            if (auto kType = mlir::dyn_cast<RankedTensorType>(mainFunc.getFunctionType().getInput(2))) {
+                if (kType.getRank() == 4) {
+                    num_heads = kType.getDimSize(1);
+                }
+            }
+            if (mainFunc.getFunctionType().getNumResults() > 0) {
+                if (auto outType = mlir::dyn_cast<RankedTensorType>(mainFunc.getFunctionType().getResult(0))) {
+                    if (outType.getRank() == 3) {
+                        vocab_size_i64 = outType.getDimSize(2);
+                    }
+                }
+            }
+            llvm::outs() << "  Model: " << num_layers << " layers, " << num_heads << " KV heads, vocab " << vocab_size_i64 << "\n";
+        }
+    }
+
     PassManager pm(&context);
     addTenzoToLinalgPass(pm);
     addTenzoBufferizationPasses(pm);
-    addTenzoToLLVMPasses(pm, /*enableVectorization=*/false);
+    addTenzoToLLVMPasses(pm, /*enableVectorization=*/false, {8, 16, 4}, /*enableParallel=*/true);
 
     if (failed(pm.run(module.get()))) {
         llvm::errs() << "❌ Compilation failed\n";
@@ -77,6 +106,7 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
     }
 
     llvm::outs() << "✅ Model compiled successfully!\n";
+    module->dump();
     llvm::outs().flush();
 
     std::vector<std::string> weights_candidates = {
@@ -128,18 +158,8 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
     s_cfg.top_p = config.top_p;
     runtime::Sampler sampler(s_cfg);
 
-    int num_heads = 4;
-    auto mainFunc = module->lookupSymbol<func::FuncOp>("main");
-    if (mainFunc && mainFunc.getFunctionType().getNumInputs() >= 3) {
-        if (auto kType = mlir::dyn_cast<RankedTensorType>(mainFunc.getFunctionType().getInput(2))) {
-            if (kType.getRank() == 4) {
-                num_heads = kType.getDimSize(1);
-            }
-        }
-    }
-
     runtime::ExecutionContext engine(context, module.get());
-    runtime::KVCacheManager kv_cache(1024, 1, 128, num_heads);
+    runtime::KVCacheManager kv_cache(1024, num_layers, 128 * num_heads, num_heads);
     kv_cache.reset();
 
     std::vector<int32_t> prompt_tokens;
@@ -165,16 +185,25 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
 
     std::vector<int64_t> in_shape = {1, 1};
     runtime::Tensor input(in_shape);
-    size_t v_size = loaded_vocab ? tokenizer.vocab_size() : 128;
+    size_t v_size = vocab_size_i64; // Use model's vocab size!
     std::vector<int64_t> out_shape = {1, 1, static_cast<int64_t>(v_size)};
     runtime::Tensor output(out_shape);
     std::vector<int64_t> seq_pos_shape = {1};
     runtime::Tensor seq_pos_t(seq_pos_shape);
-    std::vector<int64_t> kv_shape = kv_cache.get_k_cache()->shape;
-    runtime::Tensor out_k_cache(kv_shape);
-    runtime::Tensor out_v_cache(kv_shape);
-    std::vector<runtime::Tensor*> inputs = {&input, &weights_tensor, kv_cache.get_k_cache(), kv_cache.get_v_cache(), &seq_pos_t};
-    std::vector<runtime::Tensor*> outputs = {&output, &out_k_cache, &out_v_cache};
+
+    std::vector<runtime::Tensor*> inputs = {&input, &weights_tensor};
+    std::vector<runtime::Tensor*> outputs = {&output};
+
+    for (int l = 0; l < num_layers; ++l) {
+        inputs.push_back(kv_cache.get_k_cache(l));
+        inputs.push_back(kv_cache.get_v_cache(l));
+    }
+    inputs.push_back(&seq_pos_t);
+
+    for (int l = 0; l < num_layers; ++l) {
+        outputs.push_back(kv_cache.get_k_cache(l));
+        outputs.push_back(kv_cache.get_v_cache(l));
+    }
 
     for (int step = 0; step < total_steps; ++step) {
         if (step < prefill_token_count) {
@@ -188,15 +217,18 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
 
         try {
             engine.forward(inputs, outputs);
+            if (step == prefill_token_count - 1) {
+                llvm::outs() << "\nDEBUG: First 10 logits: ";
+                for (int i = 0; i < 10; ++i) {
+                    llvm::outs() << output.data[i] << " ";
+                }
+                llvm::outs() << "\n";
+            }
         } catch (const std::exception& e) {
             llvm::errs() << "\n❌ Runtime Error during forward pass: " << e.what() << "\n";
             return;
         }
 
-        size_t kv_num_floats = 1;
-        for (auto dim : kv_cache.get_k_cache()->shape) kv_num_floats *= dim;
-        std::memcpy(kv_cache.get_k_cache()->data, out_k_cache.data, kv_num_floats * sizeof(float));
-        std::memcpy(kv_cache.get_v_cache()->data, out_v_cache.data, kv_num_floats * sizeof(float));
 
         // When prefill completes, start decoding and sample tokens
         if (step >= prefill_token_count - 1) {

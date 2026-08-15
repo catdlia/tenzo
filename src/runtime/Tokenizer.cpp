@@ -47,7 +47,15 @@ std::vector<int32_t> Tokenizer::encode(const std::string& text) const {
     std::vector<int32_t> tokens;
     if (text.empty() || id_to_token_.empty()) return tokens;
 
-    // Greedy longest-first matching
+    // Add BOS token if present (128000 for Llama3/BitNet)
+    auto bos_it = token_to_id_.find("<|begin_of_text|>");
+    if (bos_it != token_to_id_.end()) {
+        tokens.push_back(bos_it->second);
+    } else if (id_to_token_.size() > 128000) {
+        tokens.push_back(128000);
+    }
+
+    // Greedy longest-first matching with leading space support
     size_t i = 0;
     while (i < text.length()) {
         size_t longest_len = 0;
@@ -55,11 +63,23 @@ std::vector<int32_t> Tokenizer::encode(const std::string& text) const {
 
         for (size_t len = text.length() - i; len >= 1; --len) {
             std::string sub = text.substr(i, len);
+            
+            // Direct match
             auto it = token_to_id_.find(sub);
             if (it != token_to_id_.end()) {
                 longest_len = len;
                 best_id = it->second;
                 break;
+            }
+
+            // Match with leading space if word boundary
+            if (i == 0 || text[i-1] == ' ') {
+                auto it_sp = token_to_id_.find(" " + sub);
+                if (it_sp != token_to_id_.end()) {
+                    longest_len = len;
+                    best_id = it_sp->second;
+                    break;
+                }
             }
         }
 

@@ -18,7 +18,7 @@ build:
 # Локальний бекап (на випадок відсутності інтернету)
 build-local:
 	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
-	docker compose run --rm dev ninja -C /app/cmake-build-debug tenzo-cli
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli
 
 # ==========================================
 # 🧪 TESTING & RUNNING (via Docker)
@@ -26,60 +26,60 @@ build-local:
 
 # Quick rebuild and test (fastest iteration)
 q: build
-	@docker compose run --rm dev bash -c "/app/cmake-build-debug/tenzo-cli cpu 2>&1 | tail -8"
+	@docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "/app/cmake-build-debug/tenzo-cli cpu 2>&1 | tail -8"
 
 # Run all tests
 test: build
 	@echo "🧪 Running tests..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli test
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli test
 
 # Run CPU benchmark
 cpu: build
 	@echo "⚡ Running CPU benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli cpu
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli cpu
 
 # Run large matrix benchmark (768x768)
 large: build
 	@echo "🔥 Running Large Matrix benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli large
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli large
 
 # Run parallel (multithreaded) benchmark
 parallel: build
 	@echo "🔀 Running Parallel benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli parallel
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli parallel
 
 # Run stability test (3 runs)
 stability: build
 	@echo "📊 Running Stability Test (3 runs)..."
 	@for i in 1 2 3; do \
 		echo "=== Run $$i ==="; \
-		docker compose run --rm dev /app/cmake-build-debug/tenzo-cli cpu 2>&1 | grep -E "Scalar:|Vector:|Speedup:"; \
+		docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli cpu 2>&1 | grep -E "Scalar:|Vector:|Speedup:"; \
 	done
 
 # Run Conv2D benchmark
 conv2d: build
 	@echo "🎯 Running Conv2D benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli conv2d
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli conv2d
 
 # Run Dynamic Inference test
 dynamic: build
 	@echo "🌊 Running Dynamic Inference test..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli dynamic
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli dynamic
 
 # Run GPU test
 gpu: build
 	@echo "🎮 Running GPU test..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli gpu
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli gpu
 
 # Run GPU benchmark
 gpu-bench: build
 	@echo "🚀 Running GPU benchmark..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli gpu-bench
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli gpu-bench
 
 # Run all benchmarks
 bench: build
 	@echo "📊 Running all benchmarks..."
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli all
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli all
 
 # ==========================================
 # 🐍 ONNX FRONTEND (Python)
@@ -117,21 +117,21 @@ frontend-setup:
 # Configure CMake
 configure:
 	@echo "⚙️ Configuring CMake..."
-	docker compose run --rm dev cmake -B/app/cmake-build-debug -S/app -GNinja -DCMAKE_BUILD_TYPE=Debug
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev cmake -B/app/cmake-build-debug -S/app -GNinja -DCMAKE_BUILD_TYPE=Debug
 
 # Clean build
 clean:
 	@echo "🧹 Cleaning build directory..."
-	docker compose run --rm dev rm -rf /app/cmake-build-debug/*
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev rm -rf /app/cmake-build-debug/*
 
 # Run hardware analysis
 hw-analyze:
 	@echo "🖥️ Running Hardware Analysis..."
-	docker compose run --rm dev python3 /app/scripts/benchmark_hardware.py -b
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev python3 /app/scripts/benchmark_hardware.py -b
 
 # Show version
 version: build
-	docker compose run --rm dev /app/cmake-build-debug/tenzo-cli version
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli version
 
 # Build Docker image
 docker-build:
@@ -141,7 +141,7 @@ docker-build:
 # Interactive development shell
 dev:
 	@echo "🚀 Starting interactive dev shell..."
-	@docker compose run --rm dev bash
+	@docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash
 
 docker-shell: dev
 

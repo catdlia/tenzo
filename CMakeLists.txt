@@ -151,7 +151,7 @@ add_executable(tenzo-cli
         src/tests/GPUTests.cpp
         src/tests/DynamicInferenceTest.cpp
         src/tests/ZeroCopyBridgeTest.cpp
-        src/tests/EndToEndMathTest.cpp
+        src/tests/EndToEndMathTest.cpp src/tests/TestTL1.cpp
         src/tests/GenerationTest.cpp
 )
 

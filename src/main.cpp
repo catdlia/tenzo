@@ -107,7 +107,7 @@ int main(int argc, char* argv[]) {
         tenzo::runDynamicInferenceTest(context);
     } else if (strcmp(mode, "bridge") == 0) {
         tenzo::runZeroCopyBridgeTest(context);
-    } else if (strcmp(mode, "validate") == 0) {
+    } else if (strcmp(mode, "tl1") == 0) { tenzo::runTestTL1(context); } else if (strcmp(mode, "validate") == 0) {
         tenzo::runEndToEndMathTest(context);
     } else if (strcmp(mode, "generate") == 0) {
         tenzo::GenerationConfig config;

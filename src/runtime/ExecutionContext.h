@@ -6,6 +6,10 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/BuiltinOps.h"
 
+namespace llvm {
+class TargetMachine;
+}
+
 namespace tenzo {
 namespace runtime {
 
@@ -41,19 +45,17 @@ struct Tensor {
     }
 };
 
-/**
- * ExecutionContext: Manages JIT compilation and inference.
- */
 class ExecutionContext {
 public:
     ExecutionContext(mlir::MLIRContext& context, mlir::ModuleOp module);
-    ~ExecutionContext() = default;
+    ~ExecutionContext();
 
     // Run inference with dynamic inputs
     void forward(const std::vector<Tensor*>& inputs, const std::vector<Tensor*>& outputs);
 
 private:
     std::unique_ptr<mlir::ExecutionEngine> engine;
+    std::unique_ptr<llvm::TargetMachine> tm;
 };
 
 } // namespace runtime

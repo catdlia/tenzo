@@ -16015,3 +16015,16 @@ Thumbs.db
 /.python_libs/distutils-precedence.pth
 /.python_libs/isympy.py
 /.python_libs/typing_extensions.py
+.env
+export_output_*
+*.bin
+BitNet/
+
+# Ignore weights and generated models
+*.bin
+*.gguf
+export_output*/
+BitNet/
+.python_libs/
+.venv/
+**/export_output*/

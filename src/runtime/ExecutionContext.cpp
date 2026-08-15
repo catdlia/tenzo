@@ -6,6 +6,11 @@
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/OpenMP/OpenMPToLLVMIRTranslation.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetOptions.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Support/DynamicLibrary.h"
 
 namespace tenzo {
 namespace runtime {
@@ -14,6 +19,7 @@ ExecutionContext::ExecutionContext(mlir::MLIRContext& context, mlir::ModuleOp mo
     // 1. Initialize LLVM
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmPrinter();
+    llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
 
     // 2. Register translations
     tenzo::registerAllTenzoDialectTranslations(context);
@@ -23,15 +29,39 @@ ExecutionContext::ExecutionContext(mlir::MLIRContext& context, mlir::ModuleOp mo
 
     // 3. Setup JIT options
     mlir::ExecutionEngineOptions engineOptions;
-    // Removed makeOptimizingTransformer to prevent segfault (target machine is nullptr)
+    
+    std::string error;
+    auto targetTriple = llvm::sys::getDefaultTargetTriple();
+    const llvm::Target *target = llvm::TargetRegistry::lookupTarget(targetTriple, error);
+    if (target) {
+        llvm::TargetOptions opt;
+        tm = std::unique_ptr<llvm::TargetMachine>(
+            target->createTargetMachine(targetTriple, llvm::sys::getHostCPUName(), "", opt, llvm::Reloc::PIC_)
+        );
+    } else {
+        llvm::errs() << "Warning: Could not create TargetMachine for optimizing transformer: " << error << "\n";
+    }
+
+    auto transformer = tm ? mlir::makeOptimizingTransformer(3, 0, tm.get()) : nullptr;
+    if (transformer) {
+        engineOptions.transformer = transformer;
+    }
+    engineOptions.enableObjectDump = true;
     engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
     
-    // Add runtime libraries to resolve symbols like memrefCopy
-    llvm::SmallVector<llvm::StringRef, 2> sharedLibs = {
+    // Add runtime libraries to resolve symbols like memrefCopy and OpenMP kmpc symbols
+    llvm::SmallVector<llvm::StringRef, 4> sharedLibs = {
         "/usr/lib/llvm-21/lib/libmlir_c_runner_utils.so.21.1",
-        "/usr/lib/llvm-21/lib/libmlir_runner_utils.so.21.1"
+        "/usr/lib/llvm-21/lib/libmlir_runner_utils.so.21.1",
+        "/usr/lib/llvm-21/lib/libomp.so",
+        "/usr/lib/x86_64-linux-gnu/libgomp.so.1"
     };
     engineOptions.sharedLibPaths = sharedLibs;
+
+    std::error_code ec;
+    llvm::raw_fd_ostream os("/app/optimized.mlir", ec, llvm::sys::fs::OF_None);
+    module->print(os);
+    os.close();
 
     // 4. Create Engine
     auto maybeEngine = mlir::ExecutionEngine::create(module, engineOptions);
@@ -41,6 +71,8 @@ ExecutionContext::ExecutionContext(mlir::MLIRContext& context, mlir::ModuleOp mo
     }
     engine = std::move(maybeEngine.get());
 }
+
+ExecutionContext::~ExecutionContext() = default;
 
 #include <deque>
 
