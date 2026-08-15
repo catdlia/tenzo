@@ -134,7 +134,13 @@ def QuantizeOp : Tenzo_Op<"quantize", [Pure]> {
   let summary = "Quantize a tensor to lower precision";
   let description = [{
     Quantizes a floating-point tensor to a lower precision tensor.
-    Supports parameterized bit_width and quant_scheme (e.g., "ternary").
+    Supports parameterized bit_width (32, 16, 8, 4, 3, 2) and quant_scheme.
+    Supported schemes:
+    - "fp32", "fp16": No-op or downcast
+    - "int8", "int4": Standard integer quantization
+    - "classic_tl1": Bitnet.cpp ELUT (2 bits/weight, g=2)
+    - "classic_tl2": Bitnet.cpp ELUT with mirror consolidation (1.67 bits/weight, g=3)
+    - "experimental_fused": Tenzo native Fused KV-cache compression and implicit shuffle
   }];
   
   let arguments = (ins 
@@ -151,6 +157,7 @@ def DequantizeOp : Tenzo_Op<"dequantize", [Pure]> {
   let summary = "Dequantize a tensor to floating point";
   let description = [{
     Dequantizes a lower precision tensor back to a floating-point tensor.
+    Supports parameterized bit_width and quant_scheme corresponding to QuantizeOp.
   }];
   
   let arguments = (ins 
