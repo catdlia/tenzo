@@ -1,186 +1,86 @@
 # 📋 Tenzo Compiler — Project Status
 
-> **Last updated:** 2026-03-14
+> **Last updated:** August 2026
 
 ---
 
-## 💡 Problem Statement
+## 💡 Vision
 
-There is no open-source, truly **heterogeneous compiler** for tensor computations (inference and training) that targets **consumer and edge hardware**. The existing landscape is:
+Tenzo is a high-performance **heterogeneous compiler** designed specifically for running ultra-efficient, heavily quantized Large Language Models (LLMs) on consumer and edge hardware. 
 
-| Solution | Problem |
-|----------|---------|
-| TensorRT, CoreML, OpenVINO | Proprietary, vendor-locked |
-| XLA (Google) | Tightly coupled to TPU/CUDA server stacks |
-| TVM | Complex, still mostly server-oriented |
-| Triton | NVIDIA GPUs only |
-| IREE (Google) | Closest competitor, but immature on consumer hardware |
+While existing solutions (TensorRT, CoreML, OpenVINO, llama.cpp) are either vendor-locked or rely on hand-written assembly libraries for every new architecture, **Tenzo takes a compiler-first approach**. By building on top of MLIR/LLVM, Tenzo detects the hardware at compile-time, applies aggressive graph-level fusions, and statically lowers operations to optimally tiled and unrolled vector micro-kernels (e.g. AVX2, NEON) — completely eliminating the need for dynamic memory allocation on the hot path.
 
-**Tenzo's thesis:** LLVM/MLIR already provides backends for every major ISA (x86, ARM, RISC-V, AMDGPU, NVPTX, SPIR-V). By building a compiler *on top of MLIR*, we can detect the hardware at compile-time, select the optimal lowering path, and generate native code — **for any target** — without vendor lock-in.
+Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling models like `BitNet-b1.58-2B-4T` to run with minimal memory footprints and blazing fast decode speeds on constrained edge devices like low-power Intel Core i3 CPUs.
 
 ---
 
-## 🎯 Vision
-
-```text
-                      Tensor IR (tenzo dialect)
-                              │
-                    ┌─────────┴──────────┐
-                    ▼                    ▼
-           Operator Fusion         Graph Optimization
-                    │
-                    ▼
-         Linalg / Tensor / MemRef (MLIR mid-level)
-                    │
-          ┌────┬────┼────┬────────┐
-          ▼    ▼    ▼    ▼        ▼
-        x86  ARM  RISC-V  CUDA   Vulkan/SPIR-V
-       AVX2  NEON  V-ext  PTX    (iGPU/AMD)
-       AVX512 SVE
-          │    │    │      │        │
-          ▼    ▼    ▼      ▼        ▼
-       ┌──────────────────────────────┐
-       │  Hardware Auto-Detection     │
-       │  → Optimal tiling, blocking  │
-       │  → Register mapping          │
-       │  → Cache hierarchy tuning    │
-       └──────────────────────────────┘
-```
-
-**Goal:** Write a neural network once → Tenzo detects the target hardware → generates optimal machine code → runs inference (and eventually training).
-
----
-
-## 📍 Current State (honest assessment)
+## 📍 Current State (Honest Assessment)
 
 ### ✅ What Works
-- **Custom MLIR Dialect** (`tenzo.matmul`, `tenzo.conv2d`, `tenzo.relu`, `tenzo.add`)
-- **Full CPU compilation pipeline** (x86 AVX2 only):
-  - Tenzo DSL → Linalg → Bufferization → GotoBLAS packing → 6×16 micro-kernel → LLVM JIT
-  - Operator Fusion (MatMul + Bias + ReLU)
-  - 60.3 GFLOPS on 512×512 matmul (beats OpenBLAS by 31.9%)
-- **Basic GPU path** (Vulkan/SPIR-V only, proof of concept)
-- **Hardware detection** (x86 P/E-core topology via sysfs, cache sizes)
+- **Custom MLIR Dialect for LLMs**:
+  - `tenzo.bitlinear_tl1`: Native support for 1.58-bit ternary weights packed into 2-bit formats.
+  - `tenzo.matmul_q8`: Native `i8` quantized linear layers (used for `lm_head`).
+  - `tenzo.rope`, `tenzo.rms_norm`, `tenzo.attention`: Specialized LLM operations.
+- **End-to-End LLM Generation Pipeline**:
+  - Full support for 30-layer LLaMA-based BitNet architectures.
+  - Generates perfectly coherent text with strict token-to-token accuracy matching PyTorch reference implementations.
+- **Micro-Architectural Optimizations (x86 AVX2)**:
+  - **AVX2 256-bit PSHUFB Micro-kernels**: Decodes 64 output channels per instruction using duplicated 16-byte LUTs across 128-bit lanes.
+  - **Zero-Spill Unroll x2**: Hand-tuned inner loop unrolling that strictly fits within the 16 YMM registers of AVX2, preventing LLVM from spilling to the stack.
+  - **Zero-Allocation Bufferization**: Replaced all dynamic `memref.alloc` calls with `tensor.empty` + `OneShotBufferize`, keeping the inference hot-loop 100% free of memory allocations (`malloc`/`free`).
+- **Runtime Components**:
+  - OpenMP-based multithreading (Optimal on P-Cores).
+  - Built-in BPE Tokenizer and dynamic `KVCacheManager`.
 
 ### ⚠️ What's Missing (Critical Gaps)
 
 | Gap | Description | Priority |
 |-----|-------------|----------|
-| **No inference runtime** | No model loading, no graph execution engine, no memory management | 🔴 Critical |
-| **Single-target only** | Only x86 AVX2 works; ARM/RISC-V/CUDA not implemented | 🔴 Critical |
-| **Primitive HW detection** | Only reads x86 sysfs; needs a proper hardware abstraction layer | 🟡 High |
-| **No model ingestion** | Can't load ONNX/SafeTensors/other model formats | 🟡 High |
-| **No training** | Only forward pass; no autograd, no backward pass, no optimizer | 🔵 Future |
-| **No memory planning** | No tensor lifetime analysis, no memory pool allocation | 🟡 High |
-| **No quantization** | INT8/INT4 paths not implemented (despite VNNI support on hardware) | 🟡 High |
-| **No multi-threading** | Macro-kernel runs single-threaded; `ThreadPool::parallelFor()` API added but not yet wired into GEMM | 🟡 High |
+| **K/V Cache Quantization** | K/V cache currently consumes FP32/FP16 memory. Needs `i8` or `i4` quantization to support large context windows on edge devices. | 🔴 Critical |
+| **Attention + RoPE Fusion** | RoPE and SDPA are currently separate. Fusing them into a FlashAttention-style MLIR kernel will reduce memory bandwidth. | 🟡 High |
+| **Multi-target Backends** | Micro-kernels are explicitly tuned for x86 AVX2. Need equivalent paths for ARM NEON/SVE and RISC-V RVV. | 🔴 Critical |
+| **GPU/Vulkan Support** | The SPIR-V pipeline is a basic proof-of-concept. It needs to support `tl1_pack` and `q8` tensor layouts. | 🟡 High |
+| **Autoregressive Speculation** | Needs speculative decoding or Medusa-heads to break the memory bandwidth wall. | 🔵 Future |
 
 ---
 
-## 📊 Performance (what's proven)
+## 📊 Performance Metrics
 
-MatMul 512×512, Intel i3-1215U (Alder Lake):
+**Hardware:** Intel Core i3-1215U (Alder Lake, 15W, 2 P-Cores, 4 E-Cores)
+**Model:** `microsoft/BitNet-b1.58-2B-4T` (30 layers)
 
-| Approach | GFLOPS | vs OpenBLAS |
-|----------|--------|-------------|
-| LLVM -O3 Scalar | ~2.3 | — |
-| OpenBLAS (NumPy) | ~45.7 | baseline |
-| **Tenzo MLIR E2E** | **~60.3** | **+31.9%** |
-| **Tenzo Isolated Kernel** | **124.4** | **+172%** |
-| **Tenzo 8-instance Parallel** | **~225.2** | **+393%** |
-
-This proves the compilation approach works well for x86 AVX2. The challenge is generalizing this to other targets.
+| Configuration | Threads | Decode Speed | Memory Footprint | Note |
+|---------------|---------|--------------|------------------|------|
+| **Baseline (F32/F16)** | N/A | OOM | ~4.0 GB | Exceeds device memory |
+| **Tenzo (Q8 + TL1 Unroll x4)** | 2 (P-Cores) | 1.99 tok/sec | 851 MB | Register spilling due to >16 YMM limit |
+| **Tenzo (Q8 + TL1 Unroll x2)** | 4 (SMT) | 1.91 tok/sec | 851 MB | SMT cache contention degrades perf |
+| **Tenzo (Q8 + TL1 Unroll x2)** | **2 (P-Cores)** | **2.55 tok/sec** | **851 MB** | **Optimal: Zero-Spill Fused FMA/PSHUFB** |
 
 ---
 
 ## 🗺️ Roadmap
 
-### Phase 1: Inference Engine (next milestone)
-- [x] **Hardware Abstraction Layer (HAL)**: Abstract hardware detection beyond x86 sysfs — need a unified `HardwareProfile` that describes any target (ISA, SIMD width, cache hierarchy, num cores, GPU capabilities)
-- [x] **Model Ingestion**: ONNX parser → Tenzo dialect graph
-- [x] **Dynamic Shape Support**: Support for `?` batch sizes in MLIR and C++ Runtime
-- [x] **Inference Runtime**: `ExecutionContext`, `Tensor`, and `MemRefDescriptor` for JIT execution
-- [ ] **Memory Planning**: Tensor lifetime analysis, memory pool allocation
-- [ ] **Intra-kernel Threading**: Parallelize macro-kernel M-loop via OpenMP
+### Phase 1: Edge CPU Dominance (Ongoing)
+- [x] End-to-end BitNet 1.58B generation.
+- [x] Zero-Allocation MLIR Bufferization.
+- [x] Hand-tuned AVX2 micro-kernels (Zero-Spill).
+- [ ] **K/V Cache Quantization**: Implement INT8/INT4 dynamic caching.
+- [ ] **ARM NEON Backend**: Expand auto-vectorizer to target Apple Silicon and Snapdragon.
 
-### Phase 2: Multi-Target Backends
-- [ ] **ARM/NEON backend**: Micro-kernel generation for NEON/SVE (Apple Silicon, Snapdragon, server ARM)
-- [ ] **RISC-V Vector extension**: Micro-kernel for RVV 1.0
-- [ ] **CUDA/NVPTX path**: MLIR GPU dialect → NVPTX backend, cuBLAS-competitive kernels
-- [ ] **AMD/ROCm path**: MLIR → AMDGPU backend or HIP-compatible SPIR-V
+### Phase 2: Kernel Fusion & GPU
+- [ ] **FlashAttention MLIR Kernel**: Fuse SDPA, RoPE, and causal masking.
+- [ ] **Vulkan SPIR-V Compute**: Bring 1.58-bit decompression to iGPUs via Vulkan.
 
-### Phase 3: Production Readiness
-- [ ] **Quantization**: INT8 (AVX-VNNI `vpdpbusd`), INT4, mixed-precision
-- [ ] **Conv2D via im2col + GEMM**: Reuse GEMM infra for convolutions
-- [ ] **Operator library expansion**: Softmax, LayerNorm, Attention, Embedding
-- [ ] **Benchmark CI**: Automated perf regression tracking across targets
-
-### Phase 4: Training (distant future)
-- [ ] **Autograd**: Reverse-mode automatic differentiation on the Tenzo IR
-- [ ] **Backward pass generation**: Adjoint of each operation
-- [ ] **Optimizer kernels**: SGD, Adam, AdamW as fused operations
-- [ ] **Distributed training**: Multi-device data/model parallelism
+### Phase 3: Developer Experience
+- [ ] **Standalone Inference Engine**: Decouple the JIT execution engine from `tenzo-cli` for embedding in iOS/Android apps.
+- [ ] **Multi-Model Support**: Support modern architectures beyond LLaMA (Mistral, MoE).
 
 ---
 
 ## 📦 Component Inventory
 
-### `src/dialect/` — Tenzo MLIR Dialect
-| File | Status | Description |
-|------|--------|-------------|
-| `TenzoOps.td` | ✅ Stable | ODS: `matmul`, `conv2d`, `relu`, `add` |
-| `TenzoDialect.cpp/h` | ✅ Stable | Dialect registration |
-
-### `src/passes/` — Compiler Passes (CPU path)
-| File | Status | Description |
-|------|--------|-------------|
-| `Lowering.cpp` | ✅ Stable | Tenzo → Arith patterns |
-| `FusionPass.cpp` | ✅ Stable | Operator fusion |
-| `LinalgLowering.cpp` | ✅ Stable | Tenzo → Linalg |
-| `Bufferization.cpp` | ✅ Stable | One-shot bufferization |
-| `OptimalVectorization.cpp` | ✅ Stable | GotoBLAS-style vectorization |
-| `ExplicitMicroKernel.cpp` | ✅ Stable | 6×16 AVX2 FMA kernel |
-| `ExplicitMicroKernelPass.cpp` | ✅ Stable | Pass wrapper |
-| `PackingPass.cpp` | ✅ Stable | BLIS-style packing |
-| `PackingKernels.cpp` | ✅ Stable | Row-major → Block-panel |
-| `MacroKernelPass.cpp` | ✅ Stable | 5-loop cache-blocking |
-| `TransformStrategy.cpp` | ✅ Stable | Transform Dialect strategy |
-| `LLVMLowering.cpp` | ✅ Stable | LLVM IR lowering |
-
-### `src/passes/gpu/` — GPU/SPIR-V Path
-| File | Status | Description |
-|------|--------|-------------|
-| `GPULowering.cpp/h` | 🧪 PoC | Linalg → GPU → SPIR-V (proof of concept) |
-
-### `src/context/` — Hardware Abstraction Layer
-| File | Status | Description |
-|------|--------|--------------|
-| `HardwareProfile.h` | ✅ Stable | Abstract interface: ISA, topology, cache, micro-kernel params |
-| `HardwareProfile.cpp` | ✅ Stable | Platform-aware factory (`#ifdef __aarch64__`) |
-| `X86HardwareProfile.cpp/h` | ✅ Stable | x86 sysfs P/E-core topology, CPUID, cache detection |
-| `ARMHardwareProfile.cpp/h` | 🧪 Stub | ARM NEON/SVE, big.LITTLE topology detection |
-| `TenzoContext.cpp/h` | ✅ Stable | MLIR context + dialect registration |
-| `AutoTuner.cpp/h` | ✅ Stable | Runtime parameter tuning |
-
-### `src/runtime/` — Execution
-| File | Status | Description |
-|------|--------|-------------|
-| `VulkanRuntime.cpp/h` | 🧪 PoC | Minimal Vulkan compute wrapper |
-| `ThreadPool.cpp/h` | ✅ Stable | CPU-pinned thread pool |
-
----
-
-## 🏗️ Build Infrastructure
-
-```text
- Compilation:  make build → remote_build.sh → Hetzner cpx62 (16C) + distcc
- Execution:    docker compose run → Docker container (Vulkan SDK, LLVM 21)
-```
-
-| File | Purpose |
-|------|---------|
-| `CMakeLists.txt` | Build config (tenzo-cli + micro_bench targets) |
-| `Makefile` | Convenience targets: `make build`, `cpu`, `test`, `gpu`, etc. |
-| `remote_build.sh` | Hetzner cloud compilation orchestrator |
-| `Dockerfile` | Ubuntu 24.04 + LLVM 21 + Vulkan SDK |
-| `docker-compose.yml` | Dev container with Intel iGPU passthrough |
+- `src/dialect/` — MLIR definitions (`tenzo.bitlinear_tl1`, `tenzo.rope`).
+- `src/passes/` — Compiler passes (Linalg Lowering, Bufferization, Micro-Kernel generation).
+- `src/context/` — Hardware detection and topology profiling.
+- `src/runtime/` — Execution environment (Tokenizer, KVCacheManager, OpenMP executor).
+- `tenzo-frontend/` — PyTorch-to-MLIR exporter (`export_bitnet.py`).

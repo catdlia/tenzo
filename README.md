@@ -6,15 +6,14 @@
 
 There is no open-source compiler for tensor computations that truly targets **all hardware**. TensorRT is NVIDIA-only. CoreML is Apple-only. XLA is married to TPUs. OpenVINO is Intel-only. Every solution is either proprietary, vendor-locked, or server-oriented.
 
-**Tenzo** uses MLIR/LLVM as a universal backend to generate optimal native code for **any target**: x86 (AVX2/AVX-512), ARM (NEON/SVE), RISC-V (V-extension), CUDA, AMD, and Vulkan GPUs. The compiler detects the hardware, selects the optimal lowering strategy (tiling, blocking, register allocation, SIMD width), and generates code that rivals hand-tuned libraries.
+**Tenzo** uses MLIR/LLVM as a universal backend to generate optimal native code for **any target**, with a specialized focus on heavily quantized Large Language Models (like the 1.58-bit BitNet architectures). The compiler detects the hardware, selects the optimal lowering strategy (register allocation, SIMD width), and generates code that rivals hand-tuned libraries.
 
 ### ✨ Key Features
-- **Custom MLIR Dialect** (`tenzo.matmul`, `tenzo.bitlinear_tl1`, `tenzo.rope`) — high-level tensor IR
-- **Zero-Allocation Bufferization** — in-place memory reuse keeping allocations completely out of the hot loop
-- **Explicit AVX2 micro-kernels** — e.g. `vpshufb` 256-bit SIMD kernel for BitNet with unroll x2 and zero register spilling
-- **Quantization Support** — BitNet 1.58b ternary weights (`tl1_pack`), `lm_head` Q8 (`i8`) quantization
-- **Operator Fusion & Hardware auto-detection** — CPU topology, cache hierarchy, SIMD capabilities
-- **Vulkan/SPIR-V path** — proof-of-concept GPU pipeline
+- **Custom MLIR Dialect** (`tenzo.bitlinear_tl1`, `tenzo.rope`, `tenzo.rms_norm`) — high-level LLM tensor IR.
+- **Zero-Allocation Bufferization** — in-place memory reuse keeping dynamic memory allocations completely out of the inference hot loop.
+- **Explicit AVX2 micro-kernels** — e.g. `vpshufb` 256-bit SIMD kernel for BitNet with unroll x2 and **zero register spilling**.
+- **Quantization Support** — BitNet 1.58B ternary weights (`tl1_pack`), `lm_head` Q8 (`i8`) quantization.
+- **Operator Fusion & Hardware auto-detection** — CPU topology, cache hierarchy, SIMD capabilities.
 
 ## 📊 Performance (BitNet 1.58B 2B model, 30 Layers)
 *Benchmarked on Intel Core i3-1215U (Alder Lake, 15W, 2 P-Cores).*
@@ -28,7 +27,11 @@ There is no open-source compiler for tensor computations that truly targets **al
 ## 🏗️ Architecture
 
 ```text
-   tenzo.matmul / tenzo.bitlinear_tl1 / tenzo.rope
+       PyTorch / HuggingFace Model
+                 │
+   tenzo-frontend (Weight Extraction & tl1_pack)
+                 │
+   tenzo.bitlinear_tl1 / tenzo.rope / tenzo.matmul_q8
                  │
          Fusion + Graph Opt
                  │
@@ -47,8 +50,8 @@ There is no open-source compiler for tensor computations that truly targets **al
 
 ## 📍 Current State
 
-**Working:** Full x86 AVX2 pipeline (DSL → LLVM JIT), operator fusion, BitNet 1.58B generation (Llama architecture), zero-allocation bufferization.
-**Not yet:** Multi-target backends, standalone inference runtime beyond CLI.
+**Working:** Full x86 AVX2 pipeline (DSL → LLVM JIT), operator fusion, BitNet 1.58B autoregressive generation, zero-allocation bufferization, OpenMP multithreading.
+**Not yet:** Multi-target backends, standalone inference runtime beyond CLI, K/V Cache quantization.
 
 See [PROJECT_STATUS.md](PROJECT_STATUS.md) for detailed component inventory and gap analysis.
 
@@ -56,18 +59,22 @@ See [PROJECT_STATUS.md](PROJECT_STATUS.md) for detailed component inventory and 
 
 ### Prerequisites
 - Docker & Docker Compose
-- Hetzner Cloud CLI (`hcloud`) for remote compilation
+- `uv` (Python package manager)
 
-### Build & Run
+### 1. Build the Compiler
 ```bash
-make build         # Compile remotely (Hetzner cloud server)
 make build-local   # Compile locally in Docker
-make test          # Quick validation (CPU + Conv2D + GPU)
-make cpu           # CPU MatMul benchmark
-make bench         # All benchmarks
 ```
 
-> Compilation via `distcc` on a Hetzner server (or local Docker). Execution inside Docker with Vulkan SDK + LLVM 21.
+### 2. Export Model (BitNet 1.58B)
+```bash
+uv run python3 tenzo-frontend/export_bitnet.py --quant-mode tl1_pack --num-layers 30 --output-dir export_output_bitnet
+```
+
+### 3. Run Inference
+```bash
+docker compose run --rm -e OMP_NUM_THREADS=2 -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli generate -m /app/export_output_bitnet -n 30
+```
 
 ## 📂 Structure
 
@@ -75,21 +82,18 @@ make bench         # All benchmarks
 |-----------|---------|
 | `src/dialect/` | Tenzo MLIR dialect (ODS/TableGen) |
 | `src/passes/` | Compiler passes: fusion, lowering, zero-alloc bufferize, AVX2 micro-kernels |
-| `src/passes/gpu/` | SPIR-V conversion pipeline |
 | `src/context/` | Hardware detection, auto-tuning |
-| `src/runtime/` | Vulkan compute wrapper, OpenMP execution |
+| `src/runtime/` | Tokenizer, KVCacheManager, OpenMP execution |
 | `src/tests/` | Benchmarks and E2E validation |
 | `tenzo-frontend/` | PyTorch exporters (`export_bitnet.py`) |
 
 ## 🗺️ Roadmap
 
 - [x] End-to-end MLIR compilation pipeline (x86 AVX2)
-- [x] GotoBLAS micro-kernel architecture & packing
 - [x] BitNet 1.58B LLM Generation with `vpshufb` AVX2 kernel (Zero Spill)
 - [x] Zero-Allocation MLIR Bufferization
+- [ ] **K/V Cache Quantization** — INT8/INT4 context window
 - [ ] **Multi-target backends** — ARM/NEON, RISC-V, CUDA/NVPTX, AMD/ROCm
-- [ ] **Hardware Abstraction Layer** — unified hardware profiling beyond x86
-- [ ] **Training** — autograd, backward pass, optimizer kernels
 
 ## 📜 License
 MIT License
