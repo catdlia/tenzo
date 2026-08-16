@@ -70,7 +70,7 @@ def unpack_2bit_weights(raw, out_dim, in_dim):
     return tern
 
 
-def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192, kv_mode="int8_fused"):
+def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192, kv_mode="int8_fused", lm_quant="int8"):
     print(f"📖 Parsing MLIR graph: {mlir_path}")
     with open(mlir_path, "r") as f:
         mlir_text = f.read()
@@ -86,9 +86,17 @@ def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192, kv_mo
     head_dim = 128
     num_layers = 30
 
-    # 1. Embeddings: 128256 x 2560 float32
+    # 1. Embeddings: 128256 x 2560 float32 -> quantized if lm_quant == 'int8'
     embed_bytes = vocab_size * hidden_size * 4
-    embed_tokens_w = raw_bytes[0:embed_bytes].view(np.float32).reshape(vocab_size, hidden_size)
+    embed_tokens_f32 = raw_bytes[0:embed_bytes].view(np.float32).reshape(vocab_size, hidden_size)
+
+    if lm_quant == "int8":
+        amax = np.max(np.abs(embed_tokens_f32), axis=1, keepdims=True)
+        embed_scales = np.maximum(amax / 127.0, 1e-8).astype(np.float32).reshape(-1)
+        embed_weights = np.clip(np.round(embed_tokens_f32 / embed_scales[:, None]), -127, 127).astype(np.int8)
+    else:
+        embed_weights = embed_tokens_f32
+        embed_scales = None
 
     pattern = re.compile(r'(%\w+)\s*=\s*arith\.constant\s+(\d+)\s*:\s*index\s*\n\s*(%\w+)\s*=\s*memref\.view\s+%\w+\[\1\]\[\]\s*:\s*memref<\?xi8>\s+to\s+memref<([^>]+)>')
     all_views = []
@@ -100,8 +108,10 @@ def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192, kv_mo
     scale_pattern = re.compile(r'(%\w+)\s*=\s*arith\.constant\s+([0-9\.e\+\-]+)\s*:\s*f32\s*\n\s*%\w+\s*=\s*"tenzo\.bitlinear_elut"\([^,]+,\s*[^,]+,\s*\1\)')
     all_scales = [float(m.group(2)) for m in scale_pattern.finditer(mlir_text)]
 
+    lm_desc = "INT8 Symmetric (328 MB)" if lm_quant == "int8" else "FP32 Standard (1.31 GB)"
     print(f"  • Model: Hidden Size={hidden_size}, Vocab Size={vocab_size}, Layers={num_layers}")
-    print(f"  • KV Cache: Mode={kv_mode.upper()}, Max Sequence Length={max_seq_len}")
+    print(f"  • LM-Head / Embed Quantization: {lm_desc}")
+    print(f"  • KV Cache Quantization: {kv_mode.upper()} (Max Seq Len={max_seq_len})")
     print(f"  • Found {len(all_views)} memory views and {len(all_scales)} BitLinear scales")
 
     ctx = tenzo_runtime.ExecutionContext(
@@ -192,7 +202,7 @@ def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192, kv_mo
         ctx.set_final_norm(final_norm)
 
     print(f"✅ All {num_layers} layers packed into AVX2 registers successfully!")
-    return ctx, embed_tokens_w
+    return ctx, embed_weights, embed_scales
 
 
 def sample_token(logits, past_tokens, temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.15):
@@ -236,7 +246,7 @@ def sample_token(logits, past_tokens, temperature=0.7, top_p=0.9, top_k=40, repe
     return int(np.random.choice(len(probs), p=probs))
 
 
-def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_mode="int8_fused"):
+def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_mode="int8_fused", lm_quant="int8"):
     model_dir = os.path.join(PROJECT_ROOT, "tenzo-frontend", "export_output")
     mlir_path = os.path.join(model_dir, "model.mlir")
     weights_path = os.path.join(model_dir, "weights.bin")
@@ -248,7 +258,9 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_m
         prompt_tokens = [128000, 1, 2]
 
     safe_max_seq_len = max(8192, len(prompt_tokens) + max_tokens + 256)
-    ctx, embed_w = parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=safe_max_seq_len, kv_mode=kv_mode)
+    ctx, embed_w, embed_s = parse_mlir_and_load_weights(
+        mlir_path, weights_path, max_seq_len=safe_max_seq_len, kv_mode=kv_mode, lm_quant=lm_quant
+    )
 
     print(f"\n💬 [Tenzo Engine] Output Stream: {prompt}", end="", flush=True)
 
@@ -259,7 +271,7 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_m
     t_start = time.perf_counter()
     cur_x = None
     for tok in prompt_tokens:
-        tok_embed = ctx.embedding_lookup(tok, embed_w)
+        tok_embed = ctx.embedding_lookup(tok, embed_w, embed_s) if embed_s is not None else ctx.embedding_lookup(tok, embed_w)
         cur_x = ctx.forward_step(tok_embed)
 
     ttft = time.perf_counter() - t_start
@@ -267,7 +279,11 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_m
     # 2. Autoregressive Decode
     t_decode_start = time.perf_counter()
     for step in range(max_tokens):
-        logits = ctx.compute_logits(cur_x, embed_w).reshape(-1)
+        if embed_s is not None:
+            logits = ctx.compute_logits(cur_x, embed_w, embed_s).reshape(-1)
+        else:
+            logits = ctx.compute_logits(cur_x, embed_w).reshape(-1)
+
         next_tok = sample_token(logits, all_tokens, temperature=temp, repetition_penalty=repetition_penalty)
         
         all_tokens.append(next_tok)
@@ -280,19 +296,21 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_m
 
         print(tok_str, end="", flush=True)
 
-        tok_embed = ctx.embedding_lookup(next_tok, embed_w)
+        tok_embed = ctx.embedding_lookup(next_tok, embed_w, embed_s) if embed_s is not None else ctx.embedding_lookup(next_tok, embed_w)
         cur_x = ctx.forward_step(tok_embed)
 
     decode_time = time.perf_counter() - t_decode_start
     n_gen = len(generated_tokens)
     speed = n_gen / decode_time if decode_time > 0 else 0
 
-    kv_desc = "INT8 Fused (4x compressed)" if kv_mode == "int8_fused" else "FP32 Standard"
+    lm_desc = "INT8 (4x comp: 328 MB)" if lm_quant == "int8" else "FP32 (1.31 GB)"
+    kv_desc = "INT8 Fused (4x comp: 314 MB)" if kv_mode == "int8_fused" else "FP32 (1.25 GB)"
 
     print(f"\n\n╔════════════════════════════════════════════════════════╗")
     print(f"║             Tenzo Engine Profiling Summary             ║")
     print(f"╠════════════════════════════════════════════════════════╣")
-    print(f"║ KV Cache Mode:           {kv_desc:<29} ║")
+    print(f"║ Model / LM Quantization: {lm_desc:<29} ║")
+    print(f"║ KV-Cache Quantization:   {kv_desc:<29} ║")
     print(f"║ Prompt Tokens:           {len(prompt_tokens):<29} ║")
     print(f"║ Generated Tokens:        {n_gen:<29} ║")
     print(f"║ Time To First Token:     {ttft*1000:<26.2f} ms ║")
@@ -307,7 +325,8 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--max-tokens", type=int, default=50, help="Maximum generated tokens")
     parser.add_argument("-t", "--temp", type=float, default=0.7, help="Sampling temperature")
     parser.add_argument("-r", "--repetition-penalty", type=float, default=1.15, help="Repetition penalty")
-    parser.add_argument("--kv-mode", type=str, default="int8_fused", choices=["fp32", "int8_fused"], help="KV Cache compression mode")
+    parser.add_argument("--model-quant", "--lm-quant", dest="lm_quant", type=str, default="int8", choices=["int8", "fp32"], help="Model LM-head quantization scheme")
+    parser.add_argument("--kv-quant", "--kv-mode", dest="kv_mode", type=str, default="int8_fused", choices=["int8_fused", "fp32"], help="KV Cache quantization scheme")
     args = parser.parse_args()
 
-    generate_text(args.prompt, args.max_tokens, args.temp, args.repetition_penalty, args.kv_mode)
+    generate_text(args.prompt, args.max_tokens, args.temp, args.repetition_penalty, args.kv_mode, args.lm_quant)

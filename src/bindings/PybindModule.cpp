@@ -1097,14 +1097,33 @@ public:
         #pragma omp parallel for schedule(static)
         for (py::ssize_t v = 0; v < vocab_size; ++v) {
             const int8_t* row = w_ptr + v * h_dim;
-            __m256 acc = _mm256_setzero_ps();
+            __m256 acc0 = _mm256_setzero_ps();
+            __m256 acc1 = _mm256_setzero_ps();
+            __m256 acc2 = _mm256_setzero_ps();
+            __m256 acc3 = _mm256_setzero_ps();
             py::ssize_t i = 0;
+            for (; i + 32 <= h_dim; i += 32) {
+                __m256 va0 = _mm256_loadu_ps(x_ptr + i);
+                __m128i vb0 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i));
+                acc0 = _mm256_fmadd_ps(va0, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb0)), acc0);
+
+                __m256 va1 = _mm256_loadu_ps(x_ptr + i + 8);
+                __m128i vb1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 8));
+                acc1 = _mm256_fmadd_ps(va1, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb1)), acc1);
+
+                __m256 va2 = _mm256_loadu_ps(x_ptr + i + 16);
+                __m128i vb2 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 16));
+                acc2 = _mm256_fmadd_ps(va2, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb2)), acc2);
+
+                __m256 va3 = _mm256_loadu_ps(x_ptr + i + 24);
+                __m128i vb3 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 24));
+                acc3 = _mm256_fmadd_ps(va3, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb3)), acc3);
+            }
+            __m256 acc = _mm256_add_ps(_mm256_add_ps(acc0, acc1), _mm256_add_ps(acc2, acc3));
             for (; i + 8 <= h_dim; i += 8) {
                 __m256 va = _mm256_loadu_ps(x_ptr + i);
                 __m128i vb_i8 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i));
-                __m256i vb_i32 = _mm256_cvtepi8_epi32(vb_i8);
-                __m256 vb_f32 = _mm256_cvtepi32_ps(vb_i32);
-                acc = _mm256_fmadd_ps(va, vb_f32, acc);
+                acc = _mm256_fmadd_ps(va, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb_i8)), acc);
             }
             alignas(32) float tmp[8];
             _mm256_store_ps(tmp, acc);

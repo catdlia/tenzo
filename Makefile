@@ -82,14 +82,14 @@ generate:
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli generate -p "$(if $(PROMPT),$(PROMPT),Tenzo Edge AI)" -n $(if $(TOKENS),$(TOKENS),30) -t $(if $(TEMP),$(TEMP),0.7) -m tenzo-frontend/export_output
 
 # Run ultra-fast native AVX2 text generation
-# Usage: make run-fast PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7]
+# Usage: make run-fast PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|fp32]
 run-fast:
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "pip3 install numpy --break-system-packages -q && python3 /app/scripts/run_generation_fast.py -p \"$(if $(PROMPT),$(PROMPT),Explain the importance of compilers in computer science)\" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7)"
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "pip3 install numpy --break-system-packages -q && python3 /app/scripts/run_generation_fast.py -p \"$(if $(PROMPT),$(PROMPT),Explain the importance of compilers in computer science)\" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)"
 
 # Run side-by-side comparison: Microsoft BitNet.cpp vs Tenzo Native Engine
-# Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7]
+# Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|fp32]
 compare:
-	python3 /home/illia/CLionProjects/untitled/scripts/compare_bitnet_tenzo.py -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7)
+	python3 /home/illia/CLionProjects/untitled/scripts/compare_bitnet_tenzo.py -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
 
 # Run all benchmarks
 bench: build
