@@ -70,7 +70,7 @@ def unpack_2bit_weights(raw, out_dim, in_dim):
     return tern
 
 
-def parse_mlir_and_load_weights(mlir_path, weights_path):
+def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192):
     print(f"📖 Parsing MLIR graph: {mlir_path}")
     with open(mlir_path, "r") as f:
         mlir_text = f.read()
@@ -101,10 +101,11 @@ def parse_mlir_and_load_weights(mlir_path, weights_path):
     all_scales = [float(m.group(2)) for m in scale_pattern.finditer(mlir_text)]
 
     print(f"  • Model: Hidden Size={hidden_size}, Vocab Size={vocab_size}, Layers={num_layers}")
+    print(f"  • Max Sequence Length (KV Cache): {max_seq_len}")
     print(f"  • Found {len(all_views)} memory views and {len(all_scales)} BitLinear scales")
 
     ctx = tenzo_runtime.ExecutionContext(
-        hidden_size, num_q_heads, num_kv_heads, head_dim, num_layers, 4096, "classic_tl1"
+        hidden_size, num_q_heads, num_kv_heads, head_dim, num_layers, max_seq_len, "classic_tl1"
     )
 
     v_idx = 1  # all_views[0] is embed_tokens.weight
@@ -242,11 +243,12 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15):
     vocab_path = os.path.join(model_dir, "tokenizer.vocab")
 
     tokenizer = Tokenizer(vocab_path)
-    ctx, embed_w = parse_mlir_and_load_weights(mlir_path, weights_path)
-
     prompt_tokens = tokenizer.encode(prompt)
     if not prompt_tokens:
         prompt_tokens = [128000, 1, 2]
+
+    safe_max_seq_len = max(8192, len(prompt_tokens) + max_tokens + 256)
+    ctx, embed_w = parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=safe_max_seq_len)
 
     print(f"\n💬 [Tenzo Engine] Output Stream: {prompt}", end="", flush=True)
 

@@ -487,7 +487,7 @@ public:
     std::vector<std::vector<float>> v_cache;
     std::vector<float> scores_buffer;
 
-    KVCache(int num_layers, int num_q_heads, int num_kv_heads, int head_dim, int max_seq_len = 4096)
+    KVCache(int num_layers, int num_q_heads, int num_kv_heads, int head_dim, int max_seq_len = 8192)
         : num_layers(num_layers), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
           head_dim(head_dim), max_seq_len(max_seq_len),
           q_dim(num_q_heads * head_dim), kv_dim(num_kv_heads * head_dim),
@@ -705,7 +705,7 @@ public:
         int num_kv_heads,
         int head_dim,
         int num_layers,
-        int max_seq_len = 4096,
+        int max_seq_len = 8192,
         const std::string& quant_scheme = "classic_tl1"
     ) : hidden_size(hidden_size), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
         head_dim(head_dim), num_layers(num_layers), max_seq_len(max_seq_len),
@@ -1051,7 +1051,7 @@ PYBIND11_MODULE(tenzo_runtime, m) {
     py::class_<ExecutionContext>(m, "ExecutionContext")
         .def(py::init<int, int, int, int, int, int, const std::string&>(),
              py::arg("hidden_size"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"),
-             py::arg("num_layers"), py::arg("max_seq_len") = 4096, py::arg("quant_scheme") = "classic_tl1")
+             py::arg("num_layers"), py::arg("max_seq_len") = 8192, py::arg("quant_scheme") = "classic_tl1")
         .def_readonly("max_seq_len", &ExecutionContext::max_seq_len)
         .def("reset", &ExecutionContext::reset)
         .def("get_seq_len", &ExecutionContext::get_seq_len)
