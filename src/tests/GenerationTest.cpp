@@ -158,10 +158,6 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
     s_cfg.top_p = config.top_p;
     runtime::Sampler sampler(s_cfg);
 
-    runtime::ExecutionContext engine(context, module.get());
-    runtime::KVCacheManager kv_cache(1024, num_layers, 128 * num_heads, num_heads);
-    kv_cache.reset();
-
     std::vector<int32_t> prompt_tokens;
     if (loaded_vocab) {
         prompt_tokens = tokenizer.encode(config.prompt);
@@ -170,18 +166,23 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
         prompt_tokens = {1, 2, 3};
     }
 
+    int prefill_token_count = static_cast<int>(prompt_tokens.size());
+    int total_steps = prefill_token_count + config.max_tokens;
+
+    runtime::ExecutionContext engine(context, module.get());
+    runtime::KVCacheManager kv_cache(std::max(4096, total_steps + 128), num_layers, 128 * num_heads, num_heads);
+    kv_cache.reset();
+
     llvm::outs() << "\n💬 [Tenzo Engine] Output Stream: " << config.prompt;
     llvm::outs().flush();
 
     int32_t current_token = prompt_tokens[0];
+    std::vector<int32_t> all_tokens = prompt_tokens;
 
     auto start_time = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point ttft_time;
     bool ttft_captured = false;
     int generated_tokens_count = 0;
-
-    int prefill_token_count = static_cast<int>(prompt_tokens.size());
-    int total_steps = prefill_token_count + config.max_tokens;
 
     std::vector<int64_t> in_shape = {1, 1};
     runtime::Tensor input(in_shape);
@@ -229,10 +230,10 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
             return;
         }
 
-
         // When prefill completes, start decoding and sample tokens
         if (step >= prefill_token_count - 1) {
-            current_token = sampler.sample(output.data, v_size);
+            current_token = sampler.sample(output.data, v_size, all_tokens);
+            all_tokens.push_back(current_token);
             
             if (!ttft_captured) {
                 ttft_time = std::chrono::high_resolution_clock::now();
@@ -243,6 +244,11 @@ void runGenerationTest(MLIRContext& context, const GenerationConfig& config) {
                 generated_tokens_count++;
                 if (loaded_vocab) {
                     std::string token_str = tokenizer.decode({current_token});
+                    if (token_str == "<|endoftext|>" || token_str == "<|eot_id|>" || 
+                        token_str == "</s>" || token_str == "<eos>") {
+                        llvm::outs() << "\n[EOS reached]\n";
+                        break;
+                    }
                     llvm::outs() << token_str;
                     llvm::outs().flush();
                 }

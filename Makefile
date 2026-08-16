@@ -18,7 +18,7 @@ build:
 # Локальний бекап (на випадок відсутності інтернету)
 build-local:
 	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo_runtime
 
 # ==========================================
 # 🧪 TESTING & RUNNING (via Docker)
@@ -75,6 +75,21 @@ gpu: build
 gpu-bench: build
 	@echo "🚀 Running GPU benchmark..."
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli gpu-bench
+
+# Run text generation (MLIR JIT)
+# Usage: make generate PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7]
+generate:
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli generate -p "$(if $(PROMPT),$(PROMPT),Tenzo Edge AI)" -n $(if $(TOKENS),$(TOKENS),30) -t $(if $(TEMP),$(TEMP),0.7) -m tenzo-frontend/export_output
+
+# Run ultra-fast native AVX2 text generation
+# Usage: make run-fast PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|fp32]
+run-fast:
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "pip3 install numpy --break-system-packages -q && python3 /app/scripts/run_generation_fast.py -p \"$(if $(PROMPT),$(PROMPT),Explain the importance of compilers in computer science)\" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)"
+
+# Run side-by-side comparison: Microsoft BitNet.cpp vs Tenzo Native Engine
+# Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|fp32]
+compare:
+	python3 /home/illia/CLionProjects/untitled/scripts/compare_bitnet_tenzo.py -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
 
 # Run all benchmarks
 bench: build
@@ -164,16 +179,18 @@ watch:
 
 # Help
 help:
-	@echo "╔════════════════════════════════════════════════════╗"
-	@echo "║          Tenzo Compiler Build System               ║"
-	@echo "╠════════════════════════════════════════════════════╣"
-	@echo "║  make build       - Віддалена збірка (Hetzner)║"
-	@echo "║  make build-local - Локальна збірка (в Docker)     ║"
-	@echo "║  make test        - Run all tests                  ║"
-	@echo "║  make cpu         - Run CPU MatMul benchmark       ║"
-	@echo "║  make large       - Run large matrix (768x768)     ║"
-	@echo "║  make gpu         - Run GPU pipeline test          ║"
-	@echo "╚════════════════════════════════════════════════════╝"
+	@echo "╔════════════════════════════════════════════════════════════════════════╗"
+	@echo "║                   Tenzo Compiler Build System (v0.3.0)                 ║"
+	@echo "╠════════════════════════════════════════════════════════════════════════╣"
+	@echo "║  make build-local - Compile compiler & runtime locally inside Docker   ║"
+	@echo "║  make build       - Compile remotely via cloud server                  ║"
+	@echo "║  make run-fast    - Run ultra-fast native C++ 1.58-bit BitNet LLM gen  ║"
+	@echo "║  make compare     - Run side-by-side benchmark vs Microsoft BitNet.cpp ║"
+	@echo "║  make test        - Run all compiler unit & regression tests           ║"
+	@echo "║  make cpu         - Run CPU MatMul benchmark                           ║"
+	@echo "║  make large       - Run large matrix (768x768) benchmark               ║"
+	@echo "║  make gpu         - Run GPU pipeline test                              ║"
+	@echo "╚════════════════════════════════════════════════════════════════════════╝"
 
 stop-cloud:
 	hcloud server delete tenzo-build-node

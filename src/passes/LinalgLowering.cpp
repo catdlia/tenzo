@@ -1136,14 +1136,110 @@ struct EmbeddingLoweringToLinalg : public OpConversionPattern<tenzo::EmbeddingOp
                 Value tokenIdx = b.create<arith::IndexCastOp>(l, b.getIndexType(), tokenI32);
                 Value dIdx = b.create<linalg::IndexOp>(l, rank - 1);
 
-                Value embValQ = b.create<tensor::ExtractOp>(l, weight_q, ValueRange{tokenIdx, dIdx});
-                Value embValQExt = b.create<arith::ExtSIOp>(l, b.getI32Type(), embValQ);
-                Value embValQF32 = b.create<arith::SIToFPOp>(l, b.getF32Type(), embValQExt);
-                
-                Value scale = b.create<tensor::ExtractOp>(l, scales, ValueRange{tokenIdx});
-                Value embVal = b.create<arith::MulFOp>(l, embValQF32, scale);
+                Value embVal;
+                if (scales) {
+                    Value embValQ = b.create<tensor::ExtractOp>(l, weight_q, ValueRange{tokenIdx, dIdx});
+                    Value embValQExt = b.create<arith::ExtSIOp>(l, b.getI32Type(), embValQ);
+                    Value embValQF32 = b.create<arith::SIToFPOp>(l, b.getF32Type(), embValQExt);
+                    Value scale = b.create<tensor::ExtractOp>(l, scales, ValueRange{tokenIdx});
+                    embVal = b.create<arith::MulFOp>(l, embValQF32, scale);
+                } else {
+                    embVal = b.create<tensor::ExtractOp>(l, weight_q, ValueRange{tokenIdx, dIdx});
+                }
                 
                 b.create<linalg::YieldOp>(l, embVal);
+            }
+        );
+        return success();
+    }
+};
+
+struct BitLinearElutLoweringToLinalg : public OpConversionPattern<tenzo::BitLinearElutOp> {
+    using OpConversionPattern<tenzo::BitLinearElutOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::BitLinearElutOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value input = adaptor.getInput();
+        Value weights = adaptor.getWeights();
+        Value scale = adaptor.getScale();
+
+        auto inType = mlir::cast<RankedTensorType>(input.getType());
+        auto wType = mlir::cast<RankedTensorType>(weights.getType());
+        auto resType = mlir::cast<RankedTensorType>(op.getResult().getType());
+
+        int64_t K_packed = wType.getShape()[1];
+
+        Value emptyOut = rewriter.create<tensor::EmptyOp>(loc, resType.getShape(), resType.getElementType());
+
+        SmallVector<AffineMap, 1> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(3)
+        };
+        SmallVector<utils::IteratorType, 3> iterators = {
+            utils::IteratorType::parallel,
+            utils::IteratorType::parallel,
+            utils::IteratorType::parallel
+        };
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op, resType,
+            ValueRange{}, ValueRange{emptyOut},
+            indexingMaps, iterators,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                Value bIdx = b.create<linalg::IndexOp>(l, 0);
+                Value sIdx = b.create<linalg::IndexOp>(l, 1);
+                Value nIdx = b.create<linalg::IndexOp>(l, 2);
+
+                Value zeroF32 = b.create<arith::ConstantOp>(l, b.getF32FloatAttr(0.0f));
+                Value zeroIdx = b.create<arith::ConstantIndexOp>(l, 0);
+                Value oneIdx = b.create<arith::ConstantIndexOp>(l, 1);
+                Value kPackedIdx = b.create<arith::ConstantIndexOp>(l, K_packed);
+
+                Value sum = b.create<scf::ForOp>(
+                    l, zeroIdx, kPackedIdx, oneIdx, ValueRange{zeroF32},
+                    [&](OpBuilder &bLoop, Location lLoop, Value kIdx, ValueRange accRange) {
+                        Value curAcc = accRange[0];
+                        Value wByte = bLoop.create<tensor::ExtractOp>(lLoop, weights, ValueRange{nIdx, kIdx});
+                        Value wByteI32 = bLoop.create<arith::ExtUIOp>(lLoop, bLoop.getI32Type(), wByte);
+
+                        Value c0 = bLoop.create<arith::ConstantIndexOp>(lLoop, 0);
+                        Value c1 = bLoop.create<arith::ConstantIndexOp>(lLoop, 1);
+                        Value c2 = bLoop.create<arith::ConstantIndexOp>(lLoop, 2);
+                        Value c3 = bLoop.create<arith::ConstantIndexOp>(lLoop, 3);
+                        Value c4 = bLoop.create<arith::ConstantIndexOp>(lLoop, 4);
+
+                        Value kBase = bLoop.create<arith::MulIOp>(lLoop, kIdx, c4);
+
+                        Value c0I32 = bLoop.create<arith::ConstantOp>(lLoop, bLoop.getI32IntegerAttr(0));
+                        Value c2I32 = bLoop.create<arith::ConstantOp>(lLoop, bLoop.getI32IntegerAttr(2));
+                        Value c4I32 = bLoop.create<arith::ConstantOp>(lLoop, bLoop.getI32IntegerAttr(4));
+                        Value c6I32 = bLoop.create<arith::ConstantOp>(lLoop, bLoop.getI32IntegerAttr(6));
+                        Value mask3 = bLoop.create<arith::ConstantOp>(lLoop, bLoop.getI32IntegerAttr(3));
+                        Value oneI32 = bLoop.create<arith::ConstantOp>(lLoop, bLoop.getI32IntegerAttr(1));
+
+                        auto add_slot = [&](Value shiftVal, Value kOffset, Value accIn) {
+                            Value shifted = (shiftVal == c0I32) ? wByteI32 : bLoop.create<arith::ShRUIOp>(lLoop, wByteI32, shiftVal);
+                            Value code = bLoop.create<arith::AndIOp>(lLoop, shifted, mask3);
+                            Value ternI32 = bLoop.create<arith::SubIOp>(lLoop, code, oneI32);
+                            Value ternF32 = bLoop.create<arith::SIToFPOp>(lLoop, bLoop.getF32Type(), ternI32);
+
+                            Value inKIdx = bLoop.create<arith::AddIOp>(lLoop, kBase, kOffset);
+                            Value inVal = bLoop.create<tensor::ExtractOp>(lLoop, input, ValueRange{bIdx, sIdx, inKIdx});
+                            Value prod = bLoop.create<arith::MulFOp>(lLoop, inVal, ternF32);
+                            return bLoop.create<arith::AddFOp>(lLoop, accIn, prod);
+                        };
+
+                        Value acc0 = add_slot(c0I32, c0, curAcc);
+                        Value acc1 = add_slot(c2I32, c1, acc0);
+                        Value acc2 = add_slot(c4I32, c2, acc1);
+                        Value acc3 = add_slot(c6I32, c3, acc2);
+
+                        bLoop.create<scf::YieldOp>(lLoop, ValueRange{acc3});
+                    }
+                ).getResult(0);
+
+                Value finalVal = b.create<arith::MulFOp>(l, sum, scale);
+                b.create<linalg::YieldOp>(l, finalVal);
             }
         );
         return success();
@@ -1818,6 +1914,7 @@ void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns)
     patterns.add<MatMulQ8Lowering>(patterns.getContext());
     patterns.add<BitLinearTL1LoweringToLinalg>(patterns.getContext());
     patterns.add<BitLinearTL1PackLoweringToLinalg>(patterns.getContext());
+    patterns.add<BitLinearElutLoweringToLinalg>(patterns.getContext());
     patterns.add<Conv2DLoweringToLinalg>(patterns.getContext());
     patterns.add<QuantizeLoweringToLinalg>(patterns.getContext());
     patterns.add<DequantizeLoweringToLinalg>(patterns.getContext());
