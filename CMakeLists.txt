@@ -380,6 +380,8 @@ pybind11_add_module(tenzo_runtime src/bindings/PybindModule.cpp)
 # Clear global include directories (LLVM/MLIR) for this target to avoid GCC vs LLVM cxxabi.h conflicts
 set_target_properties(tenzo_runtime PROPERTIES INCLUDE_DIRECTORIES "")
 
+target_compile_options(tenzo_runtime PRIVATE -mavx2 -mfma -O3 -fopenmp)
+
 target_link_libraries(tenzo_runtime PRIVATE
-    # Eventually link tenzo core libraries here
+    OpenMP::OpenMP_CXX
 )
