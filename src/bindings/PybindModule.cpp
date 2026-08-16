@@ -481,29 +481,64 @@ public:
     int q_dim;
     int kv_dim;
     int current_seq_len;
+    std::string kv_mode; // "fp32" or "int8_fused"
 
-    // k_cache[layer_idx], v_cache[layer_idx]: [num_kv_heads * max_seq_len * head_dim]
-    std::vector<std::vector<float>> k_cache;
-    std::vector<std::vector<float>> v_cache;
+    // FP32 Cache: k_cache_fp32[layer_idx], v_cache_fp32[layer_idx]
+    std::vector<std::vector<float>> k_cache_fp32;
+    std::vector<std::vector<float>> v_cache_fp32;
+
+    // Fused INT8 Compressed Cache: 4x memory savings & bandwidth reduction
+    std::vector<std::vector<int8_t>> k_cache_i8;
+    std::vector<std::vector<int8_t>> v_cache_i8;
+    std::vector<std::vector<float>> k_scales;
+    std::vector<std::vector<float>> v_scales;
+
+    // Preallocated per-head scores buffer
     std::vector<float> scores_buffer;
 
-    KVCache(int num_layers, int num_q_heads, int num_kv_heads, int head_dim, int max_seq_len = 8192)
-        : num_layers(num_layers), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
-          head_dim(head_dim), max_seq_len(max_seq_len),
-          q_dim(num_q_heads * head_dim), kv_dim(num_kv_heads * head_dim),
-          current_seq_len(0) {
+    KVCache(
+        int num_layers,
+        int num_q_heads,
+        int num_kv_heads,
+        int head_dim,
+        int max_seq_len = 8192,
+        const std::string& kv_mode = "int8_fused"
+    ) : num_layers(num_layers), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
+        head_dim(head_dim), max_seq_len(max_seq_len),
+        q_dim(num_q_heads * head_dim), kv_dim(num_kv_heads * head_dim),
+        current_seq_len(0), kv_mode(kv_mode) {
         
         size_t cache_elements = static_cast<size_t>(num_kv_heads) * max_seq_len * head_dim;
-        k_cache.resize(num_layers, std::vector<float>(cache_elements, 0.0f));
-        v_cache.resize(num_layers, std::vector<float>(cache_elements, 0.0f));
+        size_t scale_elements = static_cast<size_t>(num_kv_heads) * max_seq_len;
+
+        if (kv_mode == "fp32") {
+            k_cache_fp32.resize(num_layers, std::vector<float>(cache_elements, 0.0f));
+            v_cache_fp32.resize(num_layers, std::vector<float>(cache_elements, 0.0f));
+        } else {
+            // int8_fused
+            k_cache_i8.resize(num_layers, std::vector<int8_t>(cache_elements, 0));
+            v_cache_i8.resize(num_layers, std::vector<int8_t>(cache_elements, 0));
+            k_scales.resize(num_layers, std::vector<float>(scale_elements, 1.0f));
+            v_scales.resize(num_layers, std::vector<float>(scale_elements, 1.0f));
+        }
+
         scores_buffer.resize(static_cast<size_t>(num_q_heads) * max_seq_len, 0.0f);
     }
 
     void reset() {
         current_seq_len = 0;
-        for (int l = 0; l < num_layers; ++l) {
-            std::fill(k_cache[l].begin(), k_cache[l].end(), 0.0f);
-            std::fill(v_cache[l].begin(), v_cache[l].end(), 0.0f);
+        if (kv_mode == "fp32") {
+            for (int l = 0; l < num_layers; ++l) {
+                std::fill(k_cache_fp32[l].begin(), k_cache_fp32[l].end(), 0.0f);
+                std::fill(v_cache_fp32[l].begin(), v_cache_fp32[l].end(), 0.0f);
+            }
+        } else {
+            for (int l = 0; l < num_layers; ++l) {
+                std::fill(k_cache_i8[l].begin(), k_cache_i8[l].end(), 0);
+                std::fill(v_cache_i8[l].begin(), v_cache_i8[l].end(), 0);
+                std::fill(k_scales[l].begin(), k_scales[l].end(), 1.0f);
+                std::fill(v_scales[l].begin(), v_scales[l].end(), 1.0f);
+            }
         }
     }
 
@@ -531,7 +566,7 @@ public:
         }
     }
 
-    // Appends new K and V (with RoPE), then computes GQA Attention
+    // Appends new K and V (with in-place RoPE & fused quantization), then computes GQA Attention
     py::array_t<float> forward_attention(
         int layer_idx,
         py::array_t<float> q_arr,
@@ -550,107 +585,206 @@ public:
             throw std::runtime_error("Tensor dimension mismatch in forward_attention");
         }
 
-        std::vector<float> q_local(q_dim);
-        std::vector<float> k_local(kv_dim);
-        std::memcpy(q_local.data(), buf_q.ptr, q_dim * sizeof(float));
-        std::memcpy(k_local.data(), buf_k.ptr, kv_dim * sizeof(float));
+        float* q_ptr = static_cast<float*>(buf_q.ptr);
+        float* k_ptr = static_cast<float*>(buf_k.ptr);
         const float* v_src = static_cast<const float*>(buf_v.ptr);
 
-        // Apply RoPE
+        // In-place zero-copy RoPE
         for (int h = 0; h < num_q_heads; ++h) {
-            apply_rope(q_local.data() + h * head_dim, head_dim, current_seq_len);
+            apply_rope(q_ptr + h * head_dim, head_dim, current_seq_len);
         }
         for (int h = 0; h < num_kv_heads; ++h) {
-            apply_rope(k_local.data() + h * head_dim, head_dim, current_seq_len);
+            apply_rope(k_ptr + h * head_dim, head_dim, current_seq_len);
         }
 
-        float* layer_k = k_cache[layer_idx].data();
-        float* layer_v = v_cache[layer_idx].data();
-
-        // 1. Append RoPE-transformed K and V into KV Cache at current_seq_len
         int t_idx = current_seq_len;
-        for (int h = 0; h < num_kv_heads; ++h) {
-            float* k_dst = layer_k + (h * max_seq_len + t_idx) * head_dim;
-            float* v_dst = layer_v + (h * max_seq_len + t_idx) * head_dim;
-            const float* k_val = k_local.data() + h * head_dim;
-            const float* v_val = v_src + h * head_dim;
-
-            std::memcpy(k_dst, k_val, head_dim * sizeof(float));
-            std::memcpy(v_dst, v_val, head_dim * sizeof(float));
-        }
-
         int seq_len = current_seq_len + 1;
         float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
         int group_size = num_q_heads / num_kv_heads;
 
-        // 2. Compute Scaled Dot-Product Attention for each Q head
         auto out_arr = py::array_t<float>({1, 1, q_dim});
         float* out_ptr = static_cast<float*>(out_arr.request().ptr);
         float* scores_base = scores_buffer.data();
 
-        #pragma omp parallel for schedule(static)
-        for (int q_h = 0; q_h < num_q_heads; ++q_h) {
-            int kv_h = q_h / group_size;
-            const float* q_head = q_local.data() + q_h * head_dim;
-            const float* k_head_base = layer_k + kv_h * max_seq_len * head_dim;
-            const float* v_head_base = layer_v + kv_h * max_seq_len * head_dim;
-            float* out_head = out_ptr + q_h * head_dim;
-            float* scores = scores_base + q_h * max_seq_len;
-            float max_score = -1e9f;
+        if (kv_mode == "fp32") {
+            float* layer_k = k_cache_fp32[layer_idx].data();
+            float* layer_v = v_cache_fp32[layer_idx].data();
 
-            // Score = (Q * K^T) * scale
-            for (int t = 0; t < seq_len; ++t) {
-                const float* k_t = k_head_base + t * head_dim;
-                float dot = 0.0f;
-
-                // AVX2 Vectorized Dot Product
-                __m256 dot_vec = _mm256_setzero_ps();
-                int d = 0;
-                for (; d + 8 <= head_dim; d += 8) {
-                    __m256 q_v = _mm256_loadu_ps(q_head + d);
-                    __m256 k_v = _mm256_loadu_ps(k_t + d);
-                    dot_vec = _mm256_fmadd_ps(q_v, k_v, dot_vec);
-                }
-                alignas(32) float temp[8];
-                _mm256_store_ps(temp, dot_vec);
-                dot = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
-
-                for (; d < head_dim; ++d) {
-                    dot += q_head[d] * k_t[d];
-                }
-
-                float s = dot * scale;
-                scores[t] = s;
-                if (s > max_score) max_score = s;
+            for (int h = 0; h < num_kv_heads; ++h) {
+                float* k_dst = layer_k + (h * max_seq_len + t_idx) * head_dim;
+                float* v_dst = layer_v + (h * max_seq_len + t_idx) * head_dim;
+                const float* k_val = k_ptr + h * head_dim;
+                const float* v_val = v_src + h * head_dim;
+                std::memcpy(k_dst, k_val, head_dim * sizeof(float));
+                std::memcpy(v_dst, v_val, head_dim * sizeof(float));
             }
 
-            // Softmax
-            float sum_exp = 0.0f;
-            for (int t = 0; t < seq_len; ++t) {
-                scores[t] = std::exp(scores[t] - max_score);
-                sum_exp += scores[t];
-            }
-            float inv_sum = 1.0f / (sum_exp > 1e-9f ? sum_exp : 1.0f);
-            for (int t = 0; t < seq_len; ++t) {
-                scores[t] *= inv_sum;
-            }
+            #pragma omp parallel for schedule(static)
+            for (int q_h = 0; q_h < num_q_heads; ++q_h) {
+                int kv_h = q_h / group_size;
+                const float* q_head = q_ptr + q_h * head_dim;
+                const float* k_head_base = layer_k + kv_h * max_seq_len * head_dim;
+                const float* v_head_base = layer_v + kv_h * max_seq_len * head_dim;
+                float* out_head = out_ptr + q_h * head_dim;
+                float* scores = scores_base + q_h * max_seq_len;
+                float max_score = -1e9f;
 
-            // Out = Score * V
-            std::fill(out_head, out_head + head_dim, 0.0f);
-            for (int t = 0; t < seq_len; ++t) {
-                float weight = scores[t];
-                __m256 w_v = _mm256_set1_ps(weight);
-                const float* v_t = v_head_base + t * head_dim;
-
-                int d = 0;
-                for (; d + 8 <= head_dim; d += 8) {
-                    __m256 o_v = _mm256_loadu_ps(out_head + d);
-                    __m256 v_val = _mm256_loadu_ps(v_t + d);
-                    o_v = _mm256_fmadd_ps(w_v, v_val, o_v);
-                    _mm256_storeu_ps(out_head + d, o_v);
+                for (int t = 0; t < seq_len; ++t) {
+                    const float* k_t = k_head_base + t * head_dim;
+                    __m256 dot_vec = _mm256_setzero_ps();
+                    int d = 0;
+                    for (; d + 8 <= head_dim; d += 8) {
+                        __m256 q_v = _mm256_loadu_ps(q_head + d);
+                        __m256 k_v = _mm256_loadu_ps(k_t + d);
+                        dot_vec = _mm256_fmadd_ps(q_v, k_v, dot_vec);
+                    }
+                    alignas(32) float temp[8];
+                    _mm256_store_ps(temp, dot_vec);
+                    float dot = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+                    for (; d < head_dim; ++d) {
+                        dot += q_head[d] * k_t[d];
+                    }
+                    float s = dot * scale;
+                    scores[t] = s;
+                    if (s > max_score) max_score = s;
                 }
-                for (; d < head_dim; ++d) {
-                    out_head[d] += weight * v_t[d];
+
+                float sum_exp = 0.0f;
+                for (int t = 0; t < seq_len; ++t) {
+                    scores[t] = std::exp(scores[t] - max_score);
+                    sum_exp += scores[t];
+                }
+                float inv_sum = 1.0f / (sum_exp > 1e-9f ? sum_exp : 1.0f);
+                for (int t = 0; t < seq_len; ++t) {
+                    scores[t] *= inv_sum;
+                }
+
+                // Out = Score * V (Accumulated in 16 YMM registers)
+                __m256 o_acc[16];
+                for (int i = 0; i < 16; ++i) o_acc[i] = _mm256_setzero_ps();
+
+                for (int t = 0; t < seq_len; ++t) {
+                    __m256 w_v = _mm256_set1_ps(scores[t]);
+                    const float* v_t = v_head_base + t * head_dim;
+                    for (int i = 0; i < 16; ++i) {
+                        __m256 v_val = _mm256_loadu_ps(v_t + i * 8);
+                        o_acc[i] = _mm256_fmadd_ps(w_v, v_val, o_acc[i]);
+                    }
+                }
+                for (int i = 0; i < 16; ++i) {
+                    _mm256_storeu_ps(out_head + i * 8, o_acc[i]);
+                }
+            }
+        } else {
+            // === Fused INT8 Compressed KV-Cache ===
+            int8_t* layer_k = k_cache_i8[layer_idx].data();
+            int8_t* layer_v = v_cache_i8[layer_idx].data();
+            float* l_k_scales = k_scales[layer_idx].data();
+            float* l_v_scales = v_scales[layer_idx].data();
+
+            // 1. In-Register Fused Symmetric Quantization for K and V
+            for (int h = 0; h < num_kv_heads; ++h) {
+                const float* k_src = k_ptr + h * head_dim;
+                const float* v_src_h = v_src + h * head_dim;
+                int8_t* k_dst = layer_k + (h * max_seq_len + t_idx) * head_dim;
+                int8_t* v_dst = layer_v + (h * max_seq_len + t_idx) * head_dim;
+
+                float amax_k = 0.0f;
+                float amax_v = 0.0f;
+                for (int d = 0; d < head_dim; ++d) {
+                    amax_k = std::max(amax_k, std::abs(k_src[d]));
+                    amax_v = std::max(amax_v, std::abs(v_src_h[d]));
+                }
+                float s_k = std::max(amax_k / 127.0f, 1e-8f);
+                float s_v = std::max(amax_v / 127.0f, 1e-8f);
+                float inv_s_k = 1.0f / s_k;
+                float inv_s_v = 1.0f / s_v;
+
+                l_k_scales[h * max_seq_len + t_idx] = s_k;
+                l_v_scales[h * max_seq_len + t_idx] = s_v;
+
+                for (int d = 0; d < head_dim; ++d) {
+                    float q_k = std::round(k_src[d] * inv_s_k);
+                    float q_v = std::round(v_src_h[d] * inv_s_v);
+                    k_dst[d] = static_cast<int8_t>(std::clamp(q_k, -127.0f, 127.0f));
+                    v_dst[d] = static_cast<int8_t>(std::clamp(q_v, -127.0f, 127.0f));
+                }
+            }
+
+            // 2. High-Performance AVX2 Fused Dequantized Attention
+            #pragma omp parallel for schedule(static)
+            for (int q_h = 0; q_h < num_q_heads; ++q_h) {
+                int kv_h = q_h / group_size;
+                const float* q_head = q_ptr + q_h * head_dim;
+                const int8_t* k_head_base = layer_k + kv_h * max_seq_len * head_dim;
+                const int8_t* v_head_base = layer_v + kv_h * max_seq_len * head_dim;
+                const float* k_head_scales = l_k_scales + kv_h * max_seq_len;
+                const float* v_head_scales = l_v_scales + kv_h * max_seq_len;
+                float* out_head = out_ptr + q_h * head_dim;
+                float* scores = scores_base + q_h * max_seq_len;
+                float max_score = -1e9f;
+
+                // Scaled Dot Product (Q @ K^T)
+                for (int t = 0; t < seq_len; ++t) {
+                    const int8_t* k_t = k_head_base + t * head_dim;
+                    float s_k = k_head_scales[t];
+
+                    __m256 dot_vec0 = _mm256_setzero_ps();
+                    __m256 dot_vec1 = _mm256_setzero_ps();
+                    int d = 0;
+                    for (; d + 16 <= head_dim; d += 16) {
+                        __m256 q0 = _mm256_loadu_ps(q_head + d);
+                        __m128i k_raw0 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(k_t + d));
+                        __m256 k_f0 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(k_raw0));
+                        dot_vec0 = _mm256_fmadd_ps(q0, k_f0, dot_vec0);
+
+                        __m256 q1 = _mm256_loadu_ps(q_head + d + 8);
+                        __m128i k_raw1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(k_t + d + 8));
+                        __m256 k_f1 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(k_raw1));
+                        dot_vec1 = _mm256_fmadd_ps(q1, k_f1, dot_vec1);
+                    }
+                    __m256 dot_vec = _mm256_add_ps(dot_vec0, dot_vec1);
+                    alignas(32) float temp[8];
+                    _mm256_store_ps(temp, dot_vec);
+                    float raw_dot = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+                    for (; d < head_dim; ++d) {
+                        raw_dot += q_head[d] * static_cast<float>(k_t[d]);
+                    }
+
+                    float s = raw_dot * (s_k * scale);
+                    scores[t] = s;
+                    if (s > max_score) max_score = s;
+                }
+
+                // Softmax
+                float sum_exp = 0.0f;
+                for (int t = 0; t < seq_len; ++t) {
+                    scores[t] = std::exp(scores[t] - max_score);
+                    sum_exp += scores[t];
+                }
+                float inv_sum = 1.0f / (sum_exp > 1e-9f ? sum_exp : 1.0f);
+                for (int t = 0; t < seq_len; ++t) {
+                    scores[t] *= inv_sum;
+                }
+
+                // Out = Scores @ V (Accumulated in 16 YMM registers)
+                __m256 o_acc[16];
+                for (int i = 0; i < 16; ++i) o_acc[i] = _mm256_setzero_ps();
+
+                for (int t = 0; t < seq_len; ++t) {
+                    float s_v = v_head_scales[t];
+                    float eff_w = scores[t] * s_v;
+                    __m256 w_v = _mm256_set1_ps(eff_w);
+                    const int8_t* v_t = v_head_base + t * head_dim;
+
+                    for (int i = 0; i < 16; ++i) {
+                        __m128i v_raw = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(v_t + i * 8));
+                        __m256 v_val = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(v_raw));
+                        o_acc[i] = _mm256_fmadd_ps(w_v, v_val, o_acc[i]);
+                    }
+                }
+                for (int i = 0; i < 16; ++i) {
+                    _mm256_storeu_ps(out_head + i * 8, o_acc[i]);
                 }
             }
         }
@@ -706,11 +840,12 @@ public:
         int head_dim,
         int num_layers,
         int max_seq_len = 8192,
-        const std::string& quant_scheme = "classic_tl1"
+        const std::string& quant_scheme = "classic_tl1",
+        const std::string& kv_mode = "int8_fused"
     ) : hidden_size(hidden_size), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
         head_dim(head_dim), num_layers(num_layers), max_seq_len(max_seq_len),
         quant_scheme(quant_scheme),
-        kv_cache(num_layers, num_q_heads, num_kv_heads, head_dim, max_seq_len) {
+        kv_cache(num_layers, num_q_heads, num_kv_heads, head_dim, max_seq_len, kv_mode) {
         
         layers.resize(num_layers);
     }
@@ -1039,8 +1174,9 @@ PYBIND11_MODULE(tenzo_runtime, m) {
           py::arg("input"), py::arg("weight"), py::arg("bias") = py::none(), py::arg("quant_scheme") = "fp32", py::arg("scale") = 1.0f);
 
     py::class_<KVCache>(m, "KVCache")
-        .def(py::init<int, int, int, int, int>(),
-             py::arg("num_layers"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"), py::arg("max_seq_len") = 4096)
+        .def(py::init<int, int, int, int, int, const std::string&>(),
+             py::arg("num_layers"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"),
+             py::arg("max_seq_len") = 8192, py::arg("kv_mode") = "int8_fused")
         .def_readonly("max_seq_len", &KVCache::max_seq_len)
         .def("reset", &KVCache::reset)
         .def("get_seq_len", &KVCache::get_seq_len)
@@ -1049,9 +1185,10 @@ PYBIND11_MODULE(tenzo_runtime, m) {
              py::arg("layer_idx"), py::arg("q"), py::arg("k"), py::arg("v"));
 
     py::class_<ExecutionContext>(m, "ExecutionContext")
-        .def(py::init<int, int, int, int, int, int, const std::string&>(),
+        .def(py::init<int, int, int, int, int, int, const std::string&, const std::string&>(),
              py::arg("hidden_size"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"),
-             py::arg("num_layers"), py::arg("max_seq_len") = 8192, py::arg("quant_scheme") = "classic_tl1")
+             py::arg("num_layers"), py::arg("max_seq_len") = 8192, py::arg("quant_scheme") = "classic_tl1",
+             py::arg("kv_mode") = "int8_fused")
         .def_readonly("max_seq_len", &ExecutionContext::max_seq_len)
         .def("reset", &ExecutionContext::reset)
         .def("get_seq_len", &ExecutionContext::get_seq_len)

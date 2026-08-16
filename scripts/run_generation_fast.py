@@ -70,7 +70,7 @@ def unpack_2bit_weights(raw, out_dim, in_dim):
     return tern
 
 
-def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192):
+def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192, kv_mode="int8_fused"):
     print(f"📖 Parsing MLIR graph: {mlir_path}")
     with open(mlir_path, "r") as f:
         mlir_text = f.read()
@@ -101,11 +101,11 @@ def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192):
     all_scales = [float(m.group(2)) for m in scale_pattern.finditer(mlir_text)]
 
     print(f"  • Model: Hidden Size={hidden_size}, Vocab Size={vocab_size}, Layers={num_layers}")
-    print(f"  • Max Sequence Length (KV Cache): {max_seq_len}")
+    print(f"  • KV Cache: Mode={kv_mode.upper()}, Max Sequence Length={max_seq_len}")
     print(f"  • Found {len(all_views)} memory views and {len(all_scales)} BitLinear scales")
 
     ctx = tenzo_runtime.ExecutionContext(
-        hidden_size, num_q_heads, num_kv_heads, head_dim, num_layers, max_seq_len, "classic_tl1"
+        hidden_size, num_q_heads, num_kv_heads, head_dim, num_layers, max_seq_len, "classic_tl1", kv_mode
     )
 
     v_idx = 1  # all_views[0] is embed_tokens.weight
@@ -236,7 +236,7 @@ def sample_token(logits, past_tokens, temperature=0.7, top_p=0.9, top_k=40, repe
     return int(np.random.choice(len(probs), p=probs))
 
 
-def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15):
+def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_mode="int8_fused"):
     model_dir = os.path.join(PROJECT_ROOT, "tenzo-frontend", "export_output")
     mlir_path = os.path.join(model_dir, "model.mlir")
     weights_path = os.path.join(model_dir, "weights.bin")
@@ -248,7 +248,7 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15):
         prompt_tokens = [128000, 1, 2]
 
     safe_max_seq_len = max(8192, len(prompt_tokens) + max_tokens + 256)
-    ctx, embed_w = parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=safe_max_seq_len)
+    ctx, embed_w = parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=safe_max_seq_len, kv_mode=kv_mode)
 
     print(f"\n💬 [Tenzo Engine] Output Stream: {prompt}", end="", flush=True)
 
@@ -287,9 +287,12 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15):
     n_gen = len(generated_tokens)
     speed = n_gen / decode_time if decode_time > 0 else 0
 
+    kv_desc = "INT8 Fused (4x compressed)" if kv_mode == "int8_fused" else "FP32 Standard"
+
     print(f"\n\n╔════════════════════════════════════════════════════════╗")
     print(f"║             Tenzo Engine Profiling Summary             ║")
     print(f"╠════════════════════════════════════════════════════════╣")
+    print(f"║ KV Cache Mode:           {kv_desc:<29} ║")
     print(f"║ Prompt Tokens:           {len(prompt_tokens):<29} ║")
     print(f"║ Generated Tokens:        {n_gen:<29} ║")
     print(f"║ Time To First Token:     {ttft*1000:<26.2f} ms ║")
@@ -304,6 +307,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--max-tokens", type=int, default=50, help="Maximum generated tokens")
     parser.add_argument("-t", "--temp", type=float, default=0.7, help="Sampling temperature")
     parser.add_argument("-r", "--repetition-penalty", type=float, default=1.15, help="Repetition penalty")
+    parser.add_argument("--kv-mode", type=str, default="int8_fused", choices=["fp32", "int8_fused"], help="KV Cache compression mode")
     args = parser.parse_args()
 
-    generate_text(args.prompt, args.max_tokens, args.temp, args.repetition_penalty)
+    generate_text(args.prompt, args.max_tokens, args.temp, args.repetition_penalty, args.kv_mode)
