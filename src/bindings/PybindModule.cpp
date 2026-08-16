@@ -467,8 +467,292 @@ py::array_t<float> dispatch_linear_cxx(
     }
 }
 
+//===----------------------------------------------------------------------===//
+// 4. C++ KV-Cache & High-Performance Scaled Dot-Product Attention
+//===----------------------------------------------------------------------===//
+
+class KVCache {
+public:
+    int num_layers;
+    int num_heads;
+    int head_dim;
+    int hidden_size;
+    int max_seq_len;
+    int current_seq_len;
+
+    // Cache buffers: [num_layers][num_heads * max_seq_len * head_dim]
+    std::vector<std::vector<float>> k_cache;
+    std::vector<std::vector<float>> v_cache;
+
+    KVCache(int num_layers, int num_heads, int head_dim, int max_seq_len = 2048)
+        : num_layers(num_layers), num_heads(num_heads), head_dim(head_dim),
+          hidden_size(num_heads * head_dim), max_seq_len(max_seq_len), current_seq_len(0) {
+        
+        size_t layer_size = static_cast<size_t>(num_heads) * max_seq_len * head_dim;
+        k_cache.resize(num_layers, std::vector<float>(layer_size, 0.0f));
+        v_cache.resize(num_layers, std::vector<float>(layer_size, 0.0f));
+    }
+
+    void reset() {
+        current_seq_len = 0;
+        for (int l = 0; l < num_layers; ++l) {
+            std::fill(k_cache[l].begin(), k_cache[l].end(), 0.0f);
+            std::fill(v_cache[l].begin(), v_cache[l].end(), 0.0f);
+        }
+    }
+
+    int get_seq_len() const { return current_seq_len; }
+
+    void increment_seq_len(int n = 1) {
+        current_seq_len += n;
+        if (current_seq_len > max_seq_len) {
+            throw std::runtime_error("KV-Cache overflow! Exceeded max_seq_len.");
+        }
+    }
+
+    // Appends new K and V, then computes Scaled Dot-Product Attention:
+    // Q: [1, 1, hidden_size]
+    // new_k, new_v: [1, 1, hidden_size]
+    // Returns: [1, 1, hidden_size]
+    py::array_t<float> forward_attention(
+        int layer_idx,
+        py::array_t<float> q_arr,
+        py::array_t<float> k_arr,
+        py::array_t<float> v_arr
+    ) {
+        if (layer_idx < 0 || layer_idx >= num_layers) {
+            throw std::out_of_range("Invalid layer index");
+        }
+
+        auto buf_q = q_arr.request();
+        auto buf_k = k_arr.request();
+        auto buf_v = v_arr.request();
+
+        if (buf_q.size != hidden_size || buf_k.size != hidden_size || buf_v.size != hidden_size) {
+            throw std::runtime_error("Tensor size mismatch in forward_attention");
+        }
+
+        const float* q_ptr = static_cast<const float*>(buf_q.ptr);
+        const float* k_new = static_cast<const float*>(buf_k.ptr);
+        const float* v_new = static_cast<const float*>(buf_v.ptr);
+
+        float* layer_k = k_cache[layer_idx].data();
+        float* layer_v = v_cache[layer_idx].data();
+
+        // 1. Append new K and V into cache at current_seq_len position
+        // Memory layout for layer: [num_heads, max_seq_len, head_dim]
+        int t_idx = current_seq_len;
+        for (int h = 0; h < num_heads; ++h) {
+            float* k_dst = layer_k + (h * max_seq_len + t_idx) * head_dim;
+            float* v_dst = layer_v + (h * max_seq_len + t_idx) * head_dim;
+            const float* k_src = k_new + h * head_dim;
+            const float* v_src = v_new + h * head_dim;
+
+            std::memcpy(k_dst, k_src, head_dim * sizeof(float));
+            std::memcpy(v_dst, v_src, head_dim * sizeof(float));
+        }
+
+        int seq_len = current_seq_len + 1;
+        float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+
+        // 2. Compute Scaled Dot-Product Attention for each head
+        auto out_arr = py::array_t<float>({1, 1, hidden_size});
+        float* out_ptr = static_cast<float*>(out_arr.request().ptr);
+
+        #pragma omp parallel for schedule(static)
+        for (int h = 0; h < num_heads; ++h) {
+            const float* q_head = q_ptr + h * head_dim;
+            const float* k_head_base = layer_k + h * max_seq_len * head_dim;
+            const float* v_head_base = layer_v + h * max_seq_len * head_dim;
+            float* out_head = out_ptr + h * head_dim;
+
+            std::vector<float> scores(seq_len);
+            float max_score = -1e9f;
+
+            // Score = (Q * K^T) * scale
+            for (int t = 0; t < seq_len; ++t) {
+                const float* k_t = k_head_base + t * head_dim;
+                float dot = 0.0f;
+
+                // AVX2 Vectorized Dot Product
+                __m256 dot_vec = _mm256_setzero_ps();
+                int d = 0;
+                for (; d + 8 <= head_dim; d += 8) {
+                    __m256 q_v = _mm256_loadu_ps(q_head + d);
+                    __m256 k_v = _mm256_loadu_ps(k_t + d);
+                    dot_vec = _mm256_fmadd_ps(q_v, k_v, dot_vec);
+                }
+                // Horizontal sum
+                alignas(32) float temp[8];
+                _mm256_store_ps(temp, dot_vec);
+                dot = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+
+                // Scalar tail
+                for (; d < head_dim; ++d) {
+                    dot += q_head[d] * k_t[d];
+                }
+
+                float s = dot * scale;
+                scores[t] = s;
+                if (s > max_score) max_score = s;
+            }
+
+            // Softmax
+            float sum_exp = 0.0f;
+            for (int t = 0; t < seq_len; ++t) {
+                scores[t] = std::exp(scores[t] - max_score);
+                sum_exp += scores[t];
+            }
+            float inv_sum = 1.0f / (sum_exp > 1e-9f ? sum_exp : 1.0f);
+            for (int t = 0; t < seq_len; ++t) {
+                scores[t] *= inv_sum;
+            }
+
+            // Out = Score * V
+            std::fill(out_head, out_head + head_dim, 0.0f);
+            for (int t = 0; t < seq_len; ++t) {
+                float weight = scores[t];
+                __m256 w_v = _mm256_set1_ps(weight);
+                const float* v_t = v_head_base + t * head_dim;
+
+                int d = 0;
+                for (; d + 8 <= head_dim; d += 8) {
+                    __m256 o_v = _mm256_loadu_ps(out_head + d);
+                    __m256 v_val = _mm256_loadu_ps(v_t + d);
+                    o_v = _mm256_fmadd_ps(w_v, v_val, o_v);
+                    _mm256_storeu_ps(out_head + d, o_v);
+                }
+                for (; d < head_dim; ++d) {
+                    out_head[d] += weight * v_t[d];
+                }
+            }
+        }
+
+        // If this is the last layer, advance the sequence pointer
+        if (layer_idx == num_layers - 1) {
+            current_seq_len++;
+        }
+
+        return out_arr;
+    }
+};
+
+//===----------------------------------------------------------------------===//
+// 5. ExecutionContext Class for Full-Model Autoregressive Inference
+//===----------------------------------------------------------------------===//
+
+struct LayerWeights {
+    py::object q_w;
+    py::object k_w;
+    py::object v_w;
+    py::object out_w;
+    py::object gate_w;
+    py::object up_w;
+    py::object down_w;
+    float scale = 1.0f;
+};
+
+class ExecutionContext {
+public:
+    int hidden_size;
+    int num_heads;
+    int head_dim;
+    int num_layers;
+    int max_seq_len;
+    std::string quant_scheme;
+    KVCache kv_cache;
+    std::vector<LayerWeights> layers;
+
+    ExecutionContext(
+        int hidden_size,
+        int num_heads,
+        int head_dim,
+        int num_layers,
+        int max_seq_len = 2048,
+        const std::string& quant_scheme = "classic_tl1"
+    ) : hidden_size(hidden_size), num_heads(num_heads), head_dim(head_dim),
+        num_layers(num_layers), max_seq_len(max_seq_len), quant_scheme(quant_scheme),
+        kv_cache(num_layers, num_heads, head_dim, max_seq_len) {
+        
+        layers.resize(num_layers);
+    }
+
+    void reset() {
+        kv_cache.reset();
+    }
+
+    int get_seq_len() const {
+        return kv_cache.get_seq_len();
+    }
+
+    void set_layer_weights(
+        int layer_idx,
+        py::object q_w,
+        py::object k_w,
+        py::object v_w,
+        py::object out_w,
+        float scale = 1.0f
+    ) {
+        if (layer_idx < 0 || layer_idx >= num_layers) {
+            throw std::out_of_range("Invalid layer index");
+        }
+
+        auto pack_if_tl1 = [&](py::object w) -> py::object {
+            if (quant_scheme == "classic_tl1" || quant_scheme == "classic_tl2") {
+                if (py::isinstance<py::array_t<int8_t>>(w)) {
+                    auto arr = w.cast<py::array_t<int8_t>>();
+                    if (arr.ndim() == 2) {
+                        return pack_ternary_weights(arr);
+                    }
+                }
+            }
+            return w;
+        };
+
+        layers[layer_idx].q_w = pack_if_tl1(q_w);
+        layers[layer_idx].k_w = pack_if_tl1(k_w);
+        layers[layer_idx].v_w = pack_if_tl1(v_w);
+        layers[layer_idx].out_w = pack_if_tl1(out_w);
+        layers[layer_idx].scale = scale;
+    }
+
+    // Runs a full transformer layer in C++ without Python overhead
+    py::array_t<float> forward_layer(int layer_idx, py::array_t<float> x) {
+        if (layer_idx < 0 || layer_idx >= num_layers) {
+            throw std::out_of_range("Invalid layer index");
+        }
+        const auto& lw = layers[layer_idx];
+
+        // 1. Compute Q, K, V projections using native AVX2 SIMD
+        auto q = dispatch_linear_cxx(x, lw.q_w, std::nullopt, quant_scheme, lw.scale);
+        auto k = dispatch_linear_cxx(x, lw.k_w, std::nullopt, quant_scheme, lw.scale);
+        auto v = dispatch_linear_cxx(x, lw.v_w, std::nullopt, quant_scheme, lw.scale);
+
+        // 2. Fused Scaled Dot-Product Attention & KV Cache Update in C++
+        auto attn_out = kv_cache.forward_attention(layer_idx, q, k, v);
+
+        // 3. Output Projection
+        auto out = dispatch_linear_cxx(attn_out, lw.out_w, std::nullopt, quant_scheme, lw.scale);
+
+        return out;
+    }
+
+    // Runs a full token generation step across all layers
+    py::array_t<float> forward_step(py::array_t<float> x) {
+        py::array_t<float> cur_x = x;
+        for (int l = 0; l < num_layers; ++l) {
+            cur_x = forward_layer(l, cur_x);
+        }
+        return cur_x;
+    }
+};
+
+//===----------------------------------------------------------------------===//
+// 6. Pybind11 Module Definitions
+//===----------------------------------------------------------------------===//
+
 PYBIND11_MODULE(tenzo_runtime, m) {
-    m.doc() = "Tenzo C++ Runtime Native AVX2 Module";
+    m.doc() = "Tenzo C++ Runtime Native AVX2 Engine & KV-Cache Module";
 
     m.def("pack_ternary_weights", &pack_ternary_weights, "Pack [N, K] ternary weights into [N/64, K/2, 32] TL1 format",
           py::arg("tern_weights"));
@@ -481,4 +765,25 @@ PYBIND11_MODULE(tenzo_runtime, m) {
 
     m.def("dispatch_linear_cxx", &dispatch_linear_cxx, "Universal Linear Dispatcher (FP32, BitLinear TL1)",
           py::arg("input"), py::arg("weight"), py::arg("bias") = py::none(), py::arg("quant_scheme") = "fp32", py::arg("scale") = 1.0f);
+
+    py::class_<KVCache>(m, "KVCache")
+        .def(py::init<int, int, int, int>(),
+             py::arg("num_layers"), py::arg("num_heads"), py::arg("head_dim"), py::arg("max_seq_len") = 2048)
+        .def("reset", &KVCache::reset)
+        .def("get_seq_len", &KVCache::get_seq_len)
+        .def("increment_seq_len", &KVCache::increment_seq_len, py::arg("n") = 1)
+        .def("forward_attention", &KVCache::forward_attention,
+             py::arg("layer_idx"), py::arg("q"), py::arg("k"), py::arg("v"));
+
+    py::class_<ExecutionContext>(m, "ExecutionContext")
+        .def(py::init<int, int, int, int, int, const std::string&>(),
+             py::arg("hidden_size"), py::arg("num_heads"), py::arg("head_dim"),
+             py::arg("num_layers"), py::arg("max_seq_len") = 2048, py::arg("quant_scheme") = "classic_tl1")
+        .def("reset", &ExecutionContext::reset)
+        .def("get_seq_len", &ExecutionContext::get_seq_len)
+        .def("set_layer_weights", &ExecutionContext::set_layer_weights,
+             py::arg("layer_idx"), py::arg("q_w"), py::arg("k_w"), py::arg("v_w"), py::arg("out_w"), py::arg("scale") = 1.0f)
+        .def("forward_layer", &ExecutionContext::forward_layer, py::arg("layer_idx"), py::arg("x"))
+        .def("forward_step", &ExecutionContext::forward_step, py::arg("x"));
 }
+
