@@ -9,6 +9,8 @@
 #include <iostream>
 #include <cstring>
 #include <optional>
+#include <queue>
+#include <unordered_set>
 
 namespace py = pybind11;
 
@@ -152,18 +154,12 @@ void gemm_avx2_dense(
 
 namespace {
 
-void bitlinear_tl1_avx2_single(
+inline float build_lut(
     const float* __restrict__ act,
-    const int8_t* __restrict__ packed_w, // [n_blocks, K/2, 32]
-    float* __restrict__ out,
     int64_t K,
-    int64_t N,
-    float weight_scale
+    __m256i* __restrict__ lut_vecs
 ) {
     const int64_t K_half = K / 2;
-    const int64_t n_blocks = N / 64;
-
-    // 1. Find max abs for activation quantization
     float max_abs = 1e-6f;
     for (int64_t k = 0; k < K; ++k) {
         float val = std::abs(act[k]);
@@ -172,22 +168,13 @@ void bitlinear_tl1_avx2_single(
 
     const float scale_act = 31.0f / max_abs;
     const float inv_scale_act = max_abs / 31.0f;
-    const float total_scale = inv_scale_act * weight_scale;
 
-    // 2. Quantize activations to int16
-    std::vector<int16_t> act_i16(K);
-    for (int64_t k = 0; k < K; ++k) {
-        act_i16[k] = static_cast<int16_t>(std::round(act[k] * scale_act));
-    }
-
-    // 3. Build 256-bit LUTs (16 bytes per 128-bit lane duplicated)
-    std::vector<__m256i> lut_vecs(K_half);
     static const int w0_vals[3] = {-1, 0, 1};
     static const int w1_vals[3] = {-1, 0, 1};
 
     for (int64_t k = 0; k < K_half; ++k) {
-        int16_t a0 = act_i16[2 * k];
-        int16_t a1 = act_i16[2 * k + 1];
+        int16_t a0 = static_cast<int16_t>(std::round(act[2 * k] * scale_act));
+        int16_t a1 = static_cast<int16_t>(std::round(act[2 * k + 1] * scale_act));
 
         alignas(32) int8_t lut_bytes[32] = {0};
 
@@ -206,73 +193,107 @@ void bitlinear_tl1_avx2_single(
         }
         lut_vecs[k] = _mm256_load_si256(reinterpret_cast<const __m256i*>(lut_bytes));
     }
+    return inv_scale_act;
+}
 
-    const __m256i mask_low = _mm256_set1_epi8(0x0F);
-    const __m256 scale_vec = _mm256_set1_ps(total_scale);
+inline void compute_single_block(
+    const __m256i* __restrict__ lut_vecs,
+    const int8_t* __restrict__ block_w,
+    int64_t K_half,
+    float* __restrict__ out_block,
+    __m256 scale_vec,
+    __m256i mask_low
+) {
+    __m256i acc_low_32_0 = _mm256_setzero_si256(); // ch 0..7
+    __m256i acc_low_32_1 = _mm256_setzero_si256(); // ch 8..15
+    __m256i acc_low_32_2 = _mm256_setzero_si256(); // ch 16..23
+    __m256i acc_low_32_3 = _mm256_setzero_si256(); // ch 24..31
 
-    // 4. Dot Product across N blocks of 64 channels
-    #pragma omp parallel for schedule(static)
-    for (int64_t b = 0; b < n_blocks; ++b) {
-        const int8_t* block_w = packed_w + b * K_half * 32;
+    __m256i acc_high_32_0 = _mm256_setzero_si256(); // ch 32..39
+    __m256i acc_high_32_1 = _mm256_setzero_si256(); // ch 40..47
+    __m256i acc_high_32_2 = _mm256_setzero_si256(); // ch 48..55
+    __m256i acc_high_32_3 = _mm256_setzero_si256(); // ch 56..63
 
-        __m256i acc_low_0 = _mm256_setzero_si256(); // ch 0..7
-        __m256i acc_low_1 = _mm256_setzero_si256(); // ch 8..15
-        __m256i acc_low_2 = _mm256_setzero_si256(); // ch 16..23
-        __m256i acc_low_3 = _mm256_setzero_si256(); // ch 24..31
+    int64_t k = 0;
+    while (k < K_half) {
+        int64_t chunk = std::min<int64_t>(64, K_half - k);
+        __m256i acc_low_16_0 = _mm256_setzero_si256();
+        __m256i acc_low_16_1 = _mm256_setzero_si256();
+        __m256i acc_high_16_0 = _mm256_setzero_si256();
+        __m256i acc_high_16_1 = _mm256_setzero_si256();
 
-        __m256i acc_high_0 = _mm256_setzero_si256(); // ch 32..39
-        __m256i acc_high_1 = _mm256_setzero_si256(); // ch 40..47
-        __m256i acc_high_2 = _mm256_setzero_si256(); // ch 48..55
-        __m256i acc_high_3 = _mm256_setzero_si256(); // ch 56..63
-
-        for (int64_t k = 0; k < K_half; ++k) {
+        for (int64_t c = 0; c < chunk; ++c, ++k) {
             __m256i w_bytes = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(block_w + k * 32));
             __m256i lut = lut_vecs[k];
 
-            // Extract nibbles
             __m256i idx_low = _mm256_and_si256(w_bytes, mask_low);
             __m256i idx_high = _mm256_and_si256(_mm256_srli_epi16(w_bytes, 4), mask_low);
 
-            // Parallel lookup with vpshufb
             __m256i res_low = _mm256_shuffle_epi8(lut, idx_low);
             __m256i res_high = _mm256_shuffle_epi8(lut, idx_high);
 
-            // Low 32 channels: sign extend 8-bit to 16-bit
-            __m256i res_l16_0 = _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 0)); // bytes 0..15 -> 16 int16
-            __m256i res_l16_1 = _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 1)); // bytes 16..31 -> 16 int16
+            acc_low_16_0 = _mm256_add_epi16(acc_low_16_0, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 0)));
+            acc_low_16_1 = _mm256_add_epi16(acc_low_16_1, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 1)));
 
-            acc_low_0 = _mm256_add_epi32(acc_low_0, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_l16_0, 0)));
-            acc_low_1 = _mm256_add_epi32(acc_low_1, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_l16_0, 1)));
-            acc_low_2 = _mm256_add_epi32(acc_low_2, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_l16_1, 0)));
-            acc_low_3 = _mm256_add_epi32(acc_low_3, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_l16_1, 1)));
-
-            // High 32 channels: sign extend 8-bit to 16-bit
-            __m256i res_h16_0 = _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 0)); // bytes 0..15 -> 16 int16
-            __m256i res_h16_1 = _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 1)); // bytes 16..31 -> 16 int16
-
-            acc_high_0 = _mm256_add_epi32(acc_high_0, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_h16_0, 0)));
-            acc_high_1 = _mm256_add_epi32(acc_high_1, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_h16_0, 1)));
-            acc_high_2 = _mm256_add_epi32(acc_high_2, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_h16_1, 0)));
-            acc_high_3 = _mm256_add_epi32(acc_high_3, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(res_h16_1, 1)));
+            acc_high_16_0 = _mm256_add_epi16(acc_high_16_0, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 0)));
+            acc_high_16_1 = _mm256_add_epi16(acc_high_16_1, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 1)));
         }
 
-        // Store out all 64 channels
-        auto store_8f = [&](__m256i acc, float* dst) {
-            __m256 f = _mm256_cvtepi32_ps(acc);
-            f = _mm256_mul_ps(f, scale_vec);
-            _mm256_storeu_ps(dst, f);
-        };
+        acc_low_32_0 = _mm256_add_epi32(acc_low_32_0, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_low_16_0, 0)));
+        acc_low_32_1 = _mm256_add_epi32(acc_low_32_1, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_low_16_0, 1)));
+        acc_low_32_2 = _mm256_add_epi32(acc_low_32_2, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_low_16_1, 0)));
+        acc_low_32_3 = _mm256_add_epi32(acc_low_32_3, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_low_16_1, 1)));
 
-        float* out_block = out + b * 64;
-        store_8f(acc_low_0, out_block + 0);
-        store_8f(acc_low_1, out_block + 8);
-        store_8f(acc_low_2, out_block + 16);
-        store_8f(acc_low_3, out_block + 24);
-        store_8f(acc_high_0, out_block + 32);
-        store_8f(acc_high_1, out_block + 40);
-        store_8f(acc_high_2, out_block + 48);
-        store_8f(acc_high_3, out_block + 56);
+        acc_high_32_0 = _mm256_add_epi32(acc_high_32_0, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_high_16_0, 0)));
+        acc_high_32_1 = _mm256_add_epi32(acc_high_32_1, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_high_16_0, 1)));
+        acc_high_32_2 = _mm256_add_epi32(acc_high_32_2, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_high_16_1, 0)));
+        acc_high_32_3 = _mm256_add_epi32(acc_high_32_3, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_high_16_1, 1)));
     }
+
+    _mm256_storeu_ps(out_block + 0, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_low_32_0), scale_vec));
+    _mm256_storeu_ps(out_block + 8, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_low_32_1), scale_vec));
+    _mm256_storeu_ps(out_block + 16, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_low_32_2), scale_vec));
+    _mm256_storeu_ps(out_block + 24, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_low_32_3), scale_vec));
+
+    _mm256_storeu_ps(out_block + 32, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_high_32_0), scale_vec));
+    _mm256_storeu_ps(out_block + 40, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_high_32_1), scale_vec));
+    _mm256_storeu_ps(out_block + 48, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_high_32_2), scale_vec));
+    _mm256_storeu_ps(out_block + 56, _mm256_mul_ps(_mm256_cvtepi32_ps(acc_high_32_3), scale_vec));
+}
+
+inline void compute_from_lut(
+    const __m256i* __restrict__ lut_vecs,
+    const int8_t* __restrict__ packed_w, // [n_blocks, K_half, 32]
+    int64_t n_blocks,
+    int64_t K_half,
+    float* __restrict__ out,
+    float total_scale
+) {
+    if (!packed_w || n_blocks <= 0) return;
+    const __m256i mask_low = _mm256_set1_epi8(0x0F);
+    const __m256 scale_vec = _mm256_set1_ps(total_scale);
+
+    #pragma omp parallel for schedule(dynamic, 4)
+    for (int64_t b = 0; b < n_blocks; ++b) {
+        const int8_t* block_w = packed_w + b * K_half * 32;
+        compute_single_block(lut_vecs, block_w, K_half, out + b * 64, scale_vec, mask_low);
+    }
+}
+
+void bitlinear_tl1_avx2_single(
+    const float* __restrict__ act,
+    const int8_t* __restrict__ packed_w, // [n_blocks, K/2, 32]
+    float* __restrict__ out,
+    int64_t K,
+    int64_t N,
+    float weight_scale
+) {
+    const int64_t K_half = K / 2;
+    const int64_t n_blocks = N / 64;
+
+    std::vector<__m256i> lut_vecs(K_half);
+    float inv_scale_act = build_lut(act, K, lut_vecs.data());
+    compute_from_lut(lut_vecs.data(), packed_w, n_blocks, K_half, out, inv_scale_act * weight_scale);
 }
 
 } // namespace
@@ -566,28 +587,16 @@ public:
         }
     }
 
-    // Appends new K and V (with in-place RoPE & fused quantization), then computes GQA Attention
-    py::array_t<float> forward_attention(
+    void forward_attention_raw(
         int layer_idx,
-        py::array_t<float> q_arr,
-        py::array_t<float> k_arr,
-        py::array_t<float> v_arr
+        float* q_ptr,
+        float* k_ptr,
+        const float* v_src,
+        float* out_ptr
     ) {
         if (layer_idx < 0 || layer_idx >= num_layers) {
             throw std::out_of_range("Invalid layer index");
         }
-
-        auto buf_q = q_arr.request();
-        auto buf_k = k_arr.request();
-        auto buf_v = v_arr.request();
-
-        if (buf_q.size != q_dim || buf_k.size != kv_dim || buf_v.size != kv_dim) {
-            throw std::runtime_error("Tensor dimension mismatch in forward_attention");
-        }
-
-        float* q_ptr = static_cast<float*>(buf_q.ptr);
-        float* k_ptr = static_cast<float*>(buf_k.ptr);
-        const float* v_src = static_cast<const float*>(buf_v.ptr);
 
         // In-place zero-copy RoPE
         for (int h = 0; h < num_q_heads; ++h) {
@@ -601,9 +610,6 @@ public:
         int seq_len = current_seq_len + 1;
         float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
         int group_size = num_q_heads / num_kv_heads;
-
-        auto out_arr = py::array_t<float>({1, 1, q_dim});
-        float* out_ptr = static_cast<float*>(out_arr.request().ptr);
         float* scores_base = scores_buffer.data();
 
         if (kv_mode == "fp32") {
@@ -619,7 +625,7 @@ public:
                 std::memcpy(v_dst, v_val, head_dim * sizeof(float));
             }
 
-            #pragma omp parallel for schedule(static)
+            #pragma omp parallel for schedule(dynamic, 2)
             for (int q_h = 0; q_h < num_q_heads; ++q_h) {
                 int kv_h = q_h / group_size;
                 const float* q_head = q_ptr + q_h * head_dim;
@@ -649,113 +655,6 @@ public:
                     if (s > max_score) max_score = s;
                 }
 
-                float sum_exp = 0.0f;
-                for (int t = 0; t < seq_len; ++t) {
-                    scores[t] = std::exp(scores[t] - max_score);
-                    sum_exp += scores[t];
-                }
-                float inv_sum = 1.0f / (sum_exp > 1e-9f ? sum_exp : 1.0f);
-                for (int t = 0; t < seq_len; ++t) {
-                    scores[t] *= inv_sum;
-                }
-
-                // Out = Score * V (Accumulated in 16 YMM registers)
-                __m256 o_acc[16];
-                for (int i = 0; i < 16; ++i) o_acc[i] = _mm256_setzero_ps();
-
-                for (int t = 0; t < seq_len; ++t) {
-                    __m256 w_v = _mm256_set1_ps(scores[t]);
-                    const float* v_t = v_head_base + t * head_dim;
-                    for (int i = 0; i < 16; ++i) {
-                        __m256 v_val = _mm256_loadu_ps(v_t + i * 8);
-                        o_acc[i] = _mm256_fmadd_ps(w_v, v_val, o_acc[i]);
-                    }
-                }
-                for (int i = 0; i < 16; ++i) {
-                    _mm256_storeu_ps(out_head + i * 8, o_acc[i]);
-                }
-            }
-        } else {
-            // === Fused INT8 Compressed KV-Cache ===
-            int8_t* layer_k = k_cache_i8[layer_idx].data();
-            int8_t* layer_v = v_cache_i8[layer_idx].data();
-            float* l_k_scales = k_scales[layer_idx].data();
-            float* l_v_scales = v_scales[layer_idx].data();
-
-            // 1. In-Register Fused Symmetric Quantization for K and V
-            for (int h = 0; h < num_kv_heads; ++h) {
-                const float* k_src = k_ptr + h * head_dim;
-                const float* v_src_h = v_src + h * head_dim;
-                int8_t* k_dst = layer_k + (h * max_seq_len + t_idx) * head_dim;
-                int8_t* v_dst = layer_v + (h * max_seq_len + t_idx) * head_dim;
-
-                float amax_k = 0.0f;
-                float amax_v = 0.0f;
-                for (int d = 0; d < head_dim; ++d) {
-                    amax_k = std::max(amax_k, std::abs(k_src[d]));
-                    amax_v = std::max(amax_v, std::abs(v_src_h[d]));
-                }
-                float s_k = std::max(amax_k / 127.0f, 1e-8f);
-                float s_v = std::max(amax_v / 127.0f, 1e-8f);
-                float inv_s_k = 1.0f / s_k;
-                float inv_s_v = 1.0f / s_v;
-
-                l_k_scales[h * max_seq_len + t_idx] = s_k;
-                l_v_scales[h * max_seq_len + t_idx] = s_v;
-
-                for (int d = 0; d < head_dim; ++d) {
-                    float q_k = std::round(k_src[d] * inv_s_k);
-                    float q_v = std::round(v_src_h[d] * inv_s_v);
-                    k_dst[d] = static_cast<int8_t>(std::clamp(q_k, -127.0f, 127.0f));
-                    v_dst[d] = static_cast<int8_t>(std::clamp(q_v, -127.0f, 127.0f));
-                }
-            }
-
-            // 2. High-Performance AVX2 Fused Dequantized Attention
-            #pragma omp parallel for schedule(static)
-            for (int q_h = 0; q_h < num_q_heads; ++q_h) {
-                int kv_h = q_h / group_size;
-                const float* q_head = q_ptr + q_h * head_dim;
-                const int8_t* k_head_base = layer_k + kv_h * max_seq_len * head_dim;
-                const int8_t* v_head_base = layer_v + kv_h * max_seq_len * head_dim;
-                const float* k_head_scales = l_k_scales + kv_h * max_seq_len;
-                const float* v_head_scales = l_v_scales + kv_h * max_seq_len;
-                float* out_head = out_ptr + q_h * head_dim;
-                float* scores = scores_base + q_h * max_seq_len;
-                float max_score = -1e9f;
-
-                // Scaled Dot Product (Q @ K^T)
-                for (int t = 0; t < seq_len; ++t) {
-                    const int8_t* k_t = k_head_base + t * head_dim;
-                    float s_k = k_head_scales[t];
-
-                    __m256 dot_vec0 = _mm256_setzero_ps();
-                    __m256 dot_vec1 = _mm256_setzero_ps();
-                    int d = 0;
-                    for (; d + 16 <= head_dim; d += 16) {
-                        __m256 q0 = _mm256_loadu_ps(q_head + d);
-                        __m128i k_raw0 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(k_t + d));
-                        __m256 k_f0 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(k_raw0));
-                        dot_vec0 = _mm256_fmadd_ps(q0, k_f0, dot_vec0);
-
-                        __m256 q1 = _mm256_loadu_ps(q_head + d + 8);
-                        __m128i k_raw1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(k_t + d + 8));
-                        __m256 k_f1 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(k_raw1));
-                        dot_vec1 = _mm256_fmadd_ps(q1, k_f1, dot_vec1);
-                    }
-                    __m256 dot_vec = _mm256_add_ps(dot_vec0, dot_vec1);
-                    alignas(32) float temp[8];
-                    _mm256_store_ps(temp, dot_vec);
-                    float raw_dot = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
-                    for (; d < head_dim; ++d) {
-                        raw_dot += q_head[d] * static_cast<float>(k_t[d]);
-                    }
-
-                    float s = raw_dot * (s_k * scale);
-                    scores[t] = s;
-                    if (s > max_score) max_score = s;
-                }
-
                 // Softmax
                 float sum_exp = 0.0f;
                 for (int t = 0; t < seq_len; ++t) {
@@ -767,7 +666,113 @@ public:
                     scores[t] *= inv_sum;
                 }
 
-                // Out = Scores @ V (Accumulated in 16 YMM registers)
+                // Out = Scores @ V
+                std::memset(out_head, 0, head_dim * sizeof(float));
+                for (int t = 0; t < seq_len; ++t) {
+                    float s = scores[t];
+                    __m256 s_v = _mm256_set1_ps(s);
+                    const float* v_t = v_head_base + t * head_dim;
+                    int d = 0;
+                    for (; d + 8 <= head_dim; d += 8) {
+                        __m256 o_v = _mm256_loadu_ps(out_head + d);
+                        __m256 val_v = _mm256_loadu_ps(v_t + d);
+                        o_v = _mm256_fmadd_ps(s_v, val_v, o_v);
+                        _mm256_storeu_ps(out_head + d, o_v);
+                    }
+                    for (; d < head_dim; ++d) {
+                        out_head[d] += s * v_t[d];
+                    }
+                }
+            }
+        } else {
+            // INT8 Fused KV-Cache
+            int8_t* layer_k = k_cache_i8[layer_idx].data();
+            int8_t* layer_v = v_cache_i8[layer_idx].data();
+            float* layer_k_scales = k_scales[layer_idx].data();
+            float* layer_v_scales = v_scales[layer_idx].data();
+
+            for (int h = 0; h < num_kv_heads; ++h) {
+                int8_t* k_dst = layer_k + (h * max_seq_len + t_idx) * head_dim;
+                int8_t* v_dst = layer_v + (h * max_seq_len + t_idx) * head_dim;
+                const float* k_src = k_ptr + h * head_dim;
+                const float* v_s = v_src + h * head_dim;
+
+                float max_abs_k = 1e-8f;
+                float max_abs_v = 1e-8f;
+                for (int d = 0; d < head_dim; ++d) {
+                    float ak = std::abs(k_src[d]);
+                    float av = std::abs(v_s[d]);
+                    if (ak > max_abs_k) max_abs_k = ak;
+                    if (av > max_abs_v) max_abs_v = av;
+                }
+                float s_k = max_abs_k / 127.0f;
+                float s_v = max_abs_v / 127.0f;
+                layer_k_scales[h * max_seq_len + t_idx] = s_k;
+                layer_v_scales[h * max_seq_len + t_idx] = s_v;
+
+                float inv_s_k = 1.0f / s_k;
+                float inv_s_v = 1.0f / s_v;
+                for (int d = 0; d < head_dim; ++d) {
+                    k_dst[d] = static_cast<int8_t>(std::clamp(std::round(k_src[d] * inv_s_k), -128.0f, 127.0f));
+                    v_dst[d] = static_cast<int8_t>(std::clamp(std::round(v_s[d] * inv_s_v), -128.0f, 127.0f));
+                }
+            }
+
+            #pragma omp parallel for schedule(dynamic, 2)
+            for (int q_h = 0; q_h < num_q_heads; ++q_h) {
+                int kv_h = q_h / group_size;
+                const float* q_head = q_ptr + q_h * head_dim;
+                const int8_t* k_head_base = layer_k + kv_h * max_seq_len * head_dim;
+                const int8_t* v_head_base = layer_v + kv_h * max_seq_len * head_dim;
+                const float* k_head_scales = layer_k_scales + kv_h * max_seq_len;
+                const float* v_head_scales = layer_v_scales + kv_h * max_seq_len;
+                float* out_head = out_ptr + q_h * head_dim;
+                float* scores = scores_base + q_h * max_seq_len;
+                float max_score = -1e9f;
+
+                for (int t = 0; t < seq_len; ++t) {
+                    const int8_t* k_t = k_head_base + t * head_dim;
+                    float s_k = k_head_scales[t];
+
+                    __m256 dot_acc0 = _mm256_setzero_ps();
+                    __m256 dot_acc1 = _mm256_setzero_ps();
+
+                    for (int i = 0; i < 16; i += 2) {
+                        __m256 q_v0 = _mm256_loadu_ps(q_head + i * 8);
+                        __m128i k_raw0 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(k_t + i * 8));
+                        __m256 k_val0 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(k_raw0));
+                        dot_acc0 = _mm256_fmadd_ps(q_v0, k_val0, dot_acc0);
+
+                        __m256 q_v1 = _mm256_loadu_ps(q_head + (i + 1) * 8);
+                        __m128i k_raw1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(k_t + (i + 1) * 8));
+                        __m256 k_val1 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(k_raw1));
+                        dot_acc1 = _mm256_fmadd_ps(q_v1, k_val1, dot_acc1);
+                    }
+
+                    __m256 dot_tot = _mm256_add_ps(dot_acc0, dot_acc1);
+                    alignas(32) float temp[8];
+                    _mm256_store_ps(temp, dot_tot);
+                    float raw_dot = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+
+                    for (int d = 128; d < head_dim; ++d) {
+                        raw_dot += q_head[d] * static_cast<float>(k_t[d]);
+                    }
+
+                    float s = raw_dot * (s_k * scale);
+                    scores[t] = s;
+                    if (s > max_score) max_score = s;
+                }
+
+                float sum_exp = 0.0f;
+                for (int t = 0; t < seq_len; ++t) {
+                    scores[t] = std::exp(scores[t] - max_score);
+                    sum_exp += scores[t];
+                }
+                float inv_sum = 1.0f / (sum_exp > 1e-9f ? sum_exp : 1.0f);
+                for (int t = 0; t < seq_len; ++t) {
+                    scores[t] *= inv_sum;
+                }
+
                 __m256 o_acc[16];
                 for (int i = 0; i < 16; ++i) o_acc[i] = _mm256_setzero_ps();
 
@@ -788,7 +793,30 @@ public:
                 }
             }
         }
+    }
 
+    py::array_t<float> forward_attention(
+        int layer_idx,
+        py::array_t<float> q_arr,
+        py::array_t<float> k_arr,
+        py::array_t<float> v_arr
+    ) {
+        auto buf_q = q_arr.request();
+        auto buf_k = k_arr.request();
+        auto buf_v = v_arr.request();
+
+        if (buf_q.size != q_dim || buf_k.size != kv_dim || buf_v.size != kv_dim) {
+            throw std::runtime_error("Tensor dimension mismatch in forward_attention");
+        }
+
+        auto out_arr = py::array_t<float>({1, 1, q_dim});
+        forward_attention_raw(
+            layer_idx,
+            static_cast<float*>(buf_q.ptr),
+            static_cast<float*>(buf_k.ptr),
+            static_cast<const float*>(buf_v.ptr),
+            static_cast<float*>(out_arr.request().ptr)
+        );
         return out_arr;
     }
 };
@@ -798,18 +826,21 @@ public:
 //===----------------------------------------------------------------------===//
 
 struct LayerWeights {
-    py::object q_w;
-    py::object k_w;
-    py::object v_w;
-    py::object out_w;
-    py::object gate_w;
-    py::object up_w;
-    py::object down_w;
+    py::object q_w, k_w, v_w, out_w, gate_w, up_w, down_w;
+    py::object in_norm_w, attn_sub_norm_w, post_norm_w, ffn_sub_norm_w;
 
-    py::object in_norm_w;
-    py::object attn_sub_norm_w;
-    py::object post_norm_w;
-    py::object ffn_sub_norm_w;
+    const int8_t* q_w_ptr = nullptr;
+    const int8_t* k_w_ptr = nullptr;
+    const int8_t* v_w_ptr = nullptr;
+    const int8_t* out_w_ptr = nullptr;
+    const int8_t* gate_w_ptr = nullptr;
+    const int8_t* up_w_ptr = nullptr;
+    const int8_t* down_w_ptr = nullptr;
+
+    const float* in_norm_ptr = nullptr;
+    const float* attn_sub_norm_ptr = nullptr;
+    const float* post_norm_ptr = nullptr;
+    const float* ffn_sub_norm_ptr = nullptr;
 
     float q_scale = 1.0f;
     float k_scale = 1.0f;
@@ -832,6 +863,29 @@ public:
     KVCache kv_cache;
     std::vector<LayerWeights> layers;
     py::object final_norm_w;
+    const float* final_norm_ptr = nullptr;
+
+    int q_dim;
+    int kv_dim;
+    int ffn_dim;
+
+    // Preallocated scratch buffers (Zero Heap Allocations during generation)
+    std::vector<float> buf_x;
+    std::vector<float> buf_norm_x;
+    std::vector<float> buf_q;
+    std::vector<float> buf_k;
+    std::vector<float> buf_v;
+    std::vector<float> buf_attn_out;
+    std::vector<float> buf_attn_sub;
+    std::vector<float> buf_out;
+    std::vector<float> buf_h1;
+    std::vector<float> buf_post_norm;
+    std::vector<float> buf_gate;
+    std::vector<float> buf_up;
+    std::vector<float> buf_act;
+    std::vector<float> buf_ffn_norm;
+    std::vector<float> buf_down;
+    std::vector<__m256i> lut_buf;
 
     ExecutionContext(
         int hidden_size,
@@ -848,6 +902,27 @@ public:
         kv_cache(num_layers, num_q_heads, num_kv_heads, head_dim, max_seq_len, kv_mode) {
         
         layers.resize(num_layers);
+        q_dim = num_q_heads * head_dim;
+        kv_dim = num_kv_heads * head_dim;
+        ffn_dim = 6912;
+
+        int max_dim = 16384;
+        buf_x.resize(max_dim);
+        buf_norm_x.resize(max_dim);
+        buf_q.resize(max_dim);
+        buf_k.resize(max_dim);
+        buf_v.resize(max_dim);
+        buf_attn_out.resize(max_dim);
+        buf_attn_sub.resize(max_dim);
+        buf_out.resize(max_dim);
+        buf_h1.resize(max_dim);
+        buf_post_norm.resize(max_dim);
+        buf_gate.resize(max_dim);
+        buf_up.resize(max_dim);
+        buf_act.resize(max_dim);
+        buf_ffn_norm.resize(max_dim);
+        buf_down.resize(max_dim);
+        lut_buf.resize(max_dim / 2);
     }
 
     void reset() {
@@ -860,6 +935,11 @@ public:
 
     void set_final_norm(py::object w) {
         final_norm_w = w;
+        if (!final_norm_w.is_none() && py::isinstance<py::array_t<float>>(final_norm_w)) {
+            final_norm_ptr = static_cast<const float*>(final_norm_w.cast<py::array_t<float>>().request().ptr);
+        } else {
+            final_norm_ptr = nullptr;
+        }
     }
 
     void set_layer_full(
@@ -913,6 +993,42 @@ public:
         layers[layer_idx].gate_scale = gate_scale;
         layers[layer_idx].up_scale = up_scale;
         layers[layer_idx].down_scale = down_scale;
+
+        auto get_packed_ptr = [&](py::object w) -> const int8_t* {
+            if (w.is_none()) return nullptr;
+            if (py::isinstance<py::array_t<int8_t>>(w)) {
+                return static_cast<const int8_t*>(w.cast<py::array_t<int8_t>>().request().ptr);
+            }
+            return nullptr;
+        };
+
+        auto get_float_ptr = [&](py::object w) -> const float* {
+            if (w.is_none()) return nullptr;
+            if (py::isinstance<py::array_t<float>>(w)) {
+                return static_cast<const float*>(w.cast<py::array_t<float>>().request().ptr);
+            }
+            return nullptr;
+        };
+
+        layers[layer_idx].q_w_ptr = get_packed_ptr(layers[layer_idx].q_w);
+        layers[layer_idx].k_w_ptr = get_packed_ptr(layers[layer_idx].k_w);
+        layers[layer_idx].v_w_ptr = get_packed_ptr(layers[layer_idx].v_w);
+        layers[layer_idx].out_w_ptr = get_packed_ptr(layers[layer_idx].out_w);
+        layers[layer_idx].gate_w_ptr = get_packed_ptr(layers[layer_idx].gate_w);
+        layers[layer_idx].up_w_ptr = get_packed_ptr(layers[layer_idx].up_w);
+        layers[layer_idx].down_w_ptr = get_packed_ptr(layers[layer_idx].down_w);
+
+        layers[layer_idx].in_norm_ptr = get_float_ptr(in_norm_w);
+        layers[layer_idx].attn_sub_norm_ptr = get_float_ptr(attn_sub_norm_w);
+        layers[layer_idx].post_norm_ptr = get_float_ptr(post_norm_w);
+        layers[layer_idx].ffn_sub_norm_ptr = get_float_ptr(ffn_sub_norm_w);
+
+        if (!layers[layer_idx].gate_w.is_none() && py::isinstance<py::array_t<int8_t>>(layers[layer_idx].gate_w)) {
+            auto gw_req = layers[layer_idx].gate_w.cast<py::array_t<int8_t>>().request();
+            if (gw_req.ndim == 3) {
+                ffn_dim = gw_req.shape[0] * 64;
+            }
+        }
     }
 
     // Weighted RMSNorm helper
@@ -944,6 +1060,122 @@ public:
             }
         }
         return out;
+    }
+
+    inline void rms_norm_raw(const float* src, const float* w, float* dst, int dim, float eps = 1e-5f) {
+        float sum_sq = 0.0f;
+        #pragma omp simd reduction(+:sum_sq)
+        for (int i = 0; i < dim; ++i) {
+            sum_sq += src[i] * src[i];
+        }
+        float inv_rms = 1.0f / std::sqrt((sum_sq / static_cast<float>(dim)) + eps);
+        if (w) {
+            #pragma omp simd
+            for (int i = 0; i < dim; ++i) {
+                dst[i] = src[i] * inv_rms * w[i];
+            }
+        } else {
+            #pragma omp simd
+            for (int i = 0; i < dim; ++i) {
+                dst[i] = src[i] * inv_rms;
+            }
+        }
+    }
+
+    void forward_layer_raw(int layer_idx) {
+        const auto& lw = layers[layer_idx];
+
+        // 1. RMSNorm
+        rms_norm_raw(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), hidden_size);
+
+        // 2. Build LUT for norm_x ONCE (reused across Q, K, V)
+        float inv_scale_act = build_lut(buf_norm_x.data(), hidden_size, lut_buf.data());
+
+        // 3. FUSED Q, K, V in ONE parallel loop (60 blocks total)
+        int q_blocks = q_dim / 64;   // 40
+        int kv_blocks = kv_dim / 64; // 10
+        int total_qkv = q_blocks + 2 * kv_blocks; // 60
+        int k_half = hidden_size / 2;
+        __m256i mask_low = _mm256_set1_epi8(0x0F);
+
+        __m256 s_q = _mm256_set1_ps(inv_scale_act * lw.q_scale);
+        __m256 s_k = _mm256_set1_ps(inv_scale_act * lw.k_scale);
+        __m256 s_v = _mm256_set1_ps(inv_scale_act * lw.v_scale);
+
+        #pragma omp parallel for schedule(dynamic, 4)
+        for (int b = 0; b < total_qkv; ++b) {
+            if (b < q_blocks) {
+                const int8_t* bw = lw.q_w_ptr + b * k_half * 32;
+                compute_single_block(lut_buf.data(), bw, k_half, buf_q.data() + b * 64, s_q, mask_low);
+            } else if (b < q_blocks + kv_blocks) {
+                int kb = b - q_blocks;
+                const int8_t* bw = lw.k_w_ptr + kb * k_half * 32;
+                compute_single_block(lut_buf.data(), bw, k_half, buf_k.data() + kb * 64, s_k, mask_low);
+            } else {
+                int vb = b - (q_blocks + kv_blocks);
+                const int8_t* bw = lw.v_w_ptr + vb * k_half * 32;
+                compute_single_block(lut_buf.data(), bw, k_half, buf_v.data() + vb * 64, s_v, mask_low);
+            }
+        }
+
+        // 4. Zero-Copy In-Place Attention
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+
+        // 5. Attn Sub-Norm
+        rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), hidden_size);
+
+        // 6. Out Projection
+        float inv_s_out = build_lut(buf_attn_sub.data(), hidden_size, lut_buf.data());
+        compute_from_lut(lut_buf.data(), lw.out_w_ptr, hidden_size / 64, k_half, buf_out.data(), inv_s_out * lw.out_scale);
+
+        // 7. Residual 1
+        #pragma omp simd
+        for (int i = 0; i < hidden_size; ++i) {
+            buf_h1[i] = buf_x[i] + buf_out[i];
+        }
+
+        // 8. FUSED MLP Block
+        if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+            rms_norm_raw(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), hidden_size);
+
+            float inv_s_mlp = build_lut(buf_post_norm.data(), hidden_size, lut_buf.data());
+            int cur_ffn_dim = ffn_dim;
+            int ffn_blocks = cur_ffn_dim / 64; // 108
+            int total_mlp = 2 * ffn_blocks;    // 216
+
+            __m256 s_gate = _mm256_set1_ps(inv_s_mlp * lw.gate_scale);
+            __m256 s_up = _mm256_set1_ps(inv_s_mlp * lw.up_scale);
+
+            #pragma omp parallel for schedule(dynamic, 8)
+            for (int b = 0; b < total_mlp; ++b) {
+                if (b < ffn_blocks) {
+                    const int8_t* bw = lw.gate_w_ptr + b * k_half * 32;
+                    compute_single_block(lut_buf.data(), bw, k_half, buf_gate.data() + b * 64, s_gate, mask_low);
+                } else {
+                    int ub = b - ffn_blocks;
+                    const int8_t* bw = lw.up_w_ptr + ub * k_half * 32;
+                    compute_single_block(lut_buf.data(), bw, k_half, buf_up.data() + ub * 64, s_up, mask_low);
+                }
+            }
+
+            #pragma omp simd
+            for (int i = 0; i < cur_ffn_dim; ++i) {
+                float r = std::max(0.0f, buf_gate[i]);
+                buf_act[i] = (r * r) * buf_up[i];
+            }
+
+            rms_norm_raw(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), cur_ffn_dim);
+
+            float inv_s_down = build_lut(buf_ffn_norm.data(), cur_ffn_dim, lut_buf.data());
+            compute_from_lut(lut_buf.data(), lw.down_w_ptr, hidden_size / 64, cur_ffn_dim / 2, buf_down.data(), inv_s_down * lw.down_scale);
+
+            #pragma omp simd
+            for (int i = 0; i < hidden_size; ++i) {
+                buf_x[i] = buf_h1[i] + buf_down[i];
+            }
+        } else {
+            std::memcpy(buf_x.data(), buf_h1.data(), hidden_size * sizeof(float));
+        }
     }
 
     // Runs a full transformer layer in C++ without Python overhead
@@ -991,16 +1223,16 @@ public:
 
             auto g_buf = gate.request();
             auto u_buf = up.request();
-            py::ssize_t ffn_dim = g_buf.size;
+            py::ssize_t f_dim = g_buf.size;
             const float* g_ptr = static_cast<const float*>(g_buf.ptr);
             const float* u_ptr = static_cast<const float*>(u_buf.ptr);
 
-            auto act_mult = py::array_t<float>(std::vector<py::ssize_t>{1, 1, ffn_dim});
+            auto act_mult = py::array_t<float>(std::vector<py::ssize_t>{1, 1, f_dim});
             float* m_ptr = static_cast<float*>(act_mult.request().ptr);
 
             // Gated activation: relu(gate)^2 * up
             #pragma omp simd
-            for (py::ssize_t i = 0; i < ffn_dim; ++i) {
+            for (py::ssize_t i = 0; i < f_dim; ++i) {
                 float r = std::max(0.0f, g_ptr[i]);
                 m_ptr[i] = (r * r) * u_ptr[i];
             }
@@ -1027,6 +1259,20 @@ public:
 
     // Runs a full token generation step across all layers
     py::array_t<float> forward_step(py::array_t<float> x) {
+        if (quant_scheme == "classic_tl1" || quant_scheme == "classic_tl2") {
+            auto buf = x.request();
+            std::memcpy(buf_x.data(), buf.ptr, hidden_size * sizeof(float));
+
+            for (int l = 0; l < num_layers; ++l) {
+                forward_layer_raw(l);
+            }
+            kv_cache.increment_seq_len(1);
+
+            auto out = py::array_t<float>(std::vector<py::ssize_t>{1, 1, static_cast<py::ssize_t>(hidden_size)});
+            std::memcpy(out.request().ptr, buf_x.data(), hidden_size * sizeof(float));
+            return out;
+        }
+
         py::array_t<float> cur_x = x;
         for (int l = 0; l < num_layers; ++l) {
             cur_x = forward_layer(l, cur_x);
@@ -1041,8 +1287,9 @@ public:
         py::object embed_weights_obj,
         py::object embed_scales_obj = py::none()
     ) {
-        auto final_x = rms_norm_weighted(x, final_norm_w);
-        const float* x_ptr = static_cast<const float*>(final_x.request().ptr);
+        const float* x_in_ptr = static_cast<const float*>(x.request().ptr);
+        rms_norm_raw(x_in_ptr, final_norm_ptr, buf_norm_x.data(), hidden_size);
+        const float* x_ptr = buf_norm_x.data();
 
         if (py::isinstance<py::array_t<float>>(embed_weights_obj)) {
             auto ew_buf = embed_weights_obj.cast<py::array_t<float>>().request();
@@ -1053,28 +1300,20 @@ public:
             auto logits_arr = py::array_t<float>(std::vector<py::ssize_t>{1, 1, vocab_size});
             float* logits_ptr = static_cast<float*>(logits_arr.request().ptr);
 
-            #pragma omp parallel for schedule(static)
+            #pragma omp parallel for schedule(dynamic, 1024)
             for (py::ssize_t v = 0; v < vocab_size; ++v) {
                 const float* row = w_ptr + v * h_dim;
                 __m256 acc0 = _mm256_setzero_ps();
                 __m256 acc1 = _mm256_setzero_ps();
-                __m256 acc2 = _mm256_setzero_ps();
-                __m256 acc3 = _mm256_setzero_ps();
                 py::ssize_t i = 0;
-                for (; i + 32 <= h_dim; i += 32) {
+                for (; i + 16 <= h_dim; i += 16) {
                     acc0 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i), _mm256_loadu_ps(row + i), acc0);
                     acc1 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i + 8), _mm256_loadu_ps(row + i + 8), acc1);
-                    acc2 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i + 16), _mm256_loadu_ps(row + i + 16), acc2);
-                    acc3 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i + 24), _mm256_loadu_ps(row + i + 24), acc3);
                 }
-                __m256 acc = _mm256_add_ps(_mm256_add_ps(acc0, acc1), _mm256_add_ps(acc2, acc3));
-                for (; i + 8 <= h_dim; i += 8) {
-                    acc = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i), _mm256_loadu_ps(row + i), acc);
-                }
+                __m256 acc = _mm256_add_ps(acc0, acc1);
                 alignas(32) float tmp[8];
                 _mm256_store_ps(tmp, acc);
                 float sum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
-
                 for (; i < h_dim; ++i) {
                     sum += x_ptr[i] * row[i];
                 }
@@ -1094,45 +1333,61 @@ public:
         auto logits_arr = py::array_t<float>(std::vector<py::ssize_t>{1, 1, vocab_size});
         float* logits_ptr = static_cast<float*>(logits_arr.request().ptr);
 
-        #pragma omp parallel for schedule(static)
+        // 1. Quantize activation vector x to int8 ONCE
+        float amax_x = 1e-8f;
+        for (py::ssize_t i = 0; i < h_dim; ++i) {
+            float val = std::abs(x_ptr[i]);
+            if (val > amax_x) amax_x = val;
+        }
+        float s_x = amax_x / 127.0f;
+        float inv_s_x = 1.0f / s_x;
+        std::vector<int8_t> x_i8(h_dim);
+        #pragma omp simd
+        for (py::ssize_t i = 0; i < h_dim; ++i) {
+            float q = std::round(x_ptr[i] * inv_s_x);
+            x_i8[i] = static_cast<int8_t>(std::clamp(q, -128.0f, 127.0f));
+        }
+
+        // Pre-expand x into 16-bit SIMD registers ONCE (cuts inner loop ops by 2x)
+        py::ssize_t num_vecs = h_dim / 16;
+        std::vector<__m256i> x_expanded(num_vecs);
+        for (py::ssize_t j = 0; j < num_vecs; ++j) {
+            __m128i a = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x_i8.data() + j * 16));
+            x_expanded[j] = _mm256_cvtepi8_epi16(a);
+        }
+        const __m256i* x_exp_ptr = x_expanded.data();
+
+        // 2. Pure Integer AVX2 Dot-Products across vocab
+        #pragma omp parallel for schedule(dynamic, 1024)
         for (py::ssize_t v = 0; v < vocab_size; ++v) {
             const int8_t* row = w_ptr + v * h_dim;
-            __m256 acc0 = _mm256_setzero_ps();
-            __m256 acc1 = _mm256_setzero_ps();
-            __m256 acc2 = _mm256_setzero_ps();
-            __m256 acc3 = _mm256_setzero_ps();
-            py::ssize_t i = 0;
-            for (; i + 32 <= h_dim; i += 32) {
-                __m256 va0 = _mm256_loadu_ps(x_ptr + i);
-                __m128i vb0 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i));
-                acc0 = _mm256_fmadd_ps(va0, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb0)), acc0);
+            __m256i acc0 = _mm256_setzero_si256();
+            __m256i acc1 = _mm256_setzero_si256();
+            __m256i acc2 = _mm256_setzero_si256();
+            __m256i acc3 = _mm256_setzero_si256();
 
-                __m256 va1 = _mm256_loadu_ps(x_ptr + i + 8);
-                __m128i vb1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 8));
-                acc1 = _mm256_fmadd_ps(va1, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb1)), acc1);
+            py::ssize_t j = 0;
+            for (; j + 4 <= num_vecs; j += 4) {
+                __m128i b0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + j * 16));
+                __m128i b1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + (j + 1) * 16));
+                __m128i b2 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + (j + 2) * 16));
+                __m128i b3 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + (j + 3) * 16));
 
-                __m256 va2 = _mm256_loadu_ps(x_ptr + i + 16);
-                __m128i vb2 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 16));
-                acc2 = _mm256_fmadd_ps(va2, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb2)), acc2);
-
-                __m256 va3 = _mm256_loadu_ps(x_ptr + i + 24);
-                __m128i vb3 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 24));
-                acc3 = _mm256_fmadd_ps(va3, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb3)), acc3);
+                acc0 = _mm256_add_epi32(acc0, _mm256_madd_epi16(x_exp_ptr[j], _mm256_cvtepi8_epi16(b0)));
+                acc1 = _mm256_add_epi32(acc1, _mm256_madd_epi16(x_exp_ptr[j + 1], _mm256_cvtepi8_epi16(b1)));
+                acc2 = _mm256_add_epi32(acc2, _mm256_madd_epi16(x_exp_ptr[j + 2], _mm256_cvtepi8_epi16(b2)));
+                acc3 = _mm256_add_epi32(acc3, _mm256_madd_epi16(x_exp_ptr[j + 3], _mm256_cvtepi8_epi16(b3)));
             }
-            __m256 acc = _mm256_add_ps(_mm256_add_ps(acc0, acc1), _mm256_add_ps(acc2, acc3));
-            for (; i + 8 <= h_dim; i += 8) {
-                __m256 va = _mm256_loadu_ps(x_ptr + i);
-                __m128i vb_i8 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i));
-                acc = _mm256_fmadd_ps(va, _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(vb_i8)), acc);
-            }
-            alignas(32) float tmp[8];
-            _mm256_store_ps(tmp, acc);
-            float sum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
 
-            for (; i < h_dim; ++i) {
-                sum += x_ptr[i] * static_cast<float>(row[i]);
+            __m256i total_acc = _mm256_add_epi32(_mm256_add_epi32(acc0, acc1), _mm256_add_epi32(acc2, acc3));
+            alignas(32) int32_t tmp[8];
+            _mm256_store_si256(reinterpret_cast<__m256i*>(tmp), total_acc);
+            int32_t sum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+            for (py::ssize_t rem = j * 16; rem < h_dim; ++rem) {
+                sum += static_cast<int32_t>(x_i8[rem]) * static_cast<int32_t>(row[rem]);
             }
-            logits_ptr[v] = sum * scales_ptr[v];
+            logits_ptr[v] = static_cast<float>(sum) * (s_x * scales_ptr[v]);
         }
 
         return logits_arr;
@@ -1165,11 +1420,245 @@ public:
         auto out = py::array_t<float>(std::vector<py::ssize_t>{1, 1, h_dim});
         float* out_ptr = static_cast<float*>(out.request().ptr);
 
-        #pragma omp simd
-        for (py::ssize_t i = 0; i < h_dim; ++i) {
+        __m256 s_vec = _mm256_set1_ps(scale);
+        py::ssize_t i = 0;
+        for (; i + 16 <= h_dim; i += 16) {
+            __m128i r_lo = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i));
+            __m128i r_hi = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 8));
+            __m256 f_lo = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(r_lo));
+            __m256 f_hi = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(r_hi));
+            _mm256_storeu_ps(out_ptr + i, _mm256_mul_ps(f_lo, s_vec));
+            _mm256_storeu_ps(out_ptr + i + 8, _mm256_mul_ps(f_hi, s_vec));
+        }
+        for (; i < h_dim; ++i) {
             out_ptr[i] = static_cast<float>(row[i]) * scale;
         }
         return out;
+    }
+
+    std::vector<float> logits_scratch;
+
+    // Direct C++ Top-K/Top-P sampler (0.01 ms vs 18 ms in Python)
+    int sample_top_k_top_p(
+        const float* logits,
+        int vocab_size,
+        const std::vector<int>& past_tokens,
+        float temperature = 0.7f,
+        float top_p = 0.9f,
+        int top_k = 40,
+        float repetition_penalty = 1.15f
+    ) {
+        if (temperature <= 0.0f) {
+            int best_idx = 0;
+            float best_val = logits[0];
+            for (int i = 1; i < vocab_size; ++i) {
+                if (logits[i] > best_val) {
+                    best_val = logits[i];
+                    best_idx = i;
+                }
+            }
+            return best_idx;
+        }
+
+        using Pair = std::pair<float, int>;
+        std::priority_queue<Pair, std::vector<Pair>, std::greater<Pair>> min_heap;
+
+        std::unordered_set<int> past_set(past_tokens.begin(), past_tokens.end());
+
+        for (int i = 0; i < vocab_size; ++i) {
+            float l = logits[i];
+            if (repetition_penalty != 1.0f && past_set.count(i)) {
+                l = (l > 0.0f) ? (l / repetition_penalty) : (l * repetition_penalty);
+            }
+
+            if (static_cast<int>(min_heap.size()) < top_k) {
+                min_heap.push({l, i});
+            } else if (l > min_heap.top().first) {
+                min_heap.pop();
+                min_heap.push({l, i});
+            }
+        }
+
+        int k_size = min_heap.size();
+        std::vector<Pair> candidates(k_size);
+        for (int i = k_size - 1; i >= 0; --i) {
+            candidates[i] = min_heap.top();
+            min_heap.pop();
+        }
+
+        float max_l = candidates[0].first;
+        float sum_exp = 0.0f;
+        std::vector<float> probs(k_size);
+        for (int i = 0; i < k_size; ++i) {
+            probs[i] = std::exp((candidates[i].first - max_l) / temperature);
+            sum_exp += probs[i];
+        }
+        for (int i = 0; i < k_size; ++i) {
+            probs[i] /= sum_exp;
+        }
+
+        float cum_p = 0.0f;
+        int cutoff = k_size;
+        for (int i = 0; i < k_size; ++i) {
+            cum_p += probs[i];
+            if (cum_p >= top_p) {
+                cutoff = i + 1;
+                break;
+            }
+        }
+
+        float sub_sum = 0.0f;
+        for (int i = 0; i < cutoff; ++i) sub_sum += probs[i];
+        for (int i = 0; i < cutoff; ++i) probs[i] /= sub_sum;
+
+        float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+        float acc = 0.0f;
+        for (int i = 0; i < cutoff; ++i) {
+            acc += probs[i];
+            if (r <= acc) {
+                return candidates[i].second;
+            }
+        }
+        return candidates[0].second;
+    }
+
+    // Single fully-native token generation step (0 python roundtrips)
+    int generate_step_cxx(
+        int token_id,
+        float temperature,
+        float top_p,
+        int top_k,
+        float repetition_penalty,
+        const std::vector<int>& past_tokens,
+        py::object embed_weights_obj,
+        py::object embed_scales_obj = py::none()
+    ) {
+        // 1. Embedding lookup directly into buf_x
+        if (py::isinstance<py::array_t<float>>(embed_weights_obj)) {
+            auto ew_buf = embed_weights_obj.cast<py::array_t<float>>().request();
+            const float* row = static_cast<const float*>(ew_buf.ptr) + token_id * hidden_size;
+            std::memcpy(buf_x.data(), row, hidden_size * sizeof(float));
+        } else {
+            auto ew_buf = embed_weights_obj.cast<py::array_t<int8_t>>().request();
+            auto es_buf = embed_scales_obj.cast<py::array_t<float>>().request();
+            const int8_t* row = static_cast<const int8_t*>(ew_buf.ptr) + token_id * hidden_size;
+            float scale = static_cast<const float*>(es_buf.ptr)[token_id];
+            __m256 s_vec = _mm256_set1_ps(scale);
+            int i = 0;
+            for (; i + 16 <= hidden_size; i += 16) {
+                __m128i r_lo = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i));
+                __m128i r_hi = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i + 8));
+                __m256 f_lo = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(r_lo));
+                __m256 f_hi = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(r_hi));
+                _mm256_storeu_ps(buf_x.data() + i, _mm256_mul_ps(f_lo, s_vec));
+                _mm256_storeu_ps(buf_x.data() + i + 8, _mm256_mul_ps(f_hi, s_vec));
+            }
+            for (; i < hidden_size; ++i) {
+                buf_x[i] = static_cast<float>(row[i]) * scale;
+            }
+        }
+
+        // 2. Transformer layers in raw C++
+        for (int l = 0; l < num_layers; ++l) {
+            forward_layer_raw(l);
+        }
+        kv_cache.increment_seq_len(1);
+
+        // 3. Compute logits into logits_scratch
+        int vocab_size = 0;
+        if (py::isinstance<py::array_t<float>>(embed_weights_obj)) {
+            auto ew_buf = embed_weights_obj.cast<py::array_t<float>>().request();
+            vocab_size = ew_buf.shape[0];
+            if (static_cast<int>(logits_scratch.size()) < vocab_size) logits_scratch.resize(vocab_size);
+            rms_norm_raw(buf_x.data(), final_norm_ptr, buf_norm_x.data(), hidden_size);
+            const float* x_ptr = buf_norm_x.data();
+            const float* w_ptr = static_cast<const float*>(ew_buf.ptr);
+
+            #pragma omp parallel for schedule(dynamic, 1024)
+            for (int v = 0; v < vocab_size; ++v) {
+                const float* row = w_ptr + v * hidden_size;
+                __m256 acc0 = _mm256_setzero_ps();
+                __m256 acc1 = _mm256_setzero_ps();
+                int i = 0;
+                for (; i + 16 <= hidden_size; i += 16) {
+                    acc0 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i), _mm256_loadu_ps(row + i), acc0);
+                    acc1 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i + 8), _mm256_loadu_ps(row + i + 8), acc1);
+                }
+                __m256 acc = _mm256_add_ps(acc0, acc1);
+                alignas(32) float tmp[8];
+                _mm256_store_ps(tmp, acc);
+                float sum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+                for (; i < hidden_size; ++i) sum += x_ptr[i] * row[i];
+                logits_scratch[v] = sum;
+            }
+        } else {
+            auto ew_buf = embed_weights_obj.cast<py::array_t<int8_t>>().request();
+            auto es_buf = embed_scales_obj.cast<py::array_t<float>>().request();
+            vocab_size = ew_buf.shape[0];
+            if (static_cast<int>(logits_scratch.size()) < vocab_size) logits_scratch.resize(vocab_size);
+
+            rms_norm_raw(buf_x.data(), final_norm_ptr, buf_norm_x.data(), hidden_size);
+            const float* x_ptr = buf_norm_x.data();
+            const int8_t* w_ptr = static_cast<const int8_t*>(ew_buf.ptr);
+            const float* scales_ptr = static_cast<const float*>(es_buf.ptr);
+
+            float amax_x = 1e-8f;
+            for (int i = 0; i < hidden_size; ++i) {
+                float val = std::abs(x_ptr[i]);
+                if (val > amax_x) amax_x = val;
+            }
+            float s_x = amax_x / 127.0f;
+            float inv_s_x = 1.0f / s_x;
+            std::vector<int8_t> x_i8(hidden_size);
+            #pragma omp simd
+            for (int i = 0; i < hidden_size; ++i) {
+                float q = std::round(x_ptr[i] * inv_s_x);
+                x_i8[i] = static_cast<int8_t>(std::clamp(q, -128.0f, 127.0f));
+            }
+
+            int num_vecs = hidden_size / 16;
+            std::vector<__m256i> x_expanded(num_vecs);
+            for (int j = 0; j < num_vecs; ++j) {
+                __m128i a = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x_i8.data() + j * 16));
+                x_expanded[j] = _mm256_cvtepi8_epi16(a);
+            }
+            const __m256i* x_exp_ptr = x_expanded.data();
+
+            #pragma omp parallel for schedule(dynamic, 1024)
+            for (int v = 0; v < vocab_size; ++v) {
+                const int8_t* row = w_ptr + v * hidden_size;
+                __m256i acc0 = _mm256_setzero_si256();
+                __m256i acc1 = _mm256_setzero_si256();
+                __m256i acc2 = _mm256_setzero_si256();
+                __m256i acc3 = _mm256_setzero_si256();
+
+                int j = 0;
+                for (; j + 4 <= num_vecs; j += 4) {
+                    __m128i b0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + j * 16));
+                    __m128i b1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + (j + 1) * 16));
+                    __m128i b2 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + (j + 2) * 16));
+                    __m128i b3 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row + (j + 3) * 16));
+
+                    acc0 = _mm256_add_epi32(acc0, _mm256_madd_epi16(x_exp_ptr[j], _mm256_cvtepi8_epi16(b0)));
+                    acc1 = _mm256_add_epi32(acc1, _mm256_madd_epi16(x_exp_ptr[j + 1], _mm256_cvtepi8_epi16(b1)));
+                    acc2 = _mm256_add_epi32(acc2, _mm256_madd_epi16(x_exp_ptr[j + 2], _mm256_cvtepi8_epi16(b2)));
+                    acc3 = _mm256_add_epi32(acc3, _mm256_madd_epi16(x_exp_ptr[j + 3], _mm256_cvtepi8_epi16(b3)));
+                }
+
+                __m256i total_acc = _mm256_add_epi32(_mm256_add_epi32(acc0, acc1), _mm256_add_epi32(acc2, acc3));
+                alignas(32) int32_t tmp[8];
+                _mm256_store_si256(reinterpret_cast<__m256i*>(tmp), total_acc);
+                int32_t sum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+                for (int rem = j * 16; rem < hidden_size; ++rem) {
+                    sum += static_cast<int32_t>(x_i8[rem]) * static_cast<int32_t>(row[rem]);
+                }
+                logits_scratch[v] = static_cast<float>(sum) * (s_x * scales_ptr[v]);
+            }
+        }
+
+        // 4. Sample token in C++
+        return sample_top_k_top_p(logits_scratch.data(), vocab_size, past_tokens, temperature, top_p, top_k, repetition_penalty);
     }
 };
 
@@ -1230,6 +1719,15 @@ PYBIND11_MODULE(tenzo_runtime, m) {
         .def("compute_logits", &ExecutionContext::compute_logits,
              py::arg("x"), py::arg("embed_weights"), py::arg("embed_scales") = py::none())
         .def("embedding_lookup", &ExecutionContext::embedding_lookup,
-             py::arg("token_id"), py::arg("embed_weights"), py::arg("embed_scales") = py::none());
+             py::arg("token_id"), py::arg("embed_weights"), py::arg("embed_scales") = py::none())
+        .def("generate_step_cxx", &ExecutionContext::generate_step_cxx,
+             py::arg("token_id"),
+             py::arg("temperature") = 0.7f,
+             py::arg("top_p") = 0.9f,
+             py::arg("top_k") = 40,
+             py::arg("repetition_penalty") = 1.15f,
+             py::arg("past_tokens") = std::vector<int>(),
+             py::arg("embed_weights") = py::none(),
+             py::arg("embed_scales") = py::none());
 }
 

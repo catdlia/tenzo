@@ -269,22 +269,28 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_m
 
     # 1. Prefill prompt tokens
     t_start = time.perf_counter()
-    cur_x = None
-    for tok in prompt_tokens:
+    for i in range(len(prompt_tokens) - 1):
+        tok = prompt_tokens[i]
         tok_embed = ctx.embedding_lookup(tok, embed_w, embed_s) if embed_s is not None else ctx.embedding_lookup(tok, embed_w)
-        cur_x = ctx.forward_step(tok_embed)
+        ctx.forward_step(tok_embed)
 
+    last_prompt_tok = prompt_tokens[-1]
     ttft = time.perf_counter() - t_start
 
-    # 2. Autoregressive Decode
+    # 2. Autoregressive Decode in pure C++
+    cur_token = last_prompt_tok
     t_decode_start = time.perf_counter()
     for step in range(max_tokens):
-        if embed_s is not None:
-            logits = ctx.compute_logits(cur_x, embed_w, embed_s).reshape(-1)
-        else:
-            logits = ctx.compute_logits(cur_x, embed_w).reshape(-1)
-
-        next_tok = sample_token(logits, all_tokens, temperature=temp, repetition_penalty=repetition_penalty)
+        next_tok = ctx.generate_step_cxx(
+            cur_token,
+            temp,
+            0.9,
+            40,
+            repetition_penalty,
+            all_tokens,
+            embed_w,
+            embed_s if embed_s is not None else []
+        )
         
         all_tokens.append(next_tok)
         generated_tokens.append(next_tok)
@@ -295,9 +301,7 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_m
             break
 
         print(tok_str, end="", flush=True)
-
-        tok_embed = ctx.embedding_lookup(next_tok, embed_w, embed_s) if embed_s is not None else ctx.embedding_lookup(next_tok, embed_w)
-        cur_x = ctx.forward_step(tok_embed)
+        cur_token = next_tok
 
     decode_time = time.perf_counter() - t_decode_start
     n_gen = len(generated_tokens)
