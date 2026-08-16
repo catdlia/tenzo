@@ -474,25 +474,29 @@ py::array_t<float> dispatch_linear_cxx(
 class KVCache {
 public:
     int num_layers;
-    int num_heads;
+    int num_q_heads;
+    int num_kv_heads;
     int head_dim;
-    int hidden_size;
     int max_seq_len;
+    int q_dim;
+    int kv_dim;
     int current_seq_len;
 
-    // Cache buffers: [num_layers][num_heads * max_seq_len * head_dim]
+    // k_cache[layer_idx], v_cache[layer_idx]: [num_kv_heads * max_seq_len * head_dim]
     std::vector<std::vector<float>> k_cache;
     std::vector<std::vector<float>> v_cache;
     std::vector<float> scores_buffer;
 
-    KVCache(int num_layers, int num_heads, int head_dim, int max_seq_len = 2048)
-        : num_layers(num_layers), num_heads(num_heads), head_dim(head_dim),
-          hidden_size(num_heads * head_dim), max_seq_len(max_seq_len), current_seq_len(0) {
+    KVCache(int num_layers, int num_q_heads, int num_kv_heads, int head_dim, int max_seq_len = 4096)
+        : num_layers(num_layers), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
+          head_dim(head_dim), max_seq_len(max_seq_len),
+          q_dim(num_q_heads * head_dim), kv_dim(num_kv_heads * head_dim),
+          current_seq_len(0) {
         
-        size_t layer_size = static_cast<size_t>(num_heads) * max_seq_len * head_dim;
-        k_cache.resize(num_layers, std::vector<float>(layer_size, 0.0f));
-        v_cache.resize(num_layers, std::vector<float>(layer_size, 0.0f));
-        scores_buffer.resize(static_cast<size_t>(num_heads) * max_seq_len, 0.0f);
+        size_t cache_elements = static_cast<size_t>(num_kv_heads) * max_seq_len * head_dim;
+        k_cache.resize(num_layers, std::vector<float>(cache_elements, 0.0f));
+        v_cache.resize(num_layers, std::vector<float>(cache_elements, 0.0f));
+        scores_buffer.resize(static_cast<size_t>(num_q_heads) * max_seq_len, 0.0f);
     }
 
     void reset() {
@@ -512,10 +516,22 @@ public:
         }
     }
 
-    // Appends new K and V, then computes Scaled Dot-Product Attention:
-    // Q: [1, 1, hidden_size]
-    // new_k, new_v: [1, 1, hidden_size]
-    // Returns: [1, 1, hidden_size]
+    static void apply_rope(float* head_ptr, int head_dim, int pos) {
+        int half_dim = head_dim / 2;
+        for (int i = 0; i < half_dim; ++i) {
+            float freq = 1.0f / std::pow(10000.0f, (2.0f * i) / static_cast<float>(head_dim));
+            float angle = static_cast<float>(pos) * freq;
+            float cos_val = std::cos(angle);
+            float sin_val = std::sin(angle);
+
+            float x1 = head_ptr[i];
+            float x2 = head_ptr[i + half_dim];
+            head_ptr[i] = x1 * cos_val - x2 * sin_val;
+            head_ptr[i + half_dim] = x1 * sin_val + x2 * cos_val;
+        }
+    }
+
+    // Appends new K and V (with RoPE), then computes GQA Attention
     py::array_t<float> forward_attention(
         int layer_idx,
         py::array_t<float> q_arr,
@@ -530,45 +546,56 @@ public:
         auto buf_k = k_arr.request();
         auto buf_v = v_arr.request();
 
-        if (buf_q.size != hidden_size || buf_k.size != hidden_size || buf_v.size != hidden_size) {
-            throw std::runtime_error("Tensor size mismatch in forward_attention");
+        if (buf_q.size != q_dim || buf_k.size != kv_dim || buf_v.size != kv_dim) {
+            throw std::runtime_error("Tensor dimension mismatch in forward_attention");
         }
 
-        const float* q_ptr = static_cast<const float*>(buf_q.ptr);
-        const float* k_new = static_cast<const float*>(buf_k.ptr);
-        const float* v_new = static_cast<const float*>(buf_v.ptr);
+        std::vector<float> q_local(q_dim);
+        std::vector<float> k_local(kv_dim);
+        std::memcpy(q_local.data(), buf_q.ptr, q_dim * sizeof(float));
+        std::memcpy(k_local.data(), buf_k.ptr, kv_dim * sizeof(float));
+        const float* v_src = static_cast<const float*>(buf_v.ptr);
+
+        // Apply RoPE
+        for (int h = 0; h < num_q_heads; ++h) {
+            apply_rope(q_local.data() + h * head_dim, head_dim, current_seq_len);
+        }
+        for (int h = 0; h < num_kv_heads; ++h) {
+            apply_rope(k_local.data() + h * head_dim, head_dim, current_seq_len);
+        }
 
         float* layer_k = k_cache[layer_idx].data();
         float* layer_v = v_cache[layer_idx].data();
 
-        // 1. Append new K and V into cache at current_seq_len position
-        // Memory layout for layer: [num_heads, max_seq_len, head_dim]
+        // 1. Append RoPE-transformed K and V into KV Cache at current_seq_len
         int t_idx = current_seq_len;
-        for (int h = 0; h < num_heads; ++h) {
+        for (int h = 0; h < num_kv_heads; ++h) {
             float* k_dst = layer_k + (h * max_seq_len + t_idx) * head_dim;
             float* v_dst = layer_v + (h * max_seq_len + t_idx) * head_dim;
-            const float* k_src = k_new + h * head_dim;
-            const float* v_src = v_new + h * head_dim;
+            const float* k_val = k_local.data() + h * head_dim;
+            const float* v_val = v_src + h * head_dim;
 
-            std::memcpy(k_dst, k_src, head_dim * sizeof(float));
-            std::memcpy(v_dst, v_src, head_dim * sizeof(float));
+            std::memcpy(k_dst, k_val, head_dim * sizeof(float));
+            std::memcpy(v_dst, v_val, head_dim * sizeof(float));
         }
 
         int seq_len = current_seq_len + 1;
         float scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+        int group_size = num_q_heads / num_kv_heads;
 
-        // 2. Compute Scaled Dot-Product Attention for each head
-        auto out_arr = py::array_t<float>({1, 1, hidden_size});
+        // 2. Compute Scaled Dot-Product Attention for each Q head
+        auto out_arr = py::array_t<float>({1, 1, q_dim});
         float* out_ptr = static_cast<float*>(out_arr.request().ptr);
         float* scores_base = scores_buffer.data();
 
         #pragma omp parallel for schedule(static)
-        for (int h = 0; h < num_heads; ++h) {
-            const float* q_head = q_ptr + h * head_dim;
-            const float* k_head_base = layer_k + h * max_seq_len * head_dim;
-            const float* v_head_base = layer_v + h * max_seq_len * head_dim;
-            float* out_head = out_ptr + h * head_dim;
-            float* scores = scores_base + h * max_seq_len;
+        for (int q_h = 0; q_h < num_q_heads; ++q_h) {
+            int kv_h = q_h / group_size;
+            const float* q_head = q_local.data() + q_h * head_dim;
+            const float* k_head_base = layer_k + kv_h * max_seq_len * head_dim;
+            const float* v_head_base = layer_v + kv_h * max_seq_len * head_dim;
+            float* out_head = out_ptr + q_h * head_dim;
+            float* scores = scores_base + q_h * max_seq_len;
             float max_score = -1e9f;
 
             // Score = (Q * K^T) * scale
@@ -584,12 +611,10 @@ public:
                     __m256 k_v = _mm256_loadu_ps(k_t + d);
                     dot_vec = _mm256_fmadd_ps(q_v, k_v, dot_vec);
                 }
-                // Horizontal sum
                 alignas(32) float temp[8];
                 _mm256_store_ps(temp, dot_vec);
                 dot = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
 
-                // Scalar tail
                 for (; d < head_dim; ++d) {
                     dot += q_head[d] * k_t[d];
                 }
@@ -630,11 +655,6 @@ public:
             }
         }
 
-        // If this is the last layer, advance the sequence pointer
-        if (layer_idx == num_layers - 1) {
-            current_seq_len++;
-        }
-
         return out_arr;
     }
 };
@@ -651,30 +671,46 @@ struct LayerWeights {
     py::object gate_w;
     py::object up_w;
     py::object down_w;
-    float scale = 1.0f;
+
+    py::object in_norm_w;
+    py::object attn_sub_norm_w;
+    py::object post_norm_w;
+    py::object ffn_sub_norm_w;
+
+    float q_scale = 1.0f;
+    float k_scale = 1.0f;
+    float v_scale = 1.0f;
+    float out_scale = 1.0f;
+    float gate_scale = 1.0f;
+    float up_scale = 1.0f;
+    float down_scale = 1.0f;
 };
 
 class ExecutionContext {
 public:
     int hidden_size;
-    int num_heads;
+    int num_q_heads;
+    int num_kv_heads;
     int head_dim;
     int num_layers;
     int max_seq_len;
     std::string quant_scheme;
     KVCache kv_cache;
     std::vector<LayerWeights> layers;
+    py::object final_norm_w;
 
     ExecutionContext(
         int hidden_size,
-        int num_heads,
+        int num_q_heads,
+        int num_kv_heads,
         int head_dim,
         int num_layers,
-        int max_seq_len = 2048,
+        int max_seq_len = 4096,
         const std::string& quant_scheme = "classic_tl1"
-    ) : hidden_size(hidden_size), num_heads(num_heads), head_dim(head_dim),
-        num_layers(num_layers), max_seq_len(max_seq_len), quant_scheme(quant_scheme),
-        kv_cache(num_layers, num_heads, head_dim, max_seq_len) {
+    ) : hidden_size(hidden_size), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
+        head_dim(head_dim), num_layers(num_layers), max_seq_len(max_seq_len),
+        quant_scheme(quant_scheme),
+        kv_cache(num_layers, num_q_heads, num_kv_heads, head_dim, max_seq_len) {
         
         layers.resize(num_layers);
     }
@@ -687,19 +723,30 @@ public:
         return kv_cache.get_seq_len();
     }
 
-    void set_layer_weights(
+    void set_final_norm(py::object w) {
+        final_norm_w = w;
+    }
+
+    void set_layer_full(
         int layer_idx,
-        py::object q_w,
-        py::object k_w,
-        py::object v_w,
-        py::object out_w,
-        float scale = 1.0f
+        py::object q_w, float q_scale,
+        py::object k_w, float k_scale,
+        py::object v_w, float v_scale,
+        py::object out_w, float out_scale,
+        py::object gate_w, float gate_scale,
+        py::object up_w, float up_scale,
+        py::object down_w, float down_scale,
+        py::object in_norm_w = py::none(),
+        py::object attn_sub_norm_w = py::none(),
+        py::object post_norm_w = py::none(),
+        py::object ffn_sub_norm_w = py::none()
     ) {
         if (layer_idx < 0 || layer_idx >= num_layers) {
             throw std::out_of_range("Invalid layer index");
         }
 
         auto pack_if_tl1 = [&](py::object w) -> py::object {
+            if (w.is_none()) return w;
             if (quant_scheme == "classic_tl1" || quant_scheme == "classic_tl2") {
                 if (py::isinstance<py::array_t<int8_t>>(w)) {
                     auto arr = w.cast<py::array_t<int8_t>>();
@@ -715,26 +762,51 @@ public:
         layers[layer_idx].k_w = pack_if_tl1(k_w);
         layers[layer_idx].v_w = pack_if_tl1(v_w);
         layers[layer_idx].out_w = pack_if_tl1(out_w);
-        layers[layer_idx].scale = scale;
+        layers[layer_idx].gate_w = pack_if_tl1(gate_w);
+        layers[layer_idx].up_w = pack_if_tl1(up_w);
+        layers[layer_idx].down_w = pack_if_tl1(down_w);
+
+        layers[layer_idx].in_norm_w = in_norm_w;
+        layers[layer_idx].attn_sub_norm_w = attn_sub_norm_w;
+        layers[layer_idx].post_norm_w = post_norm_w;
+        layers[layer_idx].ffn_sub_norm_w = ffn_sub_norm_w;
+
+        layers[layer_idx].q_scale = q_scale;
+        layers[layer_idx].k_scale = k_scale;
+        layers[layer_idx].v_scale = v_scale;
+        layers[layer_idx].out_scale = out_scale;
+        layers[layer_idx].gate_scale = gate_scale;
+        layers[layer_idx].up_scale = up_scale;
+        layers[layer_idx].down_scale = down_scale;
     }
 
-    // Simple RMSNorm helper
-    py::array_t<float> rms_norm(py::array_t<float> x, float eps = 1e-5f) {
+    // Weighted RMSNorm helper
+    py::array_t<float> rms_norm_weighted(py::array_t<float> x, py::object weight_obj, float eps = 1e-5f) {
         auto buf = x.request();
         const float* src = static_cast<const float*>(buf.ptr);
-        auto out = py::array_t<float>({1, 1, hidden_size});
+        py::ssize_t dim = buf.size;
+        auto out = py::array_t<float>(std::vector<py::ssize_t>{1, 1, dim});
         float* dst = static_cast<float*>(out.request().ptr);
 
         float sum_sq = 0.0f;
         #pragma omp simd reduction(+:sum_sq)
-        for (int i = 0; i < hidden_size; ++i) {
+        for (py::ssize_t i = 0; i < dim; ++i) {
             sum_sq += src[i] * src[i];
         }
-        float inv_rms = 1.0f / std::sqrt((sum_sq / static_cast<float>(hidden_size)) + eps);
+        float inv_rms = 1.0f / std::sqrt((sum_sq / static_cast<float>(dim)) + eps);
 
-        #pragma omp simd
-        for (int i = 0; i < hidden_size; ++i) {
-            dst[i] = src[i] * inv_rms;
+        if (!weight_obj.is_none()) {
+            auto w_buf = weight_obj.cast<py::array_t<float>>().request();
+            const float* w_ptr = static_cast<const float*>(w_buf.ptr);
+            #pragma omp simd
+            for (py::ssize_t i = 0; i < dim; ++i) {
+                dst[i] = src[i] * inv_rms * w_ptr[i];
+            }
+        } else {
+            #pragma omp simd
+            for (py::ssize_t i = 0; i < dim; ++i) {
+                dst[i] = src[i] * inv_rms;
+            }
         }
         return out;
     }
@@ -746,32 +818,76 @@ public:
         }
         const auto& lw = layers[layer_idx];
 
-        // 1. Pre-Layer RMSNorm
-        auto norm_x = rms_norm(x);
+        // 1. Pre-Layer RMSNorm (input_layernorm)
+        auto norm_x = rms_norm_weighted(x, lw.in_norm_w);
 
         // 2. Compute Q, K, V projections using native AVX2 SIMD
-        auto q = dispatch_linear_cxx(norm_x, lw.q_w, std::nullopt, quant_scheme, lw.scale);
-        auto k = dispatch_linear_cxx(norm_x, lw.k_w, std::nullopt, quant_scheme, lw.scale);
-        auto v = dispatch_linear_cxx(norm_x, lw.v_w, std::nullopt, quant_scheme, lw.scale);
+        auto q = dispatch_linear_cxx(norm_x, lw.q_w, std::nullopt, quant_scheme, lw.q_scale);
+        auto k = dispatch_linear_cxx(norm_x, lw.k_w, std::nullopt, quant_scheme, lw.k_scale);
+        auto v = dispatch_linear_cxx(norm_x, lw.v_w, std::nullopt, quant_scheme, lw.v_scale);
 
         // 3. Fused Scaled Dot-Product Attention & KV Cache Update in C++
-        auto attn_out = kv_cache.forward_attention(layer_idx, q, k, v);
+        auto attn_raw = kv_cache.forward_attention(layer_idx, q, k, v);
 
-        // 4. Output Projection
-        auto out = dispatch_linear_cxx(attn_out, lw.out_w, std::nullopt, quant_scheme, lw.scale);
+        // 4. Attention Sub-LayerNorm
+        auto attn_sub_norm = rms_norm_weighted(attn_raw, lw.attn_sub_norm_w);
 
-        // 5. Residual Connection (x + out)
-        auto res = py::array_t<float>({1, 1, hidden_size});
+        // 5. Output Projection
+        auto out = dispatch_linear_cxx(attn_sub_norm, lw.out_w, std::nullopt, quant_scheme, lw.out_scale);
+
+        // 6. Residual Connection (h1 = x + out)
+        auto h1 = py::array_t<float>(std::vector<py::ssize_t>{1, 1, static_cast<py::ssize_t>(hidden_size)});
         const float* x_ptr = static_cast<const float*>(x.request().ptr);
         const float* out_ptr = static_cast<const float*>(out.request().ptr);
-        float* res_ptr = static_cast<float*>(res.request().ptr);
+        float* h1_ptr = static_cast<float*>(h1.request().ptr);
 
         #pragma omp simd
         for (int i = 0; i < hidden_size; ++i) {
-            res_ptr[i] = x_ptr[i] + out_ptr[i];
+            h1_ptr[i] = x_ptr[i] + out_ptr[i];
         }
 
-        return res;
+        // 7. MLP Block (if present)
+        if (!lw.gate_w.is_none() && !lw.up_w.is_none() && !lw.down_w.is_none()) {
+            // Post-Attention RMSNorm
+            auto post_norm_h = rms_norm_weighted(h1, lw.post_norm_w);
+
+            auto gate = dispatch_linear_cxx(post_norm_h, lw.gate_w, std::nullopt, quant_scheme, lw.gate_scale);
+            auto up = dispatch_linear_cxx(post_norm_h, lw.up_w, std::nullopt, quant_scheme, lw.up_scale);
+
+            auto g_buf = gate.request();
+            auto u_buf = up.request();
+            py::ssize_t ffn_dim = g_buf.size;
+            const float* g_ptr = static_cast<const float*>(g_buf.ptr);
+            const float* u_ptr = static_cast<const float*>(u_buf.ptr);
+
+            auto act_mult = py::array_t<float>(std::vector<py::ssize_t>{1, 1, ffn_dim});
+            float* m_ptr = static_cast<float*>(act_mult.request().ptr);
+
+            // Gated activation: relu(gate)^2 * up
+            #pragma omp simd
+            for (py::ssize_t i = 0; i < ffn_dim; ++i) {
+                float r = std::max(0.0f, g_ptr[i]);
+                m_ptr[i] = (r * r) * u_ptr[i];
+            }
+
+            // FFN Sub-LayerNorm
+            auto ffn_sub_norm = rms_norm_weighted(act_mult, lw.ffn_sub_norm_w);
+
+            // Down projection
+            auto down = dispatch_linear_cxx(ffn_sub_norm, lw.down_w, std::nullopt, quant_scheme, lw.down_scale);
+            const float* down_ptr = static_cast<const float*>(down.request().ptr);
+
+            // Residual connection (h1 + down)
+            auto res = py::array_t<float>(std::vector<py::ssize_t>{1, 1, static_cast<py::ssize_t>(hidden_size)});
+            float* res_ptr = static_cast<float*>(res.request().ptr);
+            #pragma omp simd
+            for (int i = 0; i < hidden_size; ++i) {
+                res_ptr[i] = h1_ptr[i] + down_ptr[i];
+            }
+            return res;
+        }
+
+        return h1;
     }
 
     // Runs a full token generation step across all layers
@@ -782,6 +898,124 @@ public:
         }
         kv_cache.increment_seq_len(1);
         return cur_x;
+    }
+
+    // Fast LM Head Logits calculation using AVX2 SIMD dot products: FP32 or INT8
+    py::array_t<float> compute_logits(
+        py::array_t<float> x,
+        py::object embed_weights_obj,
+        py::object embed_scales_obj = py::none()
+    ) {
+        auto final_x = rms_norm_weighted(x, final_norm_w);
+        const float* x_ptr = static_cast<const float*>(final_x.request().ptr);
+
+        if (py::isinstance<py::array_t<float>>(embed_weights_obj)) {
+            auto ew_buf = embed_weights_obj.cast<py::array_t<float>>().request();
+            py::ssize_t vocab_size = ew_buf.shape[0];
+            py::ssize_t h_dim = ew_buf.shape[1];
+            const float* w_ptr = static_cast<const float*>(ew_buf.ptr);
+
+            auto logits_arr = py::array_t<float>(std::vector<py::ssize_t>{1, 1, vocab_size});
+            float* logits_ptr = static_cast<float*>(logits_arr.request().ptr);
+
+            #pragma omp parallel for schedule(static)
+            for (py::ssize_t v = 0; v < vocab_size; ++v) {
+                const float* row = w_ptr + v * h_dim;
+                __m256 acc0 = _mm256_setzero_ps();
+                __m256 acc1 = _mm256_setzero_ps();
+                __m256 acc2 = _mm256_setzero_ps();
+                __m256 acc3 = _mm256_setzero_ps();
+                py::ssize_t i = 0;
+                for (; i + 32 <= h_dim; i += 32) {
+                    acc0 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i), _mm256_loadu_ps(row + i), acc0);
+                    acc1 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i + 8), _mm256_loadu_ps(row + i + 8), acc1);
+                    acc2 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i + 16), _mm256_loadu_ps(row + i + 16), acc2);
+                    acc3 = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i + 24), _mm256_loadu_ps(row + i + 24), acc3);
+                }
+                __m256 acc = _mm256_add_ps(_mm256_add_ps(acc0, acc1), _mm256_add_ps(acc2, acc3));
+                for (; i + 8 <= h_dim; i += 8) {
+                    acc = _mm256_fmadd_ps(_mm256_loadu_ps(x_ptr + i), _mm256_loadu_ps(row + i), acc);
+                }
+                alignas(32) float tmp[8];
+                _mm256_store_ps(tmp, acc);
+                float sum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+                for (; i < h_dim; ++i) {
+                    sum += x_ptr[i] * row[i];
+                }
+                logits_ptr[v] = sum;
+            }
+            return logits_arr;
+        }
+
+        auto ew_buf = embed_weights_obj.cast<py::array_t<int8_t>>().request();
+        auto es_buf = embed_scales_obj.cast<py::array_t<float>>().request();
+
+        py::ssize_t vocab_size = ew_buf.shape[0];
+        py::ssize_t h_dim = ew_buf.shape[1];
+        const int8_t* w_ptr = static_cast<const int8_t*>(ew_buf.ptr);
+        const float* scales_ptr = static_cast<const float*>(es_buf.ptr);
+
+        auto logits_arr = py::array_t<float>(std::vector<py::ssize_t>{1, 1, vocab_size});
+        float* logits_ptr = static_cast<float*>(logits_arr.request().ptr);
+
+        #pragma omp parallel for schedule(static)
+        for (py::ssize_t v = 0; v < vocab_size; ++v) {
+            const int8_t* row = w_ptr + v * h_dim;
+            __m256 acc = _mm256_setzero_ps();
+            py::ssize_t i = 0;
+            for (; i + 8 <= h_dim; i += 8) {
+                __m256 va = _mm256_loadu_ps(x_ptr + i);
+                __m128i vb_i8 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(row + i));
+                __m256i vb_i32 = _mm256_cvtepi8_epi32(vb_i8);
+                __m256 vb_f32 = _mm256_cvtepi32_ps(vb_i32);
+                acc = _mm256_fmadd_ps(va, vb_f32, acc);
+            }
+            alignas(32) float tmp[8];
+            _mm256_store_ps(tmp, acc);
+            float sum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+
+            for (; i < h_dim; ++i) {
+                sum += x_ptr[i] * static_cast<float>(row[i]);
+            }
+            logits_ptr[v] = sum * scales_ptr[v];
+        }
+
+        return logits_arr;
+    }
+
+    // Fast Embedding Lookup
+    py::array_t<float> embedding_lookup(
+        int token_id,
+        py::object embed_weights_obj,
+        py::object embed_scales_obj = py::none()
+    ) {
+        if (py::isinstance<py::array_t<float>>(embed_weights_obj)) {
+            auto ew_buf = embed_weights_obj.cast<py::array_t<float>>().request();
+            py::ssize_t h_dim = ew_buf.shape[1];
+            const float* row = static_cast<const float*>(ew_buf.ptr) + token_id * h_dim;
+
+            auto out = py::array_t<float>(std::vector<py::ssize_t>{1, 1, h_dim});
+            float* out_ptr = static_cast<float*>(out.request().ptr);
+            std::memcpy(out_ptr, row, h_dim * sizeof(float));
+            return out;
+        }
+
+        auto ew_buf = embed_weights_obj.cast<py::array_t<int8_t>>().request();
+        auto es_buf = embed_scales_obj.cast<py::array_t<float>>().request();
+
+        py::ssize_t h_dim = ew_buf.shape[1];
+        const int8_t* row = static_cast<const int8_t*>(ew_buf.ptr) + token_id * h_dim;
+        float scale = static_cast<const float*>(es_buf.ptr)[token_id];
+
+        auto out = py::array_t<float>(std::vector<py::ssize_t>{1, 1, h_dim});
+        float* out_ptr = static_cast<float*>(out.request().ptr);
+
+        #pragma omp simd
+        for (py::ssize_t i = 0; i < h_dim; ++i) {
+            out_ptr[i] = static_cast<float>(row[i]) * scale;
+        }
+        return out;
     }
 };
 
@@ -805,8 +1039,8 @@ PYBIND11_MODULE(tenzo_runtime, m) {
           py::arg("input"), py::arg("weight"), py::arg("bias") = py::none(), py::arg("quant_scheme") = "fp32", py::arg("scale") = 1.0f);
 
     py::class_<KVCache>(m, "KVCache")
-        .def(py::init<int, int, int, int>(),
-             py::arg("num_layers"), py::arg("num_heads"), py::arg("head_dim"), py::arg("max_seq_len") = 4096)
+        .def(py::init<int, int, int, int, int>(),
+             py::arg("num_layers"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"), py::arg("max_seq_len") = 4096)
         .def_readonly("max_seq_len", &KVCache::max_seq_len)
         .def("reset", &KVCache::reset)
         .def("get_seq_len", &KVCache::get_seq_len)
@@ -815,15 +1049,31 @@ PYBIND11_MODULE(tenzo_runtime, m) {
              py::arg("layer_idx"), py::arg("q"), py::arg("k"), py::arg("v"));
 
     py::class_<ExecutionContext>(m, "ExecutionContext")
-        .def(py::init<int, int, int, int, int, const std::string&>(),
-             py::arg("hidden_size"), py::arg("num_heads"), py::arg("head_dim"),
+        .def(py::init<int, int, int, int, int, int, const std::string&>(),
+             py::arg("hidden_size"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"),
              py::arg("num_layers"), py::arg("max_seq_len") = 4096, py::arg("quant_scheme") = "classic_tl1")
         .def_readonly("max_seq_len", &ExecutionContext::max_seq_len)
         .def("reset", &ExecutionContext::reset)
         .def("get_seq_len", &ExecutionContext::get_seq_len)
-        .def("set_layer_weights", &ExecutionContext::set_layer_weights,
-             py::arg("layer_idx"), py::arg("q_w"), py::arg("k_w"), py::arg("v_w"), py::arg("out_w"), py::arg("scale") = 1.0f)
+        .def("set_final_norm", &ExecutionContext::set_final_norm, py::arg("w"))
+        .def("set_layer_full", &ExecutionContext::set_layer_full,
+             py::arg("layer_idx"),
+             py::arg("q_w"), py::arg("q_scale"),
+             py::arg("k_w"), py::arg("k_scale"),
+             py::arg("v_w"), py::arg("v_scale"),
+             py::arg("out_w"), py::arg("out_scale"),
+             py::arg("gate_w"), py::arg("gate_scale"),
+             py::arg("up_w"), py::arg("up_scale"),
+             py::arg("down_w"), py::arg("down_scale"),
+             py::arg("in_norm_w") = py::none(),
+             py::arg("attn_sub_norm_w") = py::none(),
+             py::arg("post_norm_w") = py::none(),
+             py::arg("ffn_sub_norm_w") = py::none())
         .def("forward_layer", &ExecutionContext::forward_layer, py::arg("layer_idx"), py::arg("x"))
-        .def("forward_step", &ExecutionContext::forward_step, py::arg("x"));
+        .def("forward_step", &ExecutionContext::forward_step, py::arg("x"))
+        .def("compute_logits", &ExecutionContext::compute_logits,
+             py::arg("x"), py::arg("embed_weights"), py::arg("embed_scales") = py::none())
+        .def("embedding_lookup", &ExecutionContext::embedding_lookup,
+             py::arg("token_id"), py::arg("embed_weights"), py::arg("embed_scales") = py::none());
 }
 
