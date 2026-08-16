@@ -1,10 +1,21 @@
-import torch
-import torch.nn.functional as F
+import numpy as np
+import sys
+import os
+
+# Add the build directory to sys.path so we can import the pybind11 module
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "cmake-build-debug"))
+
+try:
+    import tenzo_runtime
+    HAS_TENZO = True
+except ImportError:
+    print("⚠️  Warning: tenzo_runtime module not found. Did you run `make build-local`?")
+    HAS_TENZO = False
 
 class KVCacheManager:
-    def __init__(self, max_batch, max_seq, num_heads, head_dim, dtype=torch.float16):
-        self.cache_k = torch.zeros((max_batch, num_heads, max_seq, head_dim), dtype=dtype)
-        self.cache_v = torch.zeros((max_batch, num_heads, max_seq, head_dim), dtype=dtype)
+    def __init__(self, max_batch, max_seq, num_heads, head_dim, dtype=np.float32):
+        self.cache_k = np.zeros((max_batch, num_heads, max_seq, head_dim), dtype=dtype)
+        self.cache_v = np.zeros((max_batch, num_heads, max_seq, head_dim), dtype=dtype)
         self.current_seq_len = 0
 
     def update(self, new_k, new_v):
@@ -20,48 +31,69 @@ class KVCacheManager:
 def dispatch_linear(x, weight, bias=None, quant_scheme="fp32"):
     """
     Universal dispatch for Linear operations.
-    If a scheme lacks a C++ MLIR kernel, fallback to PyTorch simulation.
+    If a scheme lacks a C++ MLIR kernel, fallback to numpy simulation.
     """
     if quant_scheme == "fp32" or quant_scheme == "fp16":
-        return F.linear(x, weight, bias)
+        res = np.dot(x, weight.T)
+        if bias is not None:
+            res += bias
+        return res
     elif quant_scheme == "classic_tl1" or quant_scheme == "classic_tl2":
-        print(f"[Tenzo C++ Call] Executing native {quant_scheme} BitLinear kernel")
-        # Placeholder for pybind11 call to Tenzo C++ ExecutionContext
-        # e.g., return tenzo_runtime.bitlinear_tl1(x, weight)
-        return F.linear(x, weight, bias) # Fallback simulation
+        if HAS_TENZO:
+            print(f"[Tenzo C++ Call] Executing native {quant_scheme} BitLinear kernel")
+            # Call the C++ extension
+            res_np = tenzo_runtime.dispatch_linear_cxx(x, weight)
+            if bias is not None:
+                res_np += bias
+            return res_np
+        else:
+            print(f"[Numpy Fallback] Simulating {quant_scheme} BitLinear kernel (tenzo_runtime missing)")
+            res = np.dot(x, weight.T)
+            if bias is not None:
+                res += bias
+            return res
     elif quant_scheme == "int4":
-        print("[PyTorch Fallback] Simulating INT4 Linear")
-        # INT4 simulation
-        return F.linear(x, weight, bias)
+        print("[Numpy Fallback] Simulating INT4 Linear")
+        res = np.dot(x, weight.T)
+        if bias is not None:
+            res += bias
+        return res
     else:
         raise ValueError(f"Unknown quant_scheme: {quant_scheme}")
 
 def generate_token(input_ids, kv_cache, config):
     print("--- Decoding Step ---")
-    x = torch.randn(1, 1, config["hidden_size"]) # Mock embedding
+    x = np.random.randn(1, 1, config["hidden_size"]).astype(np.float32)
     
     # Q, K, V Projections
-    q = dispatch_linear(x, torch.randn(config["hidden_size"], config["hidden_size"]), quant_scheme=config["q_scheme"])
-    k = dispatch_linear(x, torch.randn(config["hidden_size"], config["hidden_size"]), quant_scheme=config["q_scheme"])
-    v = dispatch_linear(x, torch.randn(config["hidden_size"], config["hidden_size"]), quant_scheme=config["q_scheme"])
+    q_w = np.random.randn(config["hidden_size"], config["hidden_size"]).astype(np.float32)
+    k_w = np.random.randn(config["hidden_size"], config["hidden_size"]).astype(np.float32)
+    v_w = np.random.randn(config["hidden_size"], config["hidden_size"]).astype(np.float32)
+    
+    q = dispatch_linear(x, q_w, quant_scheme=config["q_scheme"])
+    k = dispatch_linear(x, k_w, quant_scheme=config["q_scheme"])
+    v = dispatch_linear(x, v_w, quant_scheme=config["q_scheme"])
     
     # Reshape for Attention
-    q = q.view(1, 1, config["num_heads"], config["head_dim"]).transpose(1, 2)
-    k = k.view(1, 1, config["num_heads"], config["head_dim"]).transpose(1, 2)
-    v = v.view(1, 1, config["num_heads"], config["head_dim"]).transpose(1, 2)
+    q = q.reshape(1, 1, config["num_heads"], config["head_dim"]).transpose(0, 2, 1, 3)
+    k = k.reshape(1, 1, config["num_heads"], config["head_dim"]).transpose(0, 2, 1, 3)
+    v = v.reshape(1, 1, config["num_heads"], config["head_dim"]).transpose(0, 2, 1, 3)
     
     # Update KV Cache
     past_k, past_v = kv_cache.update(k, v)
     
     # Attention
-    attn_weights = torch.matmul(q, past_k.transpose(-2, -1)) / (config["head_dim"] ** 0.5)
-    attn_weights = F.softmax(attn_weights, dim=-1)
-    attn_output = torch.matmul(attn_weights, past_v)
+    attn_weights = np.matmul(q, past_k.transpose(0, 1, 3, 2)) / (config["head_dim"] ** 0.5)
+    # Simple softmax
+    attn_weights = np.exp(attn_weights - np.max(attn_weights, axis=-1, keepdims=True))
+    attn_weights = attn_weights / np.sum(attn_weights, axis=-1, keepdims=True)
     
-    attn_output = attn_output.transpose(1, 2).contiguous().view(1, 1, config["hidden_size"])
+    attn_output = np.matmul(attn_weights, past_v)
+    attn_output = attn_output.transpose(0, 2, 1, 3).reshape(1, 1, config["hidden_size"])
     
     # Output Projection
-    output = dispatch_linear(attn_output, torch.randn(config["hidden_size"], config["hidden_size"]), quant_scheme=config["q_scheme"])
+    out_w = np.random.randn(config["hidden_size"], config["hidden_size"]).astype(np.float32)
+    output = dispatch_linear(attn_output, out_w, quant_scheme=config["q_scheme"])
     
     return output
 
@@ -76,15 +108,16 @@ if __name__ == "__main__":
     
     kv_cache = KVCacheManager(max_batch=1, max_seq=1024, num_heads=config["num_heads"], head_dim=config["head_dim"])
     
-    input_ids = torch.tensor([[1, 2, 3]])
+    input_ids = np.array([[1, 2, 3]])
     
     # Prefill mock
     print("--- Prefill Step ---")
     kv_cache.update(
-        torch.randn(1, config["num_heads"], 3, config["head_dim"]),
-        torch.randn(1, config["num_heads"], 3, config["head_dim"])
+        np.random.randn(1, config["num_heads"], 3, config["head_dim"]).astype(np.float32),
+        np.random.randn(1, config["num_heads"], 3, config["head_dim"]).astype(np.float32)
     )
     
     # Decode 3 tokens
     for _ in range(3):
         generate_token(None, kv_cache, config)
+

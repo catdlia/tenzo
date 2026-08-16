@@ -18,7 +18,7 @@ build:
 # Локальний бекап (на випадок відсутності інтернету)
 build-local:
 	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo_runtime
 
 # ==========================================
 # 🧪 TESTING & RUNNING (via Docker)

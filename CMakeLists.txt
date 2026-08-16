@@ -45,8 +45,8 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 
-include_directories(${LLVM_INCLUDE_DIRS})
-include_directories(${MLIR_INCLUDE_DIRS})
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -156,7 +156,6 @@ add_executable(tenzo-cli
 )
 
 add_dependencies(tenzo-cli TenzoOpsIncGen)
-
 target_link_libraries(tenzo-cli PRIVATE
         # --- MLIR Ліби ---
         MLIRIR
@@ -362,3 +361,25 @@ if(USE_MLIR_KERNEL)
     endif()
 endif()
 
+# ============================================================
+# 🐍 Python Bridge (pybind11)
+# ============================================================
+
+include(FetchContent)
+FetchContent_Declare(
+  pybind11
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG        v2.11.1
+)
+FetchContent_MakeAvailable(pybind11)
+
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
+
+pybind11_add_module(tenzo_runtime src/bindings/PybindModule.cpp)
+
+# Clear global include directories (LLVM/MLIR) for this target to avoid GCC vs LLVM cxxabi.h conflicts
+set_target_properties(tenzo_runtime PROPERTIES INCLUDE_DIRECTORIES "")
+
+target_link_libraries(tenzo_runtime PRIVATE
+    # Eventually link tenzo core libraries here
+)
