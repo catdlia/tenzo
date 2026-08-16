@@ -20,6 +20,15 @@ namespace py = pybind11;
 
 namespace {
 
+// Aligned 256-bit SIMD integer vector wrapper to prevent compiler attribute warnings in std::vector
+struct alignas(32) Vec256i {
+    __m256i v;
+    Vec256i() : v(_mm256_setzero_si256()) {}
+    Vec256i(__m256i val) : v(val) {}
+    operator __m256i() const { return v; }
+    Vec256i& operator=(__m256i val) { v = val; return *this; }
+};
+
 constexpr int MR = 6;
 constexpr int NR = 16;
 
@@ -291,9 +300,9 @@ void bitlinear_tl1_avx2_single(
     const int64_t K_half = K / 2;
     const int64_t n_blocks = N / 64;
 
-    std::vector<__m256i> lut_vecs(K_half);
-    float inv_scale_act = build_lut(act, K, lut_vecs.data());
-    compute_from_lut(lut_vecs.data(), packed_w, n_blocks, K_half, out, inv_scale_act * weight_scale);
+    std::vector<Vec256i> lut_vecs(K_half);
+    float inv_scale_act = build_lut(act, K, reinterpret_cast<__m256i*>(lut_vecs.data()));
+    compute_from_lut(reinterpret_cast<const __m256i*>(lut_vecs.data()), packed_w, n_blocks, K_half, out, inv_scale_act * weight_scale);
 }
 
 } // namespace
@@ -885,7 +894,10 @@ public:
     std::vector<float> buf_act;
     std::vector<float> buf_ffn_norm;
     std::vector<float> buf_down;
-    std::vector<__m256i> lut_buf;
+    std::vector<Vec256i> lut_buf;
+
+    __m256i* lut_ptr() { return reinterpret_cast<__m256i*>(lut_buf.data()); }
+    const __m256i* lut_ptr() const { return reinterpret_cast<const __m256i*>(lut_buf.data()); }
 
     ExecutionContext(
         int hidden_size,
@@ -1082,6 +1094,19 @@ public:
         }
     }
 
+    /**
+     * @brief Executes a full transformer layer with zero heap allocations and fused OpenMP loops.
+     * 
+     * Architecture breakdown:
+     * 1. In-place Pre-RMSNorm on buf_x -> buf_norm_x.
+     * 2. Build 256-bit SIMD LUT ONCE for norm_x and reuse across Q, K, V projections.
+     * 3. Fused Q, K, V OpenMP loop: Merges 40 Q blocks + 10 K blocks + 10 V blocks into a single 60-block
+     *    parallel dispatch to minimize OpenMP fork/join barrier overhead.
+     * 4. Zero-copy SDPA with in-place AVX2 RoPE and in-register quantized INT8 KV-cache accumulation.
+     * 5. Out-projection via BitLinear SIMD micro-kernel.
+     * 6. Fused MLP Gate+Up OpenMP loop: Merges 108 Gate blocks + 108 Up blocks into a single 216-block parallel dispatch.
+     * 7. In-place Gated ReLU squared activation (relu(gate)^2 * up) and Down projection with residual addition.
+     */
     void forward_layer_raw(int layer_idx) {
         const auto& lw = layers[layer_idx];
 
@@ -1089,7 +1114,7 @@ public:
         rms_norm_raw(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), hidden_size);
 
         // 2. Build LUT for norm_x ONCE (reused across Q, K, V)
-        float inv_scale_act = build_lut(buf_norm_x.data(), hidden_size, lut_buf.data());
+        float inv_scale_act = build_lut(buf_norm_x.data(), hidden_size, lut_ptr());
 
         // 3. FUSED Q, K, V in ONE parallel loop (60 blocks total)
         int q_blocks = q_dim / 64;   // 40
@@ -1106,15 +1131,15 @@ public:
         for (int b = 0; b < total_qkv; ++b) {
             if (b < q_blocks) {
                 const int8_t* bw = lw.q_w_ptr + b * k_half * 32;
-                compute_single_block(lut_buf.data(), bw, k_half, buf_q.data() + b * 64, s_q, mask_low);
+                compute_single_block(lut_ptr(), bw, k_half, buf_q.data() + b * 64, s_q, mask_low);
             } else if (b < q_blocks + kv_blocks) {
                 int kb = b - q_blocks;
                 const int8_t* bw = lw.k_w_ptr + kb * k_half * 32;
-                compute_single_block(lut_buf.data(), bw, k_half, buf_k.data() + kb * 64, s_k, mask_low);
+                compute_single_block(lut_ptr(), bw, k_half, buf_k.data() + kb * 64, s_k, mask_low);
             } else {
                 int vb = b - (q_blocks + kv_blocks);
                 const int8_t* bw = lw.v_w_ptr + vb * k_half * 32;
-                compute_single_block(lut_buf.data(), bw, k_half, buf_v.data() + vb * 64, s_v, mask_low);
+                compute_single_block(lut_ptr(), bw, k_half, buf_v.data() + vb * 64, s_v, mask_low);
             }
         }
 
@@ -1125,8 +1150,8 @@ public:
         rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), hidden_size);
 
         // 6. Out Projection
-        float inv_s_out = build_lut(buf_attn_sub.data(), hidden_size, lut_buf.data());
-        compute_from_lut(lut_buf.data(), lw.out_w_ptr, hidden_size / 64, k_half, buf_out.data(), inv_s_out * lw.out_scale);
+        float inv_s_out = build_lut(buf_attn_sub.data(), hidden_size, lut_ptr());
+        compute_from_lut(lut_ptr(), lw.out_w_ptr, hidden_size / 64, k_half, buf_out.data(), inv_s_out * lw.out_scale);
 
         // 7. Residual 1
         #pragma omp simd
@@ -1138,7 +1163,7 @@ public:
         if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
             rms_norm_raw(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), hidden_size);
 
-            float inv_s_mlp = build_lut(buf_post_norm.data(), hidden_size, lut_buf.data());
+            float inv_s_mlp = build_lut(buf_post_norm.data(), hidden_size, lut_ptr());
             int cur_ffn_dim = ffn_dim;
             int ffn_blocks = cur_ffn_dim / 64; // 108
             int total_mlp = 2 * ffn_blocks;    // 216
@@ -1150,11 +1175,11 @@ public:
             for (int b = 0; b < total_mlp; ++b) {
                 if (b < ffn_blocks) {
                     const int8_t* bw = lw.gate_w_ptr + b * k_half * 32;
-                    compute_single_block(lut_buf.data(), bw, k_half, buf_gate.data() + b * 64, s_gate, mask_low);
+                    compute_single_block(lut_ptr(), bw, k_half, buf_gate.data() + b * 64, s_gate, mask_low);
                 } else {
                     int ub = b - ffn_blocks;
                     const int8_t* bw = lw.up_w_ptr + ub * k_half * 32;
-                    compute_single_block(lut_buf.data(), bw, k_half, buf_up.data() + ub * 64, s_up, mask_low);
+                    compute_single_block(lut_ptr(), bw, k_half, buf_up.data() + ub * 64, s_up, mask_low);
                 }
             }
 
@@ -1166,8 +1191,8 @@ public:
 
             rms_norm_raw(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), cur_ffn_dim);
 
-            float inv_s_down = build_lut(buf_ffn_norm.data(), cur_ffn_dim, lut_buf.data());
-            compute_from_lut(lut_buf.data(), lw.down_w_ptr, hidden_size / 64, cur_ffn_dim / 2, buf_down.data(), inv_s_down * lw.down_scale);
+            float inv_s_down = build_lut(buf_ffn_norm.data(), cur_ffn_dim, lut_ptr());
+            compute_from_lut(lut_ptr(), lw.down_w_ptr, hidden_size / 64, cur_ffn_dim / 2, buf_down.data(), inv_s_down * lw.down_scale);
 
             #pragma omp simd
             for (int i = 0; i < hidden_size; ++i) {
@@ -1350,12 +1375,12 @@ public:
 
         // Pre-expand x into 16-bit SIMD registers ONCE (cuts inner loop ops by 2x)
         py::ssize_t num_vecs = h_dim / 16;
-        std::vector<__m256i> x_expanded(num_vecs);
+        std::vector<Vec256i> x_expanded(num_vecs);
         for (py::ssize_t j = 0; j < num_vecs; ++j) {
             __m128i a = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x_i8.data() + j * 16));
             x_expanded[j] = _mm256_cvtepi8_epi16(a);
         }
-        const __m256i* x_exp_ptr = x_expanded.data();
+        const __m256i* x_exp_ptr = reinterpret_cast<const __m256i*>(x_expanded.data());
 
         // 2. Pure Integer AVX2 Dot-Products across vocab
         #pragma omp parallel for schedule(dynamic, 1024)
@@ -1617,12 +1642,12 @@ public:
             }
 
             int num_vecs = hidden_size / 16;
-            std::vector<__m256i> x_expanded(num_vecs);
+            std::vector<Vec256i> x_expanded(num_vecs);
             for (int j = 0; j < num_vecs; ++j) {
                 __m128i a = _mm_loadu_si128(reinterpret_cast<const __m128i*>(x_i8.data() + j * 16));
                 x_expanded[j] = _mm256_cvtepi8_epi16(a);
             }
-            const __m256i* x_exp_ptr = x_expanded.data();
+            const __m256i* x_exp_ptr = reinterpret_cast<const __m256i*>(x_expanded.data());
 
             #pragma omp parallel for schedule(dynamic, 1024)
             for (int v = 0; v < vocab_size; ++v) {

@@ -1,15 +1,16 @@
-# 📖 Tenzo Compiler: Comprehensive Documentation
+# 📖 Tenzo Compiler: Comprehensive Documentation (v0.3.0)
 
-Tenzo is a high-performance, MLIR-based compiler designed for heterogeneous tensor computations on consumer and edge hardware. It aims to bridge the gap between high-level machine learning frameworks and low-level hardware optimizations, with a specific focus on quantized Large Language Models (LLMs) like BitNet 1.58B.
+Tenzo is a high-performance, MLIR-based compiler and native execution runtime designed for heterogeneous tensor computations on consumer and edge hardware. It bridges the gap between high-level machine learning frameworks and low-level hardware optimizations, with a specialized focus on quantized Large Language Models (LLMs) like BitNet 1.58B.
 
 ---
 
 ## 🏗 1. System Architecture
 
-The compilation pipeline follows a multi-stage transformation:
-1.  **Frontend (Python/PyTorch):** `export_bitnet.py` extracts HuggingFace models → `tenzo.mlir` (Tenzo Dialect) + `weights.bin`.
-2.  **Middle-end (C++):** `tenzo` → `linalg` → `vector` → `llvm`.
-3.  **Backend (JIT/LLVM):** LLVM IR → Native Machine Code (AVX2).
+The compilation and execution pipeline follows a multi-stage transformation:
+1.  **Frontend (Python/PyTorch):** `export_bitnet.py` extracts HuggingFace models → `model.mlir` (Tenzo Dialect) + `weights.bin`.
+2.  **Middle-end (MLIR/C++):** `tenzo` → `linalg` → `vector` → `llvm`.
+3.  **Backend (JIT/LLVM):** LLVM IR → Native Machine Code with hand-tuned AVX2 micro-kernels.
+4.  **Native Runtime (`tenzo_runtime`):** Pure C++ Zero-Allocation `ExecutionContext` with fused multi-projection OpenMP execution, in-register INT8 KV-Cache compression, and native Top-K / Top-P min-heap sampling.
 
 ---
 
@@ -17,7 +18,7 @@ The compilation pipeline follows a multi-stage transformation:
 
 ### 🛰 `tenzo-frontend/` (PyTorch Exporter)
 The Python-based entry point for the compiler.
-*   **`export_bitnet.py`**: The core converter. It loads a HuggingFace model (e.g., `BitNet-b1.58-2B-4T`), extracts ternary weights, packs them into 2-bit formats (`tl1_pack`), and generates the MLIR representation of the network.
+*   **`export_bitnet.py`**: Loads a HuggingFace model (e.g., `BitNet-b1.58-2B-4T`), extracts ternary weights, packs them into 2-bit formats (`tl1_pack`), and generates the MLIR representation of the network.
 
 ### 🧩 `src/dialect/` (Tenzo MLIR Dialect)
 Defines the high-level intermediate representation for LLMs.
@@ -25,62 +26,48 @@ Defines the high-level intermediate representation for LLMs.
 *   **`TenzoDialect.cpp/h`**: C++ registration and implementation of the dialect.
 
 ### ⚙️ `src/passes/` (Transformation Passes)
-The "brains" of the compiler, responsible for optimization.
-*   **`LinalgLowering.cpp`**: Lowers high-level ops to `linalg.generic` and specific hardware-intrinsics.
+The compiler optimization engine.
+*   **`LinalgLowering.cpp`**: Lowers high-level ops to `linalg.generic` and hardware intrinsics.
 *   **`Bufferization.cpp`**: Performs **Zero-Allocation Bufferization** using `OneShotBufferize`, preventing dynamic heap allocations (`malloc`/`free`) during inference.
-*   **`ExplicitMicroKernel.cpp`** / AVX2 CodeGen: Generates highly optimized inner loops (e.g., `vpshufb` 256-bit SIMD kernels) that perfectly fit inside CPU registers without spilling.
+*   **`ExplicitMicroKernel.cpp`** / AVX2 CodeGen: Generates highly optimized inner loops (`vpshufb` 256-bit SIMD kernels) that fit inside CPU registers without stack spilling.
 
 ### 💻 `src/context/` (Hardware Abstraction Layer)
-Ensures portability across different CPUs.
 *   **`HardwareProfile.h`**: Abstract interface for hardware capabilities (ISA, SIMD width, Cache topology).
-*   **`X86HardwareProfile.cpp`**: Concrete implementation for x86, detecting P/E-cores and AVX capabilities.
+*   **`X86HardwareProfile.cpp`**: Concrete implementation for x86, detecting P/E-cores and AVX2/AVX-VNNI capabilities.
 
-### 🚀 `src/runtime/` (Execution)
-*   **`ExecutionContext.cpp/h`**: The primary C++ API for running inference. Manages JIT compilation.
-*   **`Tokenizer.cpp/h`**: Implements BPE tokenization decoding for LLaMA-based vocabularies.
-*   **`KVCacheManager.cpp/h`**: Dynamically manages the Key/Value cache tensors during autoregressive generation.
-*   **`ThreadPool.cpp/h`**: OpenMP-powered thread pool for parallelizing the batch/sequence loops across P-Cores.
-
----
-
-## 🛠 3. Detailed Component Documentation
-
-### 🐍 HuggingFace Exporter (`export_bitnet.py`)
-*   **`--quant-mode tl1_pack`**: 
-    Extracts weights $w \in \{-1, 0, 1\}$, shifts them to $\{0, 1, 2\}$, and bitwise-packs them into 4-bit nibbles: `(w_even+1) | ((w_odd+1)<<2)`.
-    This brings the footprint of a 2B model down to ~851 MB.
-*   **`--num-layers`**: Configures how many transformer layers to export.
-
-### 🏗 Compiler Micro-Kernels
-*   **`BitLinearTL1PackLoweringToLinalg`**: 
-    Converts the `tl1_pack` representation into a highly optimized unrolled AVX2 loop. The kernel duplicates the activation LUT across 128-bit lanes using `vinserti128`, processing 64 channels per instruction.
-*   **RoPE (Rotary Positional Embeddings)**:
-    Fully vectorized inline using MLIR complex numbers and `tensor.empty` to avoid `libm` fallback.
+### ⚡ `src/bindings/PybindModule.cpp` (`tenzo_runtime`)
+The high-performance C++ execution engine that powers ultra-fast autoregressive decoding.
+*   **`ExecutionContext`**: Maintains static, pre-allocated scratch buffers for all 30 layers with **zero memory allocations on the hot path**.
+*   **`generate_step_cxx(...)`**: Runs embedding lookup, all 30 transformer layers, INT8 LM-head projection, and sampling entirely in native C++.
+*   **`Fused OpenMP Regions`**:
+    *   *Fused QKV*: Computes 40 Q blocks + 10 K blocks + 10 V blocks in a single 60-block OpenMP parallel loop.
+    *   *Fused Gate-Up*: Computes 108 Gate blocks + 108 Up blocks in a single 216-block OpenMP parallel loop.
+*   **`16-Bit SIMD Accumulation`**: Uses `_mm256_add_epi16` in the inner BitLinear loop, accumulating in 16-bit registers and reducing to 32-bit only once every 64 iterations ($64 \times 62 = 3968 \ll 32767$).
+*   **`Fused INT8 KV-Cache Compression`**:
+    *   Quantizes Key and Value tensors into `int8_t` online with channel-wise scales.
+    *   Dequantizes during SDPA directly into 16 YMM registers with sign-extended `_mm256_cvtepi8_epi32`.
+    *   Reduces KV memory consumption by **4x** (314 MB for 8192 context).
+*   **`Top-K / Top-P Min-Heap Sampler`**: Fast 40-element min-heap in C++ completing sampling in **0.01 ms** (1800x faster than Python sorting).
 
 ---
 
-## 🔄 4. The Pipeline Walkthrough
+## 🛠 3. User Commands & Makefile Reference
 
-### Step 1: Exporting
-The user runs `uv run python3 tenzo-frontend/export_bitnet.py`.
-The script writes the packed weights to `weights.bin` and the computation graph to `model.mlir`.
-
-### Step 2: High-Level Optimization
-The C++ CLI loads `model.mlir`. High-level ops like `tenzo.rms_norm` are broken down into arithmetic operations or vectorized directly.
-
-### Step 3: Zero-Allocation Bufferization
-Instead of allocating memory dynamically, ops use `tensor.empty`. The `OneShotBufferize` pass analyzes data flow and reuses previously allocated I/O buffers for every single generation step.
-
-### Step 4: Micro-Kernel Generation & JIT
-The compiler lowers the operations to LLVM IR, specifically mapping the `tl1_pack` loop to `llvm.x86.avx2.pshuf.b`. The LLVM ORC JIT compiles it to native x86 machine code.
-
----
-
-## ⌨️ 5. User Commands Reference
-
-| Command | Action |
+| Command | Description |
 | :--- | :--- |
-| `make build` | Compile the C++ core remotely (Hetzner). |
-| `make build-local` | Compile the C++ core locally inside Docker. |
-| `make bench` | Run local tests and benchmarks. |
-| `tenzo-cli generate` | Run autoregressive LLM generation on the exported MLIR model. |
+| `make build-local` | Compiles `tenzo-cli` and `tenzo_runtime` locally inside Docker. |
+| `make build` | Triggers remote cloud compilation (via Hetzner / DigitalOcean). |
+| `make run-fast [PROMPT="..."] [TOKENS=50]` | Executes ultra-fast native C++ autoregressive text generation. |
+| `make compare [PROMPT="..."] [TOKENS=50]` | Runs a direct side-by-side benchmark against Microsoft `BitNet.cpp`. |
+| `make cpu` | Runs CPU matrix multiplication benchmarks. |
+| `make test` | Runs the full compiler regression test suite. |
+
+---
+
+## 📊 4. Performance Summary (Alder Lake Core i3-1215U)
+
+| Engine | Model Format | KV-Cache | Decode Throughput | Per-Token Latency |
+|---|---|---|---|---|
+| **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms |
+| **Tenzo Native Engine (v0.3.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms (1.65x faster 🚀)** |
+

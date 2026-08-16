@@ -179,16 +179,18 @@ watch:
 
 # Help
 help:
-	@echo "╔════════════════════════════════════════════════════╗"
-	@echo "║          Tenzo Compiler Build System               ║"
-	@echo "╠════════════════════════════════════════════════════╣"
-	@echo "║  make build       - Віддалена збірка (Hetzner)║"
-	@echo "║  make build-local - Локальна збірка (в Docker)     ║"
-	@echo "║  make test        - Run all tests                  ║"
-	@echo "║  make cpu         - Run CPU MatMul benchmark       ║"
-	@echo "║  make large       - Run large matrix (768x768)     ║"
-	@echo "║  make gpu         - Run GPU pipeline test          ║"
-	@echo "╚════════════════════════════════════════════════════╝"
+	@echo "╔════════════════════════════════════════════════════════════════════════╗"
+	@echo "║                   Tenzo Compiler Build System (v0.3.0)                 ║"
+	@echo "╠════════════════════════════════════════════════════════════════════════╣"
+	@echo "║  make build-local - Compile compiler & runtime locally inside Docker   ║"
+	@echo "║  make build       - Compile remotely via cloud server                  ║"
+	@echo "║  make run-fast    - Run ultra-fast native C++ 1.58-bit BitNet LLM gen  ║"
+	@echo "║  make compare     - Run side-by-side benchmark vs Microsoft BitNet.cpp ║"
+	@echo "║  make test        - Run all compiler unit & regression tests           ║"
+	@echo "║  make cpu         - Run CPU MatMul benchmark                           ║"
+	@echo "║  make large       - Run large matrix (768x768) benchmark               ║"
+	@echo "║  make gpu         - Run GPU pipeline test                              ║"
+	@echo "╚════════════════════════════════════════════════════════════════════════╝"
 
 stop-cloud:
 	hcloud server delete tenzo-build-node

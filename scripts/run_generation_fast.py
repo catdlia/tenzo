@@ -205,48 +205,12 @@ def parse_mlir_and_load_weights(mlir_path, weights_path, max_seq_len=8192, kv_mo
     return ctx, embed_weights, embed_scales
 
 
-def sample_token(logits, past_tokens, temperature=0.7, top_p=0.9, top_k=40, repetition_penalty=1.15):
-    logits = logits.copy()
-    
-    # Repetition penalty
-    if repetition_penalty != 1.0 and len(past_tokens) > 0:
-        for t in set(past_tokens):
-            if logits[t] > 0:
-                logits[t] /= repetition_penalty
-            else:
-                logits[t] *= repetition_penalty
-
-    if temperature <= 0.0:
-        return int(np.argmax(logits))
-
-    # Top-K
-    if top_k > 0 and top_k < len(logits):
-        top_k_indices = np.argpartition(logits, -top_k)[-top_k:]
-        min_top_k = np.min(logits[top_k_indices])
-        logits[logits < min_top_k] = -1e9
-
-    # Temperature scaling
-    logits = logits / temperature
-    logits = logits - np.max(logits)
-    probs = np.exp(logits)
-    probs = probs / np.sum(probs)
-
-    # Top-P
-    if top_p > 0.0 and top_p < 1.0:
-        sorted_indices = np.argsort(probs)[::-1]
-        sorted_probs = probs[sorted_indices]
-        cumulative_probs = np.cumsum(sorted_probs)
-        cutoff_index = np.searchsorted(cumulative_probs, top_p)
-        sorted_probs[cutoff_index + 1:] = 0.0
-        probs_sum = np.sum(sorted_probs)
-        if probs_sum > 0:
-            sorted_probs /= probs_sum
-        return int(np.random.choice(sorted_indices, p=sorted_probs))
-
-    return int(np.random.choice(len(probs), p=probs))
-
-
 def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_mode="int8_fused", lm_quant="int8"):
+    """
+    Executes high-performance autoregressive generation using the Tenzo Native AVX2 Engine.
+    All transformer layers, KV-cache operations, quantized LM-head GEMVs, and Top-K/Top-P min-heap
+    sampling execute directly inside C++ with zero intermediate heap allocations.
+    """
     model_dir = os.path.join(PROJECT_ROOT, "tenzo-frontend", "export_output")
     mlir_path = os.path.join(model_dir, "model.mlir")
     weights_path = os.path.join(model_dir, "weights.bin")
