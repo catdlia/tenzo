@@ -21,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     libomp-dev \
     python3 \
     python3-pip \
+    python3-numpy \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Встановлюємо LLVM/MLIR 21
