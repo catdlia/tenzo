@@ -86,6 +86,11 @@ generate:
 run-fast:
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "pip3 install numpy --break-system-packages -q && python3 /app/scripts/run_generation_fast.py -p \"$(if $(PROMPT),$(PROMPT),Explain the importance of compilers in computer science)\" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7)"
 
+# Run side-by-side comparison: Microsoft BitNet.cpp vs Tenzo Native Engine
+# Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7]
+compare:
+	python3 /home/illia/CLionProjects/untitled/scripts/compare_bitnet_tenzo.py -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7)
+
 # Run all benchmarks
 bench: build
 	@echo "📊 Running all benchmarks..."
