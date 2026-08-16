@@ -483,6 +483,7 @@ public:
     // Cache buffers: [num_layers][num_heads * max_seq_len * head_dim]
     std::vector<std::vector<float>> k_cache;
     std::vector<std::vector<float>> v_cache;
+    std::vector<float> scores_buffer;
 
     KVCache(int num_layers, int num_heads, int head_dim, int max_seq_len = 2048)
         : num_layers(num_layers), num_heads(num_heads), head_dim(head_dim),
@@ -491,6 +492,7 @@ public:
         size_t layer_size = static_cast<size_t>(num_heads) * max_seq_len * head_dim;
         k_cache.resize(num_layers, std::vector<float>(layer_size, 0.0f));
         v_cache.resize(num_layers, std::vector<float>(layer_size, 0.0f));
+        scores_buffer.resize(static_cast<size_t>(num_heads) * max_seq_len, 0.0f);
     }
 
     void reset() {
@@ -505,7 +507,7 @@ public:
 
     void increment_seq_len(int n = 1) {
         current_seq_len += n;
-        if (current_seq_len > max_seq_len) {
+        if (current_seq_len >= max_seq_len) {
             throw std::runtime_error("KV-Cache overflow! Exceeded max_seq_len.");
         }
     }
@@ -558,6 +560,7 @@ public:
         // 2. Compute Scaled Dot-Product Attention for each head
         auto out_arr = py::array_t<float>({1, 1, hidden_size});
         float* out_ptr = static_cast<float*>(out_arr.request().ptr);
+        float* scores_base = scores_buffer.data();
 
         #pragma omp parallel for schedule(static)
         for (int h = 0; h < num_heads; ++h) {
@@ -565,8 +568,7 @@ public:
             const float* k_head_base = layer_k + h * max_seq_len * head_dim;
             const float* v_head_base = layer_v + h * max_seq_len * head_dim;
             float* out_head = out_ptr + h * head_dim;
-
-            std::vector<float> scores(seq_len);
+            float* scores = scores_base + h * max_seq_len;
             float max_score = -1e9f;
 
             // Score = (Q * K^T) * scale
@@ -716,6 +718,27 @@ public:
         layers[layer_idx].scale = scale;
     }
 
+    // Simple RMSNorm helper
+    py::array_t<float> rms_norm(py::array_t<float> x, float eps = 1e-5f) {
+        auto buf = x.request();
+        const float* src = static_cast<const float*>(buf.ptr);
+        auto out = py::array_t<float>({1, 1, hidden_size});
+        float* dst = static_cast<float*>(out.request().ptr);
+
+        float sum_sq = 0.0f;
+        #pragma omp simd reduction(+:sum_sq)
+        for (int i = 0; i < hidden_size; ++i) {
+            sum_sq += src[i] * src[i];
+        }
+        float inv_rms = 1.0f / std::sqrt((sum_sq / static_cast<float>(hidden_size)) + eps);
+
+        #pragma omp simd
+        for (int i = 0; i < hidden_size; ++i) {
+            dst[i] = src[i] * inv_rms;
+        }
+        return out;
+    }
+
     // Runs a full transformer layer in C++ without Python overhead
     py::array_t<float> forward_layer(int layer_idx, py::array_t<float> x) {
         if (layer_idx < 0 || layer_idx >= num_layers) {
@@ -723,18 +746,32 @@ public:
         }
         const auto& lw = layers[layer_idx];
 
-        // 1. Compute Q, K, V projections using native AVX2 SIMD
-        auto q = dispatch_linear_cxx(x, lw.q_w, std::nullopt, quant_scheme, lw.scale);
-        auto k = dispatch_linear_cxx(x, lw.k_w, std::nullopt, quant_scheme, lw.scale);
-        auto v = dispatch_linear_cxx(x, lw.v_w, std::nullopt, quant_scheme, lw.scale);
+        // 1. Pre-Layer RMSNorm
+        auto norm_x = rms_norm(x);
 
-        // 2. Fused Scaled Dot-Product Attention & KV Cache Update in C++
+        // 2. Compute Q, K, V projections using native AVX2 SIMD
+        auto q = dispatch_linear_cxx(norm_x, lw.q_w, std::nullopt, quant_scheme, lw.scale);
+        auto k = dispatch_linear_cxx(norm_x, lw.k_w, std::nullopt, quant_scheme, lw.scale);
+        auto v = dispatch_linear_cxx(norm_x, lw.v_w, std::nullopt, quant_scheme, lw.scale);
+
+        // 3. Fused Scaled Dot-Product Attention & KV Cache Update in C++
         auto attn_out = kv_cache.forward_attention(layer_idx, q, k, v);
 
-        // 3. Output Projection
+        // 4. Output Projection
         auto out = dispatch_linear_cxx(attn_out, lw.out_w, std::nullopt, quant_scheme, lw.scale);
 
-        return out;
+        // 5. Residual Connection (x + out)
+        auto res = py::array_t<float>({1, 1, hidden_size});
+        const float* x_ptr = static_cast<const float*>(x.request().ptr);
+        const float* out_ptr = static_cast<const float*>(out.request().ptr);
+        float* res_ptr = static_cast<float*>(res.request().ptr);
+
+        #pragma omp simd
+        for (int i = 0; i < hidden_size; ++i) {
+            res_ptr[i] = x_ptr[i] + out_ptr[i];
+        }
+
+        return res;
     }
 
     // Runs a full token generation step across all layers
@@ -743,6 +780,7 @@ public:
         for (int l = 0; l < num_layers; ++l) {
             cur_x = forward_layer(l, cur_x);
         }
+        kv_cache.increment_seq_len(1);
         return cur_x;
     }
 };
@@ -768,7 +806,8 @@ PYBIND11_MODULE(tenzo_runtime, m) {
 
     py::class_<KVCache>(m, "KVCache")
         .def(py::init<int, int, int, int>(),
-             py::arg("num_layers"), py::arg("num_heads"), py::arg("head_dim"), py::arg("max_seq_len") = 2048)
+             py::arg("num_layers"), py::arg("num_heads"), py::arg("head_dim"), py::arg("max_seq_len") = 4096)
+        .def_readonly("max_seq_len", &KVCache::max_seq_len)
         .def("reset", &KVCache::reset)
         .def("get_seq_len", &KVCache::get_seq_len)
         .def("increment_seq_len", &KVCache::increment_seq_len, py::arg("n") = 1)
@@ -778,7 +817,8 @@ PYBIND11_MODULE(tenzo_runtime, m) {
     py::class_<ExecutionContext>(m, "ExecutionContext")
         .def(py::init<int, int, int, int, int, const std::string&>(),
              py::arg("hidden_size"), py::arg("num_heads"), py::arg("head_dim"),
-             py::arg("num_layers"), py::arg("max_seq_len") = 2048, py::arg("quant_scheme") = "classic_tl1")
+             py::arg("num_layers"), py::arg("max_seq_len") = 4096, py::arg("quant_scheme") = "classic_tl1")
+        .def_readonly("max_seq_len", &ExecutionContext::max_seq_len)
         .def("reset", &ExecutionContext::reset)
         .def("get_seq_len", &ExecutionContext::get_seq_len)
         .def("set_layer_weights", &ExecutionContext::set_layer_weights,

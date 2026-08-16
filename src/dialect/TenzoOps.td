@@ -250,11 +250,11 @@ def EmbeddingOp : Tenzo_Op<"embedding", [Pure]> {
   let arguments = (ins
     AnyTensor:$indices,
     AnyTensor:$weight_q,
-    AnyTensor:$scales
+    Optional<AnyTensor>:$scales
   );
   let results = (outs AnyTensor:$result);
 
-  let assemblyFormat = "$indices `,` $weight_q `,` $scales attr-dict `:` functional-type(operands, results)";
+  let assemblyFormat = "$indices `,` $weight_q (`,` $scales^)? attr-dict `:` functional-type(operands, results)";
 }
 
 // --- ELUT BitLinear Operation (Microsoft TL1 lookup-table approach) ---
