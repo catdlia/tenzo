@@ -362,6 +362,76 @@ if(USE_MLIR_KERNEL)
 endif()
 
 # ============================================================
+# 📦 Tenzo C/C++ SDK Runtime Libraries (Phase E)
+# ============================================================
+
+# Static runtime library
+add_library(tenzo_runtime_static STATIC
+    src/runtime/TenzoEngine.cpp
+)
+target_include_directories(tenzo_runtime_static PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_compile_options(tenzo_runtime_static PRIVATE
+    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
+)
+target_link_libraries(tenzo_runtime_static PUBLIC
+    OpenMP::OpenMP_CXX
+    m
+)
+set_target_properties(tenzo_runtime_static PROPERTIES OUTPUT_NAME "tenzo_runtime")
+
+# Shared runtime library
+add_library(tenzo_runtime_shared SHARED
+    src/runtime/TenzoEngine.cpp
+)
+target_include_directories(tenzo_runtime_shared PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_compile_options(tenzo_runtime_shared PRIVATE
+    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp -DTENZO_BUILD_SHARED
+)
+target_link_libraries(tenzo_runtime_shared PUBLIC
+    OpenMP::OpenMP_CXX
+    m
+)
+set_target_properties(tenzo_runtime_shared PROPERTIES OUTPUT_NAME "tenzo_runtime")
+
+# Standalone C++ Inference Executable (Example)
+add_executable(tenzo_basic_inference
+    examples/basic_inference.cpp
+)
+target_include_directories(tenzo_basic_inference PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(tenzo_basic_inference PRIVATE
+    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
+)
+target_link_libraries(tenzo_basic_inference PRIVATE
+    tenzo_runtime_static
+    OpenMP::OpenMP_CXX
+    m
+)
+
+# Production Tenzo CLI Inference Tool
+add_executable(tenzo-inference
+    src/main_inference.cpp
+)
+target_include_directories(tenzo-inference PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(tenzo-inference PRIVATE
+    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
+)
+target_link_libraries(tenzo-inference PRIVATE
+    tenzo_runtime_static
+    OpenMP::OpenMP_CXX
+    m
+)
+
+# ============================================================
 # 🐍 Python Bridge (pybind11)
 # ============================================================
 
@@ -379,9 +449,14 @@ pybind11_add_module(tenzo_runtime src/bindings/PybindModule.cpp)
 
 # Clear global include directories (LLVM/MLIR) for this target to avoid GCC vs LLVM cxxabi.h conflicts
 set_target_properties(tenzo_runtime PROPERTIES INCLUDE_DIRECTORIES "")
+target_include_directories(tenzo_runtime PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 
 target_compile_options(tenzo_runtime PRIVATE -mavx2 -mavxvnni -mfma -O3 -fopenmp)
 
 target_link_libraries(tenzo_runtime PRIVATE
     OpenMP::OpenMP_CXX
 )
+

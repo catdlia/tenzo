@@ -15,10 +15,15 @@ build:
 	@echo "🚀 Запуск віддаленої компіляції через Hetzner..."
 	./remote_build.sh
 
-# Локальний бекап (на випадок відсутності інтернету)
+# Локальний білд компілятора та SDK
 build-local:
 	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo_runtime
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
+
+# Збірка лише автономного C/C++ SDK та прикладів (швидко)
+build-sdk:
+	@echo "📦 Збірка Tenzo C/C++ SDK та standalone runtime..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
 
 # ==========================================
 # 🧪 TESTING & RUNNING (via Docker)
@@ -81,13 +86,55 @@ gpu-bench: build
 generate:
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli generate -p "$(if $(PROMPT),$(PROMPT),Tenzo Edge AI)" -n $(if $(TOKENS),$(TOKENS),30) -t $(if $(TEMP),$(TEMP),0.7) -m tenzo-frontend/export_output
 
-# Run ultra-fast native AVX2 text generation
-# Usage: make run-fast PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|fp32]
+# Run ultra-fast native AVX2 text generation (Python wrapper)
+# Usage: make run-fast PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|tl1_fused|fp32]
 run-fast:
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "pip3 install numpy --break-system-packages -q && python3 /app/scripts/run_generation_fast.py -p \"$(if $(PROMPT),$(PROMPT),Explain the importance of compilers in computer science)\" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)"
 
+# Run standalone pure C++ inference (Zero Python dependency)
+# Usage: make run-cpp PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [KV_QUANT=int8_fused|tl1_fused|fp32]
+run-cpp:
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo_basic_inference -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) -m /app/tenzo-frontend/export_output --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
+
+# Run full-featured Tenzo CLI inference tool
+# Usage: make cli [PROMPT="..."] [TOKENS=128] [TEMP=0.7] [KV_QUANT=int8_fused|tl1_fused|fp32] [MODEL=...]
+cli:
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference $(if $(PROMPT),-p "$(PROMPT)") -n $(if $(TOKENS),$(TOKENS),128) -t $(if $(TEMP),$(TEMP),0.7) -m $(if $(MODEL),$(MODEL),/app/tenzo-frontend/export_output) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
+
+# Run interactive REPL multi-turn chat console (llama.cpp / Ollama style)
+# Usage: make chat [KV_QUANT=tl1_fused|int8_fused|fp32] [MODEL=...]
+chat:
+	python3 scripts/tenzo_cli.py chat $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+# List all local models and formats
+list:
+	python3 scripts/tenzo_cli.py list
+
+# Pull model from Hugging Face
+# Usage: make pull MODEL=microsoft/bitnet-b1.58-2B-4T [QUANT=i2_s]
+pull:
+	python3 scripts/tenzo_cli.py pull $(MODEL) $(if $(QUANT),--quant $(QUANT))
+
+# Run industry-standard LLM benchmark suite (Long generation, NIAH, PPL, Throughput)
+# Usage: make bench-suite [BENCH=all|long|niah|ppl|throughput] [MODEL=...] [KV_QUANT=tl1_fused]
+bench-suite:
+	python3 scripts/benchmark_suite.py $(if $(MODEL),--model $(MODEL)) $(if $(BENCH),--bench $(BENCH)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+bench-long:
+	python3 scripts/benchmark_suite.py --bench long $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+bench-niah:
+	python3 scripts/benchmark_suite.py --bench niah $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+bench-ppl:
+	python3 scripts/benchmark_suite.py --bench ppl $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+# Run comprehensive KV-Cache long context scaling benchmark
+bench-kv:
+	python3 scripts/benchmark_kv_cache_scaling.py
+
 # Run side-by-side comparison: Microsoft BitNet.cpp vs Tenzo Native Engine
-# Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|fp32]
+# Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|tl1_fused|fp32]
 compare:
 	python3 /home/illia/CLionProjects/untitled/scripts/compare_bitnet_tenzo.py -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
 

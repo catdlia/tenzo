@@ -4,17 +4,20 @@ from huggingface_hub import snapshot_download
 
 # Mapping of standard testing models for the Universal Pipeline
 MODELS = {
-    "fp16": "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T",
-    "int4": "TheBloke/TinyLlama-1.1B-Chat-v1.0-AWQ",
-    "bitnet": "1bitLLM/bitnet_b1_58-large"
+    "gguf": "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
+    "gptq": "TheBloke/TinyLlama-1.1B-Chat-v1.0-GPTQ",
+    "awq": "TheBloke/TinyLlama-1.1B-Chat-v1.0-AWQ",
+    "exl2": "turboderp/TinyLlama-1.1B-Chat-v1.0-exl2",
+    "bitnet": "microsoft/bitnet-b1.58-2B-4T",
+    "fp16": "TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T"
 }
 
 def download_model(model_id: str, output_dir: str):
     print(f"📥 Downloading {model_id} into {output_dir}...")
     
-    # We only need safetensors/bin weights, configs, and tokenizer files
+    # We only need safetensors/bin/gguf weights, configs, and tokenizer files
     allow_patterns = [
-        "*.safetensors", "*.bin", "*.json", "*.model", "*.txt", "*.model"
+        "*.safetensors", "*.bin", "*.gguf", "*.json", "*.model", "*.txt"
     ]
     
     path = snapshot_download(
@@ -27,7 +30,7 @@ def download_model(model_id: str, output_dir: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Tenzo Model Downloader for Universal Engine Testing")
-    parser.add_argument("--type", choices=["all", "fp16", "int4", "bitnet"], default="all",
+    parser.add_argument("--type", choices=["all", "gguf", "gptq", "awq", "exl2", "bitnet", "fp16"], default="all",
                         help="Type of model to download")
     parser.add_argument("--dir", type=str, default="./models",
                         help="Output directory for models")
