@@ -260,16 +260,16 @@ void FusedKVCache::forward_attention_raw(
         }
     }
 
-    // 3. Append to KV-Cache
-    size_t layer_kv_offset = (static_cast<size_t>(layer_idx) * max_seq_len + pos) * num_kv_heads * head_dim;
-    size_t layer_scale_offset = (static_cast<size_t>(layer_idx) * max_seq_len + pos) * num_kv_heads;
-
+    // 3. Append to KV-Cache in contiguous [layer][head][time][dim] layout
     if (kv_mode == "int8_fused") {
         for (int h = 0; h < num_kv_heads; ++h) {
+            size_t head_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len * head_dim + pos * head_dim;
+            size_t scale_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len + pos;
+
             const float* k_src = k_ptr + h * head_dim;
             const float* v_src = v_ptr + h * head_dim;
-            int8_t* k_dst = int8_k.data() + layer_kv_offset + h * head_dim;
-            int8_t* v_dst = int8_v.data() + layer_kv_offset + h * head_dim;
+            int8_t* k_dst = int8_k.data() + head_off;
+            int8_t* v_dst = int8_v.data() + head_off;
 
             float amax_k = 1e-8f, amax_v = 1e-8f;
             for (int d = 0; d < head_dim; ++d) {
@@ -278,8 +278,8 @@ void FusedKVCache::forward_attention_raw(
             }
             float s_k = amax_k / 127.0f;
             float s_v = amax_v / 127.0f;
-            int8_k_scales[layer_scale_offset + h] = s_k;
-            int8_v_scales[layer_scale_offset + h] = s_v;
+            int8_k_scales[scale_off] = s_k;
+            int8_v_scales[scale_off] = s_v;
 
             float inv_sk = 1.0f / s_k;
             float inv_sv = 1.0f / s_v;
@@ -289,12 +289,14 @@ void FusedKVCache::forward_attention_raw(
             }
         }
     } else if (kv_mode == "tl1_fused") {
-        size_t tl1_layer_offset = (static_cast<size_t>(layer_idx) * max_seq_len + pos) * num_kv_heads * (head_dim / 4);
         for (int h = 0; h < num_kv_heads; ++h) {
+            size_t head_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len * (head_dim / 4) + pos * (head_dim / 4);
+            size_t scale_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len + pos;
+
             const float* k_src = k_ptr + h * head_dim;
             const float* v_src = v_ptr + h * head_dim;
-            uint8_t* k_dst = tl1_k.data() + tl1_layer_offset + h * (head_dim / 4);
-            uint8_t* v_dst = tl1_v.data() + tl1_layer_offset + h * (head_dim / 4);
+            uint8_t* k_dst = tl1_k.data() + head_off;
+            uint8_t* v_dst = tl1_v.data() + head_off;
 
             float mean_k = 0.0f, mean_v = 0.0f;
             for (int d = 0; d < head_dim; ++d) {
@@ -318,8 +320,8 @@ void FusedKVCache::forward_attention_raw(
             float s_k = (cnt_k > 0) ? (sum_k_nz / static_cast<float>(cnt_k)) : (mean_k + 1e-6f);
             float s_v = (cnt_v > 0) ? (sum_v_nz / static_cast<float>(cnt_v)) : (mean_v + 1e-6f);
 
-            tl1_k_scales[layer_scale_offset + h] = s_k;
-            tl1_v_scales[layer_scale_offset + h] = s_v;
+            tl1_k_scales[scale_off] = s_k;
+            tl1_v_scales[scale_off] = s_v;
 
             for (int d = 0; d < head_dim; d += 4) {
                 auto quant_tern = [](float val, float th) -> int {
@@ -341,8 +343,11 @@ void FusedKVCache::forward_attention_raw(
             }
         }
     } else {
-        std::memcpy(fp32_k.data() + layer_kv_offset, k_ptr, num_kv_heads * head_dim * sizeof(float));
-        std::memcpy(fp32_v.data() + layer_kv_offset, v_ptr, num_kv_heads * head_dim * sizeof(float));
+        for (int h = 0; h < num_kv_heads; ++h) {
+            size_t head_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len * head_dim + pos * head_dim;
+            std::memcpy(fp32_k.data() + head_off, k_ptr + h * head_dim, head_dim * sizeof(float));
+            std::memcpy(fp32_v.data() + head_off, v_ptr + h * head_dim, head_dim * sizeof(float));
+        }
     }
 
     // 4. Scaled Dot-Product Attention
@@ -350,7 +355,7 @@ void FusedKVCache::forward_attention_raw(
     const int gqa_ratio = num_q_heads / num_kv_heads;
     const float scale_factor = 1.0f / std::sqrt(static_cast<float>(head_dim));
 
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(dynamic, 2)
     for (int qh = 0; qh < num_q_heads; ++qh) {
         int kv_h = qh / gqa_ratio;
         const float* q_vec = q_ptr + qh * head_dim;
@@ -361,11 +366,14 @@ void FusedKVCache::forward_attention_raw(
         float max_score = -1e30f;
 
         if (kv_mode == "int8_fused") {
+            size_t base_k_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * head_dim;
+            size_t base_s_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len;
+            const int8_t* k_base = int8_k.data() + base_k_off;
+            const float* s_base = int8_k_scales.data() + base_s_off;
+
             for (int t = 0; t < seq_len; ++t) {
-                size_t offset_k = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads * head_dim + kv_h * head_dim;
-                size_t offset_s = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads + kv_h;
-                const int8_t* k_cached = int8_k.data() + offset_k;
-                float s_k = int8_k_scales[offset_s];
+                const int8_t* k_cached = k_base + t * head_dim;
+                float s_k = s_base[t];
 
                 __m256 dot_acc = _mm256_setzero_ps();
                 for (int d = 0; d < head_dim; d += 8) {
@@ -381,29 +389,79 @@ void FusedKVCache::forward_attention_raw(
                 if (dot > max_score) max_score = dot;
             }
         } else if (kv_mode == "tl1_fused") {
-            for (int t = 0; t < seq_len; ++t) {
-                size_t offset_k = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads * (head_dim / 4) + kv_h * (head_dim / 4);
-                size_t offset_s = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads + kv_h;
-                const uint8_t* k_cached = tl1_k.data() + offset_k;
-                float amax_k = tl1_k_scales[offset_s];
+            alignas(16) static const int8_t LUT_W0[16] = { -1,  0,  1, 0,  -1,  0,  1, 0,  -1,  0,  1, 0,  -1,  0,  1, 0 };
+            alignas(16) static const int8_t LUT_W1[16] = { -1, -1, -1, 0,   0,  0,  0, 0,   1,  1,  1, 0,   0,  0,  0, 0 };
+            const __m128i lut0 = _mm_load_si128(reinterpret_cast<const __m128i*>(LUT_W0));
+            const __m128i lut1 = _mm_load_si128(reinterpret_cast<const __m128i*>(LUT_W1));
+            const __m128i mask_0f = _mm_set1_epi8(0x0F);
 
-                float dot = 0.0f;
-                for (int d = 0; d < head_dim; d += 4) {
-                    uint8_t packed = k_cached[d / 4];
-                    int w0 = static_cast<int>(packed & 0x03) - 1;
-                    int w1 = static_cast<int>((packed >> 2) & 0x03) - 1;
-                    int w2 = static_cast<int>((packed >> 4) & 0x03) - 1;
-                    int w3 = static_cast<int>((packed >> 6) & 0x03) - 1;
-                    dot += q_vec[d + 0] * w0 + q_vec[d + 1] * w1 + q_vec[d + 2] * w2 + q_vec[d + 3] * w3;
+            // Pre-quantize Q to int16 for pure integer SIMD madd_epi16 dot-product
+            alignas(32) int16_t q_i16[128];
+            float max_q = 0.0f;
+            for (int d = 0; d < head_dim; ++d) {
+                float a = std::abs(q_vec[d]);
+                if (a > max_q) max_q = a;
+            }
+            float s_q = (max_q > 0.0f) ? (max_q / 127.0f) : 1.0f;
+            float inv_s_q = 1.0f / s_q;
+            for (int d = 0; d < head_dim; ++d) {
+                q_i16[d] = static_cast<int16_t>(std::round(q_vec[d] * inv_s_q));
+            }
+            const __m256i* q_i16_vec = reinterpret_cast<const __m256i*>(q_i16);
+            float q_eff_scale = s_q * scale_factor;
+
+            size_t base_k_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * (head_dim / 4);
+            size_t base_s_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len;
+            const uint8_t* k_base = tl1_k.data() + base_k_off;
+            const float* s_base = tl1_k_scales.data() + base_s_off;
+
+            for (int t = 0; t < seq_len; ++t) {
+                const uint8_t* k_cached = k_base + t * (head_dim / 4);
+                float s_k = s_base[t];
+
+                __m256i dot_acc = _mm256_setzero_si256();
+
+                for (int chunk = 0; chunk < 2; ++chunk) {
+                    __m128i raw16 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(k_cached + chunk * 16));
+                    __m128i nib_lo = _mm_and_si128(raw16, mask_0f);
+                    __m128i nib_hi = _mm_and_si128(_mm_srli_epi16(raw16, 4), mask_0f);
+
+                    __m128i w0 = _mm_shuffle_epi8(lut0, nib_lo);
+                    __m128i w1 = _mm_shuffle_epi8(lut1, nib_lo);
+                    __m128i w2 = _mm_shuffle_epi8(lut0, nib_hi);
+                    __m128i w3 = _mm_shuffle_epi8(lut1, nib_hi);
+
+                    __m128i w01_lo = _mm_unpacklo_epi8(w0, w1);
+                    __m128i w01_hi = _mm_unpackhi_epi8(w0, w1);
+                    __m128i w23_lo = _mm_unpacklo_epi8(w2, w3);
+                    __m128i w23_hi = _mm_unpackhi_epi8(w2, w3);
+
+                    __m128i w_0_15  = _mm_unpacklo_epi16(w01_lo, w23_lo);
+                    __m128i w_16_31 = _mm_unpackhi_epi16(w01_lo, w23_lo);
+                    __m128i w_32_47 = _mm_unpacklo_epi16(w01_hi, w23_hi);
+                    __m128i w_48_63 = _mm_unpackhi_epi16(w01_hi, w23_hi);
+
+                    int base_v = chunk * 4;
+                    __m256i d0 = _mm256_madd_epi16(q_i16_vec[base_v + 0], _mm256_cvtepi8_epi16(w_0_15));
+                    __m256i d1 = _mm256_madd_epi16(q_i16_vec[base_v + 1], _mm256_cvtepi8_epi16(w_16_31));
+                    __m256i d2 = _mm256_madd_epi16(q_i16_vec[base_v + 2], _mm256_cvtepi8_epi16(w_32_47));
+                    __m256i d3 = _mm256_madd_epi16(q_i16_vec[base_v + 3], _mm256_cvtepi8_epi16(w_48_63));
+
+                    dot_acc = _mm256_add_epi32(dot_acc, _mm256_add_epi32(_mm256_add_epi32(d0, d1), _mm256_add_epi32(d2, d3)));
                 }
-                dot *= (amax_k * scale_factor);
+
+                alignas(32) int32_t tmp[8];
+                _mm256_store_si256(reinterpret_cast<__m256i*>(tmp), dot_acc);
+                int32_t isum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+                float dot = static_cast<float>(isum) * (q_eff_scale * s_k);
                 scores[t] = dot;
                 if (dot > max_score) max_score = dot;
             }
         } else {
+            size_t base_k_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * head_dim;
+            const float* k_base = fp32_k.data() + base_k_off;
             for (int t = 0; t < seq_len; ++t) {
-                size_t offset_k = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads * head_dim + kv_h * head_dim;
-                const float* k_cached = fp32_k.data() + offset_k;
+                const float* k_cached = k_base + t * head_dim;
                 __m256 dot_acc = _mm256_setzero_ps();
                 for (int d = 0; d < head_dim; d += 8) {
                     dot_acc = _mm256_fmadd_ps(_mm256_loadu_ps(q_vec + d), _mm256_loadu_ps(k_cached + d), dot_acc);
@@ -430,11 +488,14 @@ void FusedKVCache::forward_attention_raw(
         for (int i = 0; i < 16; ++i) acc[i] = _mm256_setzero_ps();
 
         if (kv_mode == "int8_fused") {
+            size_t base_v_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * head_dim;
+            size_t base_sv_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len;
+            const int8_t* v_base = int8_v.data() + base_v_off;
+            const float* sv_base = int8_v_scales.data() + base_sv_off;
+
             for (int t = 0; t < seq_len; ++t) {
-                size_t offset_v = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads * head_dim + kv_h * head_dim;
-                size_t offset_s = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads + kv_h;
-                const int8_t* v_cached = int8_v.data() + offset_v;
-                __m256 weight_scale = _mm256_set1_ps(scores[t] * int8_v_scales[offset_s]);
+                const int8_t* v_cached = v_base + t * head_dim;
+                __m256 weight_scale = _mm256_set1_ps(scores[t] * sv_base[t]);
 
                 for (int i = 0; i < 16; ++i) {
                     __m128i v_bytes = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(v_cached + i * 8));
@@ -443,29 +504,57 @@ void FusedKVCache::forward_attention_raw(
                 }
             }
         } else if (kv_mode == "tl1_fused") {
-            std::memset(out_vec, 0, head_dim * sizeof(float));
-            for (int t = 0; t < seq_len; ++t) {
-                size_t offset_v = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads * (head_dim / 4) + kv_h * (head_dim / 4);
-                size_t offset_s = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads + kv_h;
-                const uint8_t* v_cached = tl1_v.data() + offset_v;
-                float eff_w = scores[t] * tl1_v_scales[offset_s];
+            alignas(16) static const int8_t LUT_W0[16] = { -1,  0,  1, 0,  -1,  0,  1, 0,  -1,  0,  1, 0,  -1,  0,  1, 0 };
+            alignas(16) static const int8_t LUT_W1[16] = { -1, -1, -1, 0,   0,  0,  0, 0,   1,  1,  1, 0,   0,  0,  0, 0 };
+            const __m128i lut0 = _mm_load_si128(reinterpret_cast<const __m128i*>(LUT_W0));
+            const __m128i lut1 = _mm_load_si128(reinterpret_cast<const __m128i*>(LUT_W1));
+            const __m128i mask_0f = _mm_set1_epi8(0x0F);
 
-                for (int d = 0; d < head_dim; d += 4) {
-                    uint8_t packed = v_cached[d / 4];
-                    int w0 = static_cast<int>(packed & 0x03) - 1;
-                    int w1 = static_cast<int>((packed >> 2) & 0x03) - 1;
-                    int w2 = static_cast<int>((packed >> 4) & 0x03) - 1;
-                    int w3 = static_cast<int>((packed >> 6) & 0x03) - 1;
-                    out_vec[d + 0] += w0 * eff_w;
-                    out_vec[d + 1] += w1 * eff_w;
-                    out_vec[d + 2] += w2 * eff_w;
-                    out_vec[d + 3] += w3 * eff_w;
+            size_t base_v_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * (head_dim / 4);
+            size_t base_sv_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len;
+            const uint8_t* v_base = tl1_v.data() + base_v_off;
+            const float* sv_base = tl1_v_scales.data() + base_sv_off;
+
+            for (int t = 0; t < seq_len; ++t) {
+                const uint8_t* v_cached = v_base + t * (head_dim / 4);
+                __m256 weight_scale = _mm256_set1_ps(scores[t] * sv_base[t]);
+
+                for (int chunk = 0; chunk < 2; ++chunk) {
+                    __m128i raw16 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(v_cached + chunk * 16));
+                    __m128i nib_lo = _mm_and_si128(raw16, mask_0f);
+                    __m128i nib_hi = _mm_and_si128(_mm_srli_epi16(raw16, 4), mask_0f);
+
+                    __m128i w0 = _mm_shuffle_epi8(lut0, nib_lo);
+                    __m128i w1 = _mm_shuffle_epi8(lut1, nib_lo);
+                    __m128i w2 = _mm_shuffle_epi8(lut0, nib_hi);
+                    __m128i w3 = _mm_shuffle_epi8(lut1, nib_hi);
+
+                    __m128i w01_lo = _mm_unpacklo_epi8(w0, w1);
+                    __m128i w01_hi = _mm_unpackhi_epi8(w0, w1);
+                    __m128i w23_lo = _mm_unpacklo_epi8(w2, w3);
+                    __m128i w23_hi = _mm_unpackhi_epi8(w2, w3);
+
+                    __m128i w_0_15  = _mm_unpacklo_epi16(w01_lo, w23_lo);
+                    __m128i w_16_31 = _mm_unpackhi_epi16(w01_lo, w23_lo);
+                    __m128i w_32_47 = _mm_unpacklo_epi16(w01_hi, w23_hi);
+                    __m128i w_48_63 = _mm_unpackhi_epi16(w01_hi, w23_hi);
+
+                    int base_i = chunk * 8;
+                    acc[base_i + 0] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(w_0_15)), weight_scale, acc[base_i + 0]);
+                    acc[base_i + 1] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_srli_si128(w_0_15, 8))), weight_scale, acc[base_i + 1]);
+                    acc[base_i + 2] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(w_16_31)), weight_scale, acc[base_i + 2]);
+                    acc[base_i + 3] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_srli_si128(w_16_31, 8))), weight_scale, acc[base_i + 3]);
+                    acc[base_i + 4] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(w_32_47)), weight_scale, acc[base_i + 4]);
+                    acc[base_i + 5] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_srli_si128(w_32_47, 8))), weight_scale, acc[base_i + 5]);
+                    acc[base_i + 6] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(w_48_63)), weight_scale, acc[base_i + 6]);
+                    acc[base_i + 7] = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_srli_si128(w_48_63, 8))), weight_scale, acc[base_i + 7]);
                 }
             }
         } else {
+            size_t base_v_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * head_dim;
+            const float* v_base = fp32_v.data() + base_v_off;
             for (int t = 0; t < seq_len; ++t) {
-                size_t offset_v = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads * head_dim + kv_h * head_dim;
-                const float* v_cached = fp32_v.data() + offset_v;
+                const float* v_cached = v_base + t * head_dim;
                 __m256 weight_vec = _mm256_set1_ps(scores[t]);
                 for (int i = 0; i < 16; ++i) {
                     acc[i] = _mm256_fmadd_ps(_mm256_loadu_ps(v_cached + i * 8), weight_vec, acc[i]);
@@ -473,10 +562,8 @@ void FusedKVCache::forward_attention_raw(
             }
         }
 
-        if (kv_mode != "tl1_fused") {
-            for (int i = 0; i < 16; ++i) {
-                _mm256_storeu_ps(out_vec + i * 8, acc[i]);
-            }
+        for (int i = 0; i < 16; ++i) {
+            _mm256_storeu_ps(out_vec + i * 8, acc[i]);
         }
 
         if (scores != scores_buf) {
