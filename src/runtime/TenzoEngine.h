@@ -114,6 +114,84 @@ public:
     );
 };
 
+// Paged Attention Block Manager (Dynamic Virtual Memory Paging)
+class PagedBlockManager {
+public:
+    int total_blocks;
+    int block_size;
+    std::vector<int32_t> free_blocks;
+
+    PagedBlockManager(int total_blocks = 512, int block_size = 16)
+        : total_blocks(total_blocks), block_size(block_size) {
+        reset();
+    }
+
+    void reset() {
+        free_blocks.clear();
+        free_blocks.reserve(total_blocks);
+        for (int i = total_blocks - 1; i >= 0; --i) {
+            free_blocks.push_back(i);
+        }
+    }
+
+    int32_t allocate_block() {
+        if (free_blocks.empty()) return -1;
+        int32_t blk = free_blocks.back();
+        free_blocks.pop_back();
+        return blk;
+    }
+
+    void free_block(int32_t blk) {
+        if (blk >= 0 && blk < total_blocks) {
+            free_blocks.push_back(blk);
+        }
+    }
+
+    size_t num_free_blocks() const { return free_blocks.size(); }
+    size_t num_allocated_blocks() const { return total_blocks - free_blocks.size(); }
+};
+
+// Paged KV-Cache with Dynamic Block-Table Translation
+class PagedKVCache {
+public:
+    int num_layers;
+    int num_q_heads;
+    int num_kv_heads;
+    int head_dim;
+    static constexpr int BLOCK_SIZE = 16;
+    int total_blocks;
+
+    PagedBlockManager block_mgr;
+    std::vector<int32_t> block_table; // Sequence logical-to-physical block mapping
+    int cur_seq_len = 0;
+
+    // Physical Page Pools: [total_blocks, num_layers, num_kv_heads, BLOCK_SIZE, head_dim]
+    std::vector<int8_t> paged_k_pool;
+    std::vector<int8_t> paged_v_pool;
+    std::vector<float> paged_k_scales;
+    std::vector<float> paged_v_scales;
+
+    PagedKVCache(
+        int num_layers = 30,
+        int num_q_heads = 20,
+        int num_kv_heads = 5,
+        int head_dim = 128,
+        int total_blocks = 512
+    );
+
+    void reset();
+    int get_seq_len() const { return cur_seq_len; }
+    void increment_seq_len(int count = 1) { cur_seq_len += count; }
+
+    void forward_attention_raw(
+        int layer_idx,
+        float* __restrict__ q_ptr,
+        float* __restrict__ k_ptr,
+        float* __restrict__ v_ptr,
+        float* __restrict__ out_ptr
+    );
+};
+
 class TenzoEngineImpl {
 public:
     tenzo_config_t config;
@@ -131,6 +209,8 @@ public:
     std::vector<float> embed_scales;
 
     FusedKVCache kv_cache;
+    PagedKVCache paged_kv_cache;
+    bool use_paged_kv = false;
 
     // Preallocated Zero-Allocation Scratch Buffers
     std::vector<float> buf_x;
@@ -159,7 +239,7 @@ public:
     explicit TenzoEngineImpl(const tenzo_config_t& cfg);
 
     void reset();
-    int get_seq_len() const { return kv_cache.get_seq_len(); }
+    int get_seq_len() const { return use_paged_kv ? paged_kv_cache.get_seq_len() : kv_cache.get_seq_len(); }
 
     void set_layer_weights(int layer_idx, const tenzo_layer_weights_t* w);
     void set_final_norm(const float* norm_w);

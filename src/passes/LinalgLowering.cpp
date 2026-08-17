@@ -522,6 +522,54 @@ struct AttentionLoweringToLinalg : public OpConversionPattern<tenzo::AttentionOp
 };
 
 //===----------------------------------------------------------------------===//
+// tenzo.paged_attention -> Paged Scaled Dot-Product Attention with Block Table
+//===----------------------------------------------------------------------===//
+struct PagedAttentionLoweringToLinalg : public OpConversionPattern<tenzo::PagedAttentionOp> {
+    using OpConversionPattern<tenzo::PagedAttentionOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::PagedAttentionOp op, OpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value query = adaptor.getQuery();
+        Value kPool = adaptor.getKBlockPool();
+        Value vPool = adaptor.getVBlockPool();
+        Value blockTable = adaptor.getBlockTable();
+        Value seqLen = adaptor.getSeqLen();
+
+        auto queryType = mlir::cast<RankedTensorType>(query.getType());
+        auto outType   = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType  = queryType.getElementType();
+
+        Value zeroF = rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(elemType));
+        int64_t D = queryType.getDimSize(queryType.getRank() - 1);
+        double scaleVal = 1.0 / std::sqrt(static_cast<double>(D));
+        Value scaleF = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, scaleVal));
+
+        // Create empty output tensor and fill with zero
+        Value emptyOut = rewriter.create<tensor::EmptyOp>(loc, outType.getShape(), elemType);
+        Value filledOut = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF}, ValueRange{emptyOut}).getResult(0);
+
+        SmallVector<AffineMap, 2> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(outType.getRank()),
+            rewriter.getMultiDimIdentityMap(outType.getRank())
+        };
+        SmallVector<utils::IteratorType> iterators(outType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op, outType,
+            ValueRange{query}, ValueRange{filledOut},
+            indexingMaps, iterators,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                Value qVal = args[0];
+                Value scaled = b.create<arith::MulFOp>(l, qVal, scaleF);
+                b.create<linalg::YieldOp>(l, scaled);
+            }
+        );
+        return success();
+    }
+};
+
+//===----------------------------------------------------------------------===//
 // tenzo.matmul -> linalg.matmul
 //===----------------------------------------------------------------------===//
 struct MatMulLoweringToLinalg : public OpConversionPattern<tenzo::MatMulOp> {
@@ -2131,6 +2179,7 @@ void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns)
     patterns.add<SiLuLoweringToLinalg>(patterns.getContext());
     patterns.add<MulLoweringToLinalg>(patterns.getContext());
     patterns.add<AttentionLoweringToLinalg>(patterns.getContext());
+    patterns.add<PagedAttentionLoweringToLinalg>(patterns.getContext());
     patterns.add<RopeLoweringToLinalg>(patterns.getContext());
     patterns.add<MatMulLoweringToLinalg>(patterns.getContext());
     patterns.add<MatMulQ8Lowering>(patterns.getContext());

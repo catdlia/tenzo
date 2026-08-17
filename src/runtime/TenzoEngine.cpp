@@ -209,6 +209,236 @@ void FusedKVCache::reset() {
     cur_seq_len = 0;
 }
 
+//===----------------------------------------------------------------------===//
+// Paged Attention Dynamic KV-Cache Implementation
+//===----------------------------------------------------------------------===//
+PagedKVCache::PagedKVCache(
+    int num_layers,
+    int num_q_heads,
+    int num_kv_heads,
+    int head_dim,
+    int total_blocks
+) : num_layers(num_layers),
+    num_q_heads(num_q_heads),
+    num_kv_heads(num_kv_heads),
+    head_dim(head_dim),
+    total_blocks(total_blocks),
+    block_mgr(total_blocks, BLOCK_SIZE) {
+
+    size_t total_elements = static_cast<size_t>(total_blocks) * num_layers * num_kv_heads * BLOCK_SIZE * head_dim;
+    paged_k_pool.resize(total_elements, 0);
+    paged_v_pool.resize(total_elements, 0);
+
+    size_t total_scales = static_cast<size_t>(total_blocks) * num_layers * num_kv_heads * BLOCK_SIZE;
+    paged_k_scales.resize(total_scales, 1.0f);
+    paged_v_scales.resize(total_scales, 1.0f);
+}
+
+void PagedKVCache::reset() {
+    cur_seq_len = 0;
+    block_table.clear();
+    block_mgr.reset();
+}
+
+void PagedKVCache::forward_attention_raw(
+    int layer_idx,
+    float* __restrict__ q_ptr,
+    float* __restrict__ k_ptr,
+    float* __restrict__ v_ptr,
+    float* __restrict__ out_ptr
+) {
+    const int pos = cur_seq_len;
+    const int half_dim = head_dim / 2;
+    const float theta_base = 10000.0f;
+
+    // 1. In-place AVX2 RoPE on Q
+    for (int h = 0; h < num_q_heads; ++h) {
+        float* q_head = q_ptr + h * head_dim;
+        for (int i = 0; i < half_dim; i += 8) {
+            alignas(32) float cos_arr[8];
+            alignas(32) float sin_arr[8];
+            for (int j = 0; j < 8; ++j) {
+                int idx = i + j;
+                float freq = 1.0f / std::pow(theta_base, static_cast<float>(2 * idx) / head_dim);
+                float angle = static_cast<float>(pos) * freq;
+                cos_arr[j] = std::cos(angle);
+                sin_arr[j] = std::sin(angle);
+            }
+            __m256 cos_vec = _mm256_load_ps(cos_arr);
+            __m256 sin_vec = _mm256_load_ps(sin_arr);
+            __m256 x0 = _mm256_loadu_ps(q_head + i);
+            __m256 x1 = _mm256_loadu_ps(q_head + i + half_dim);
+            __m256 r0 = _mm256_fmsub_ps(x0, cos_vec, _mm256_mul_ps(x1, sin_vec));
+            __m256 r1 = _mm256_fmadd_ps(x0, sin_vec, _mm256_mul_ps(x1, cos_vec));
+            _mm256_storeu_ps(q_head + i, r0);
+            _mm256_storeu_ps(q_head + i + half_dim, r1);
+        }
+    }
+
+    // 2. In-place AVX2 RoPE on K
+    for (int h = 0; h < num_kv_heads; ++h) {
+        float* k_head = k_ptr + h * head_dim;
+        for (int i = 0; i < half_dim; i += 8) {
+            alignas(32) float cos_arr[8];
+            alignas(32) float sin_arr[8];
+            for (int j = 0; j < 8; ++j) {
+                int idx = i + j;
+                float freq = 1.0f / std::pow(theta_base, static_cast<float>(2 * idx) / head_dim);
+                float angle = static_cast<float>(pos) * freq;
+                cos_arr[j] = std::cos(angle);
+                sin_arr[j] = std::sin(angle);
+            }
+            __m256 cos_vec = _mm256_load_ps(cos_arr);
+            __m256 sin_vec = _mm256_load_ps(sin_arr);
+            __m256 x0 = _mm256_loadu_ps(k_head + i);
+            __m256 x1 = _mm256_loadu_ps(k_head + i + half_dim);
+            __m256 r0 = _mm256_fmsub_ps(x0, cos_vec, _mm256_mul_ps(x1, sin_vec));
+            __m256 r1 = _mm256_fmadd_ps(x0, sin_vec, _mm256_mul_ps(x1, cos_vec));
+            _mm256_storeu_ps(k_head + i, r0);
+            _mm256_storeu_ps(k_head + i + half_dim, r1);
+        }
+    }
+
+    // 3. Dynamic Page Allocation
+    int logical_block_idx = pos / BLOCK_SIZE;
+    int slot_in_block = pos % BLOCK_SIZE;
+    if (logical_block_idx >= static_cast<int>(block_table.size())) {
+        int32_t new_blk = block_mgr.allocate_block();
+        if (new_blk >= 0) {
+            block_table.push_back(new_blk);
+        }
+    }
+
+    int32_t phys_block = (logical_block_idx < static_cast<int>(block_table.size())) ? block_table[logical_block_idx] : 0;
+
+    // 4. Quantize and write current token K and V into physical block page
+    for (int h = 0; h < num_kv_heads; ++h) {
+        size_t block_head_off = ((static_cast<size_t>(phys_block) * num_layers + layer_idx) * num_kv_heads + h) * BLOCK_SIZE * head_dim + slot_in_block * head_dim;
+        size_t scale_off = ((static_cast<size_t>(phys_block) * num_layers + layer_idx) * num_kv_heads + h) * BLOCK_SIZE + slot_in_block;
+
+        const float* k_src = k_ptr + h * head_dim;
+        const float* v_src = v_ptr + h * head_dim;
+        int8_t* k_dst = paged_k_pool.data() + block_head_off;
+        int8_t* v_dst = paged_v_pool.data() + block_head_off;
+
+        float amax_k = 1e-8f, amax_v = 1e-8f;
+        for (int d = 0; d < head_dim; ++d) {
+            amax_k = std::max(amax_k, std::abs(k_src[d]));
+            amax_v = std::max(amax_v, std::abs(v_src[d]));
+        }
+        float s_k = amax_k / 127.0f;
+        float s_v = amax_v / 127.0f;
+        paged_k_scales[scale_off] = s_k;
+        paged_v_scales[scale_off] = s_v;
+
+        float inv_sk = 1.0f / s_k;
+        float inv_sv = 1.0f / s_v;
+        for (int d = 0; d < head_dim; ++d) {
+            k_dst[d] = static_cast<int8_t>(std::clamp(std::round(k_src[d] * inv_sk), -128.0f, 127.0f));
+            v_dst[d] = static_cast<int8_t>(std::clamp(std::round(v_src[d] * inv_sv), -128.0f, 127.0f));
+        }
+    }
+
+    // 5. Paged Scaled Dot-Product Attention
+    const int total_tokens = pos + 1;
+    const int gqa_ratio = num_q_heads / num_kv_heads;
+    const float qk_scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+
+    std::vector<float> scores(total_tokens);
+
+    for (int qh = 0; qh < num_q_heads; ++qh) {
+        int kv_h = qh / gqa_ratio;
+        const float* q_head = q_ptr + qh * head_dim;
+
+        float max_score = -1e30f;
+        for (int b = 0; b <= logical_block_idx; ++b) {
+            int32_t blk = block_table[b];
+            int tokens_in_this_block = (b == logical_block_idx) ? (slot_in_block + 1) : BLOCK_SIZE;
+
+            for (int s = 0; s < tokens_in_this_block; ++s) {
+                int t = b * BLOCK_SIZE + s;
+                size_t k_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE * head_dim + s * head_dim;
+                size_t scale_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE + s;
+
+                const int8_t* k_page = paged_k_pool.data() + k_off;
+                float s_k = paged_k_scales[scale_off];
+
+                __m256 acc0 = _mm256_setzero_ps();
+                __m256 acc1 = _mm256_setzero_ps();
+                for (int d = 0; d < head_dim; d += 16) {
+                    __m256 q_v0 = _mm256_loadu_ps(q_head + d);
+                    __m256 q_v1 = _mm256_loadu_ps(q_head + d + 8);
+
+                    __m128i k_raw = _mm_loadu_si128(reinterpret_cast<const __m128i*>(k_page + d));
+                    __m256i k_epi16 = _mm256_cvtepi8_epi16(k_raw);
+                    __m256 k_f0 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(k_epi16)));
+                    __m256 k_f1 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256(k_epi16, 1)));
+
+                    acc0 = _mm256_fmadd_ps(q_v0, k_f0, acc0);
+                    acc1 = _mm256_fmadd_ps(q_v1, k_f1, acc1);
+                }
+                __m256 acc = _mm256_add_ps(acc0, acc1);
+                alignas(32) float acc_arr[8];
+                _mm256_store_ps(acc_arr, acc);
+                float dot = 0.0f;
+                for (int i = 0; i < 8; ++i) dot += acc_arr[i];
+
+                float score = dot * s_k * qk_scale;
+                scores[t] = score;
+                max_score = std::max(max_score, score);
+            }
+        }
+
+        // Softmax
+        float sum_exp = 0.0f;
+        for (int t = 0; t < total_tokens; ++t) {
+            float exp_val = std::exp(scores[t] - max_score);
+            scores[t] = exp_val;
+            sum_exp += exp_val;
+        }
+        float inv_sum = 1.0f / (sum_exp + 1e-8f);
+        for (int t = 0; t < total_tokens; ++t) {
+            scores[t] *= inv_sum;
+        }
+
+        // Accumulate Weighted Values
+        float* out_head = out_ptr + qh * head_dim;
+        std::memset(out_head, 0, head_dim * sizeof(float));
+
+        for (int b = 0; b <= logical_block_idx; ++b) {
+            int32_t blk = block_table[b];
+            int tokens_in_this_block = (b == logical_block_idx) ? (slot_in_block + 1) : BLOCK_SIZE;
+
+            for (int s = 0; s < tokens_in_this_block; ++s) {
+                int t = b * BLOCK_SIZE + s;
+                float alpha = scores[t];
+                if (alpha < 1e-7f) continue;
+
+                size_t v_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE * head_dim + s * head_dim;
+                size_t scale_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE + s;
+
+                const int8_t* v_page = paged_v_pool.data() + v_off;
+                float s_v = paged_v_scales[scale_off];
+                float weight = alpha * s_v;
+                __m256 w_vec = _mm256_set1_ps(weight);
+
+                for (int d = 0; d < head_dim; d += 16) {
+                    __m128i v_raw = _mm_loadu_si128(reinterpret_cast<const __m128i*>(v_page + d));
+                    __m256i v_epi16 = _mm256_cvtepi8_epi16(v_raw);
+                    __m256 v_f0 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(v_epi16)));
+                    __m256 v_f1 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256(v_epi16, 1)));
+
+                    __m256 cur_out0 = _mm256_loadu_ps(out_head + d);
+                    __m256 cur_out1 = _mm256_loadu_ps(out_head + d + 8);
+
+                    _mm256_storeu_ps(out_head + d, _mm256_fmadd_ps(w_vec, v_f0, cur_out0));
+                    _mm256_storeu_ps(out_head + d + 8, _mm256_fmadd_ps(w_vec, v_f1, cur_out1));
+                }
+            }
+        }
+    }
+}
+
 void FusedKVCache::forward_attention_raw(
     int layer_idx,
     float* __restrict__ q_ptr,
@@ -979,8 +1209,10 @@ void compute_linear_exl2(
 
 TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
     : config(cfg),
-      kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, cfg.max_seq_len, cfg.kv_mode ? cfg.kv_mode : "int8_fused") {
+      kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, cfg.max_seq_len, cfg.kv_mode ? cfg.kv_mode : "int8_fused"),
+      paged_kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, (cfg.max_seq_len + 15) / 16) {
     
+    use_paged_kv = (cfg.kv_mode && std::string(cfg.kv_mode) == "paged_int8");
     q_dim = cfg.num_q_heads * cfg.head_dim;
     kv_dim = cfg.num_kv_heads * cfg.head_dim;
     ffn_dim = cfg.ffn_dim;
@@ -1010,7 +1242,11 @@ TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
 }
 
 void TenzoEngineImpl::reset() {
-    kv_cache.reset();
+    if (use_paged_kv) {
+        paged_kv_cache.reset();
+    } else {
+        kv_cache.reset();
+    }
 }
 
 void TenzoEngineImpl::set_layer_weights(int layer_idx, const tenzo_layer_weights_t* w) {
@@ -1111,8 +1347,12 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
         }
     }
 
-    // 4. In-place Zero-Copy Attention with RoPE and Compressed KV-Cache
-    kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    // 4. In-place Zero-Copy Attention with RoPE and Compressed/Paged KV-Cache
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
 
     // 5. Attn Sub-Norm
     rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
@@ -1347,7 +1587,11 @@ void TenzoEngineImpl::prefill_token(int token_id) {
     for (int l = 0; l < config.num_layers; ++l) {
         forward_layer_raw(l);
     }
-    kv_cache.increment_seq_len(1);
+    if (use_paged_kv) {
+        paged_kv_cache.increment_seq_len(1);
+    } else {
+        kv_cache.increment_seq_len(1);
+    }
 }
 
 int TenzoEngineImpl::generate_step(
@@ -1360,7 +1604,11 @@ int TenzoEngineImpl::generate_step(
     for (int l = 0; l < config.num_layers; ++l) {
         forward_layer_raw(l);
     }
-    kv_cache.increment_seq_len(1);
+    if (use_paged_kv) {
+        paged_kv_cache.increment_seq_len(1);
+    } else {
+        kv_cache.increment_seq_len(1);
+    }
     compute_logits();
     return sample_top_k_top_p(params, past_tokens, past_tokens_len);
 }

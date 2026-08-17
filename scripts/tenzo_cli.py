@@ -52,7 +52,7 @@ class TenzoSession:
         self.history = []
 
     def get_kv_ram_mb(self):
-        bytes_per_elem = 0.25 if self.kv_quant == "tl1_fused" else (1.0 if self.kv_quant == "int8_fused" else 4.0)
+        bytes_per_elem = 0.25 if self.kv_quant == "tl1_fused" else (1.0 if self.kv_quant in ("int8_fused", "paged_int8") else 4.0)
         # 30 layers * ctx_size * 5 kv heads * 128 head_dim * 2 (K and V) * bytes_per_elem
         bytes_total = 30 * self.ctx_size * 5 * 128 * 2 * bytes_per_elem
         return bytes_total / (1024 * 1024)
@@ -286,8 +286,8 @@ def interactive_repl(session: TenzoSession):
                     session.model_path = new_path
                     print(f"{ANSI_GREEN}✅ Switched active model to: {args[0]} ({new_path}){ANSI_RESET}")
             elif cmd == "/kv":
-                if not args or args[0] not in ("popcount_fused", "tl1_fused", "int8_fused", "fp32"):
-                    print(f"{ANSI_RED}Usage: /kv <popcount_fused|tl1_fused|int8_fused|fp32>{ANSI_RESET}")
+                if not args or args[0] not in ("popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"):
+                    print(f"{ANSI_RED}Usage: /kv <popcount_fused|tl1_fused|int8_fused|paged_int8|fp32>{ANSI_RESET}")
                 else:
                     session.kv_quant = args[0]
                     print(f"{ANSI_GREEN}✅ KV-Cache Quantization switched to: {args[0]} (RAM for {session.ctx_size} ctx: {session.get_kv_ram_mb():.1f} MB){ANSI_RESET}")
@@ -362,18 +362,18 @@ def main():
     sub_run.add_argument("--top-k", type=int, default=40, help="Top-K filter")
     sub_run.add_argument("--rep-penalty", type=float, default=1.15, help="Repetition penalty multiplier")
     sub_run.add_argument("-c", "--ctx-size", type=int, default=8192, help="Context window capacity")
-    sub_run.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
+    sub_run.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"], help="KV-Cache quantization mode")
 
     # 4. chat
     sub_chat = subparsers.add_parser("chat", help="Launch interactive multi-turn REPL chat")
     sub_chat.add_argument("-m", "--model", type=str, default="default", help="Model name or path")
-    sub_chat.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
+    sub_chat.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"], help="KV-Cache quantization mode")
 
     # 5. bench
     sub_bench = subparsers.add_parser("bench", help="Run industry-standard LLM benchmarks")
     sub_bench.add_argument("--model", type=str, default="default", help="Model name to benchmark")
     sub_bench.add_argument("--bench", type=str, default="all", choices=["all", "long", "niah", "ppl", "throughput"], help="Benchmark type")
-    sub_bench.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
+    sub_bench.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"], help="KV-Cache quantization mode")
 
     args = parser.parse_args()
 
