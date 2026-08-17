@@ -65,22 +65,28 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 - [x] Fused in-register quantized INT8 KV-Cache compression.
 - [x] Beat Microsoft `BitNet.cpp` reference performance on edge CPUs (**20.32 tok/sec**).
 
-### Phase 2: Kernel Fusion & GPU (Next)
-- [ ] **ARM NEON Backend**: Expand auto-vectorizer to target Apple Silicon and Snapdragon.
-- [ ] **FlashAttention MLIR Kernel**: Fuse SDPA, RoPE, and causal masking at dialect level.
-- [ ] **Vulkan SPIR-V Compute**: Bring 1.58-bit decompression to iGPUs via Vulkan.
+### Phase 2 (Phase E): C/C++ SDK, Packaging & Ternary KV-Cache (Completed ✅)
+- [x] **Tenzo C/C++ SDK**: ABI-stable pure C header [`include/tenzo.h`](file:///home/illia/CLionProjects/untitled/include/tenzo.h) and modern C++ wrapper [`include/tenzo.hpp`](file:///home/illia/CLionProjects/untitled/include/tenzo.hpp).
+- [x] **Standalone Runtime Libraries**: Generated `libtenzo_runtime.a` (static) and `libtenzo_runtime.so` (shared).
+- [x] **Standalone C++ Inference**: Fully standalone C++ example [`examples/basic_inference.cpp`](file:///home/illia/CLionProjects/untitled/examples/basic_inference.cpp) with zero Python dependencies (`make run-cpp`).
+- [x] **Ternary 1.58b Fused KV-Cache (`tl1_fused`)**: 14.2x KV-Cache memory reduction vs FP32 (88 MB for 8192 context).
 
-### Phase 3: Developer Experience & Deployment
-- [ ] **Standalone Inference Engine**: Decouple the JIT execution engine from `tenzo-cli` for embedding in iOS/Android apps.
-- [ ] **Multi-Model Support**: Support modern architectures beyond LLaMA (Mistral, MoE).
+### Phase 3: Hardware Expansion & Multi-Target (Next)
+- [ ] **ARM NEON/SVE Backend**: Port AVX2 micro-kernels to ARM for Apple Silicon and Snapdragon.
+- [ ] **Vulkan SPIR-V Compute**: Bring 1.58-bit decompression to iGPUs via Vulkan.
+- [ ] **FlashAttention MLIR Kernel**: Fuse SDPA, RoPE, and causal masking at dialect level.
+- [ ] **Speculative Decoding**: Multi-token drafting engine.
 
 ---
 
 ## 📦 Component Inventory
 
+- `include/` — Public C/C++ SDK (`tenzo.h`, `tenzo.hpp`).
+- `examples/` — Standalone C++ inference examples (`basic_inference.cpp`).
 - `src/dialect/` — MLIR definitions (`tenzo.bitlinear_tl1`, `tenzo.rope`).
 - `src/passes/` — Compiler passes (Linalg Lowering, Bufferization, Micro-Kernel generation).
 - `src/context/` — Hardware detection and topology profiling.
-- `src/runtime/` — Execution environment (Tokenizer, KVCacheManager, OpenMP executor).
+- `src/runtime/` — Native C++ TenzoEngine, Tokenizer, dynamic KVCacheManager, OpenMP executor.
 - `src/bindings/` — Pybind11 native execution engine (`tenzo_runtime`).
 - `tenzo-frontend/` — PyTorch-to-MLIR exporter (`export_bitnet.py`).
+

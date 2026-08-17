@@ -96,14 +96,43 @@ Effective Memory Bandwidth     | ~10.5 GB/s           | ~17.3 GB/s
 make build-local   # Compiles tenzo-cli and tenzo_runtime inside Docker
 ```
 
-### 2. Run Ultra-Fast Text Generation
+### 2. Run Ultra-Fast Text Generation (Python CLI)
 ```bash
 make run-fast PROMPT="Explain quantum entanglement and its role in computing" TOKENS=50
 ```
 
-### 3. Run Side-by-Side Benchmark vs Microsoft BitNet.cpp
+### 3. Run Standalone Pure C++ Inference (Zero Python Dependency)
+```bash
+make run-cpp PROMPT="In computer science, a compiler translates source code written in a high-level programming language into" TOKENS=50
+```
+
+### 4. Run Side-by-Side Benchmark vs Microsoft BitNet.cpp
 ```bash
 make compare PROMPT="In computer science, a compiler translates source code written in a high-level programming language into" TOKENS=50
+```
+
+---
+
+## 📦 Tenzo C/C++ SDK & Embedding
+
+Tenzo provides clean C and C++ public APIs for direct integration into standalone desktop, mobile, and server applications with zero Python or runtime dependencies:
+
+- **C-API Header:** [`include/tenzo.h`](file:///home/illia/CLionProjects/untitled/include/tenzo.h) (`extern "C"`, ABI-stable)
+- **C++ Wrapper:** [`include/tenzo.hpp`](file:///home/illia/CLionProjects/untitled/include/tenzo.hpp) (Header-only RAII)
+- **Libraries Generated:** `libtenzo_runtime.a` (static) and `libtenzo_runtime.so` (shared)
+- **C++ Example:** [`examples/basic_inference.cpp`](file:///home/illia/CLionProjects/untitled/examples/basic_inference.cpp)
+
+```cpp
+#include "tenzo.hpp"
+
+int main() {
+    tenzo::Engine engine;
+    engine.load_model("weights.bin", "model.mlir");
+    
+    tenzo_sampling_params_t params = tenzo_default_sampling_params();
+    int next_token = engine.generate_step(prompt_token, params, past_tokens);
+    return 0;
+}
 ```
 
 ---
@@ -112,10 +141,12 @@ make compare PROMPT="In computer science, a compiler translates source code writ
 
 | Directory | Purpose |
 |-----------|---------|
+| `include/` | Public Tenzo C-API (`tenzo.h`) and modern C++ SDK (`tenzo.hpp`) |
+| `examples/` | Standalone C++ inference examples (`basic_inference.cpp`) |
 | `src/dialect/` | Tenzo MLIR dialect definitions (`tenzo.bitlinear_tl1`, `tenzo.rope`, `tenzo.rms_norm`) |
 | `src/passes/` | Compiler passes: fusion, lowering, zero-alloc bufferize, AVX2 micro-kernels |
 | `src/context/` | Hardware abstraction, topology profiling, and unified execution runtime |
-| `src/runtime/` | Tokenizer, dynamic KVCacheManager, OpenMP thread pool |
+| `src/runtime/` | Native C++ TenzoEngine, Tokenizer, dynamic KVCacheManager, OpenMP thread pool |
 | `src/bindings/` | Pybind11 zero-allocation native C++ execution module (`tenzo_runtime`) |
 | `scripts/` | Benchmark and comparison tools (`run_generation_fast.py`, `compare_bitnet_tenzo.py`) |
 | `tenzo-frontend/` | PyTorch exporters (`export_bitnet.py`, ONNX frontend) |
@@ -128,7 +159,9 @@ make compare PROMPT="In computer science, a compiler translates source code writ
 - [x] BitNet 1.58B LLM generation with 256-bit `vpshufb` SIMD micro-kernels.
 - [x] Zero-Allocation MLIR bufferization.
 - [x] Fused OpenMP multi-projection loops ($QKV$ & $\text{Gate}$-$\text{Up}$).
-- [x] Fused in-register quantized INT8 KV-Cache compression (4x memory reduction).
+- [x] Fused in-register quantized INT8 & Ternary TL1 KV-Cache compression (up to 14.2x memory reduction).
+- [x] Pure C/C++ SDK (`include/tenzo.h`, `libtenzo_runtime.a`, `libtenzo_runtime.so`).
+- [x] Standalone C++ inference without Python dependencies (`make run-cpp`).
 - [x] Beat reference Microsoft `BitNet.cpp` execution speed on consumer edge CPUs (**20.32 tok/sec**).
 - [ ] **Multi-target backends**: ARM NEON/SVE, RISC-V RVV.
 - [ ] **Vulkan / WebGPU Compute**: 1.58-bit ternary decompression for integrated graphics.
