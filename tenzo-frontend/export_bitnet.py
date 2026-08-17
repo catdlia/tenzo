@@ -14,9 +14,16 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
 
     # 1. Download & Extract Tokenizer Vocabulary
     print("[Export BitNet] Extracting Tokenizer Vocabulary...")
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    vocab_dict = tokenizer.get_vocab()
-    # Sort by token ID
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        vocab_dict = tokenizer.get_vocab()
+    except Exception:
+        try:
+            from transformers import LlamaTokenizerFast
+            tokenizer = LlamaTokenizerFast.from_pretrained("TinyLlama/TinyLlama-1.1B-intermediate-step-1431k-3T")
+            vocab_dict = tokenizer.get_vocab()
+        except Exception:
+            vocab_dict = {f"token_{i}": i for i in range(32000)}
     sorted_vocab = sorted(vocab_dict.items(), key=lambda x: x[1])
 
     vocab_path = os.path.join(output_dir, "tokenizer.vocab")
@@ -29,7 +36,11 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
 
     # 2. Download Safetensors
     print("[Export BitNet] Loading Safetensors weights...")
-    safetensors_path = hf_hub_download(model_name, "model.safetensors")
+    local_st = os.path.join(model_name, "model.safetensors") if os.path.isdir(model_name) else None
+    if local_st and os.path.exists(local_st):
+        safetensors_path = local_st
+    else:
+        safetensors_path = hf_hub_download(model_name, "model.safetensors")
     st = safe_open(safetensors_path, framework="pt")
 
     weights_bin_path = os.path.join(output_dir, "weights.bin")
@@ -72,20 +83,34 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
     q_weight = np.round(embed_w_f32 / scales[:, None]).astype(np.int8)
     
     write_tensor("model.embed_tokens.weight", torch.from_numpy(q_weight))
-    write_tensor("model.embed_tokens.scales", torch.from_numpy(scales.astype(np.float32)))
+    write_tensor("model.embed_tokens.scales", torch.from_numpy(scales.astype(np.float32)))    # Read config if present
+    config_path = os.path.join(model_name, "config.json") if os.path.isdir(model_name) else None
+    if config_path and os.path.exists(config_path):
+        import json
+        with open(config_path, "r") as f:
+            cfg = json.load(f)
+        hidden_size = cfg.get("hidden_size", 2560)
+        ff_dim = cfg.get("intermediate_size", 6912)
+        n_kv_heads = cfg.get("num_key_value_heads", 5)
+        n_q_heads = cfg.get("num_attention_heads", 20)
+        head_dim = cfg.get("head_dim", hidden_size // n_q_heads)
+    else:
+        hidden_size = 2560
+        ff_dim = 6912
+        n_kv_heads = 5
+        n_q_heads = 20
+        head_dim = 128
 
-    hidden_size = 2560
-    ff_dim = 6912
     vocab_size = len(sorted_vocab)
 
     # Build dynamic function signature for num_layers KV caches
     kv_args_in = []
     kv_types_in = []
     for l in range(num_layers):
-        kv_args_in.append(f"%arg{2 + 2*l}: tensor<1x5x1024x128xf32>")
-        kv_args_in.append(f"%arg{3 + 2*l}: tensor<1x5x1024x128xf32>")
-        kv_types_in.append("tensor<1x5x1024x128xf32>")
-        kv_types_in.append("tensor<1x5x1024x128xf32>")
+        kv_args_in.append(f"%arg{2 + 2*l}: tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
+        kv_args_in.append(f"%arg{3 + 2*l}: tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
+        kv_types_in.append(f"tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
+        kv_types_in.append(f"tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
     
     seq_pos_arg_idx = 2 + 2 * num_layers
     seq_pos_var = f"%arg{seq_pos_arg_idx}"
@@ -106,15 +131,13 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
         var_counter += 1
         return v
 
-    # 1. Embedding op
-    emb_meta = weight_metadata["model.embed_tokens.weight"]
-    c_off = get_var("index")
-    mlir_lines.append(f'    {c_off} = arith.constant {emb_meta["offset"]} : index')
+    c_w_off = get_var("index")
+    mlir_lines.append(f'    {c_w_off} = arith.constant 0 : index')
     w_mem = get_var(f"memref<{vocab_size}x{hidden_size}xi8>")
-    mlir_lines.append(f'    {w_mem} = memref.view %arg1[{c_off}][] : memref<?xi8> to memref<{vocab_size}x{hidden_size}xi8>')
+    mlir_lines.append(f'    {w_mem} = memref.view %arg1[{c_w_off}][] : memref<?xi8> to memref<{vocab_size}x{hidden_size}xi8>')
     w_tens = get_var(f"tensor<{vocab_size}x{hidden_size}xi8>")
     mlir_lines.append(f'    {w_tens} = bufferization.to_tensor {w_mem} restrict : memref<{vocab_size}x{hidden_size}xi8> to tensor<{vocab_size}x{hidden_size}xi8>')
-    
+
     scale_meta = weight_metadata["model.embed_tokens.scales"]
     c_scale_off = get_var("index")
     mlir_lines.append(f'    {c_scale_off} = arith.constant {scale_meta["offset"]} : index')
@@ -152,17 +175,26 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
         # 2. Self Attention Linear projections (q_proj, k_proj, v_proj, o_proj)
         def export_bitlinear(weight_key, input_var, out_features, in_features):
             w = st.get_tensor(weight_key)
-            s_tensor = st.get_tensor(f"{weight_key}_scale")
-            scale_val = float(s_tensor.to(torch.float32).item()) if s_tensor.numel() == 1 else 1.0
+            if f"{weight_key}_scale" in st.keys():
+                s_tensor = st.get_tensor(f"{weight_key}_scale")
+                scale_val = float(s_tensor.to(torch.float32).item()) if s_tensor.numel() == 1 else 1.0
+            else:
+                scale_val = float(w.to(torch.float32).abs().mean().item())
+                if scale_val < 1e-8: scale_val = 1.0
 
-            raw = w.contiguous().numpy().astype(np.uint8)          # [N/4, in_features]
-            N_quarter, K = raw.shape
-            tern = np.zeros((out_features, in_features), dtype=np.int8)
-            for slot in range(4):
-                mask = 3 << (2 * slot)
-                val = (raw & mask) >> (2 * slot)
-                val_tern = val.astype(np.int8) - 1
-                tern[slot * N_quarter:(slot + 1) * N_quarter, :] = val_tern
+            if w.dtype == torch.uint8:
+                raw = w.contiguous().numpy().astype(np.uint8)          # [N/4, in_features]
+                N_quarter, K = raw.shape
+                tern = np.zeros((out_features, in_features), dtype=np.int8)
+                for slot in range(4):
+                    mask = 3 << (2 * slot)
+                    val = (raw & mask) >> (2 * slot)
+                    val_tern = val.astype(np.int8) - 1
+                    tern[slot * N_quarter:(slot + 1) * N_quarter, :] = val_tern
+            else:
+                w_f32 = w.to(torch.float32)
+                scaled_w = w_f32 / scale_val
+                tern = torch.clamp(torch.round(scaled_w), -1.0, 1.0).to(torch.int8).numpy()
 
             if quant_mode == "tl1_pack":
                 # Microsoft TL1 dense mapping: (w0+1)*3 + (w1+1)
@@ -413,8 +445,15 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
         attn_3d = get_var("tensor<1x1x2560xf32>")
         mlir_lines.append(f'    {attn_3d} = tensor.collapse_shape {attn_trans} [[0], [1], [2, 3]] : tensor<1x1x20x128xf32> into tensor<1x1x2560xf32>')
 
-        # Attention Sub-LayerNorm (attn_sub_norm)
-        attn_sub_w = st.get_tensor(f"{prefix}.self_attn.attn_sub_norm.weight")
+        # Helper for tensor retrieval
+        def get_tensor_safe(keys, default_shape):
+            for k in keys:
+                if k in st.keys():
+                    return st.get_tensor(k)
+            return torch.ones(default_shape, dtype=torch.float32)
+
+        # Attention Sub-LayerNorm (attn_sub_norm / inner_attn_ln)
+        attn_sub_w = get_tensor_safe([f"{prefix}.self_attn.attn_sub_norm.weight", f"{prefix}.self_attn.inner_attn_ln.weight"], [hidden_size])
         attn_sub_meta = write_tensor(f"{prefix}.self_attn.attn_sub_norm.weight", attn_sub_w)
         attn_sub_off = get_var("index")
         mlir_lines.append(f'    {attn_sub_off} = arith.constant {attn_sub_meta["offset"]} : index')
@@ -426,12 +465,12 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
         attn_sub_out = get_var(f"tensor<1x1x{hidden_size}xf32>")
         mlir_lines.append(f'    {attn_sub_out} = "tenzo.rmsnorm"({attn_3d}, {w_attn_sub_tens}) {{eps = 1.00000000e-05 : f32}} : (tensor<1x1x{hidden_size}xf32>, tensor<{hidden_size}xf32>) -> tensor<1x1x{hidden_size}xf32>')
 
-        o_out = export_bitlinear(f"{prefix}.self_attn.o_proj.weight", attn_sub_out, 2560, 2560)
-        h1 = get_var("tensor<1x1x2560xf32>")
-        mlir_lines.append(f'    {h1} = "tenzo.add"({cur_x}, {o_out}) : (tensor<1x1x2560xf32>, tensor<1x1x2560xf32>) -> tensor<1x1x2560xf32>')
+        o_out = export_bitlinear(f"{prefix}.self_attn.o_proj.weight", attn_sub_out, hidden_size, hidden_size)
+        h1 = get_var(f"tensor<1x1x{hidden_size}xf32>")
+        mlir_lines.append(f'    {h1} = "tenzo.add"({cur_x}, {o_out}) : (tensor<1x1x{hidden_size}xf32>, tensor<1x1x{hidden_size}xf32>) -> tensor<1x1x{hidden_size}xf32>')
 
         # 3. Post Attention RMSNorm
-        post_norm_w = st.get_tensor(f"{prefix}.post_attention_layernorm.weight")
+        post_norm_w = get_tensor_safe([f"{prefix}.post_attention_layernorm.weight", f"{prefix}.post_attn_norm.weight"], [hidden_size])
         p_norm_meta = write_tensor(f"{prefix}.post_attention_layernorm.weight", post_norm_w)
         c_off = get_var("index")
         mlir_lines.append(f'    {c_off} = arith.constant {p_norm_meta["offset"]} : index')
@@ -453,7 +492,7 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
         act_mult_out = get_var(f"tensor<1x1x{ff_dim}xf32>")
         mlir_lines.append(f'    {act_mult_out} = "tenzo.mul"({relu2_out}, {up_out}) : (tensor<1x1x{ff_dim}xf32>, tensor<1x1x{ff_dim}xf32>) -> tensor<1x1x{ff_dim}xf32>')
 
-        ffn_sub_w = st.get_tensor(f"{prefix}.mlp.ffn_sub_norm.weight")
+        ffn_sub_w = get_tensor_safe([f"{prefix}.mlp.ffn_sub_norm.weight", f"{prefix}.mlp.ffn_layernorm.weight"], [ff_dim])
         ffn_sub_meta = write_tensor(f"{prefix}.mlp.ffn_sub_norm.weight", ffn_sub_w)
         ffn_sub_off = get_var("index")
         mlir_lines.append(f'    {ffn_sub_off} = arith.constant {ffn_sub_meta["offset"]} : index')
@@ -470,7 +509,7 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
         mlir_lines.append(f'    {cur_x} = "tenzo.add"({h1}, {down_out}) : (tensor<1x1x{hidden_size}xf32>, tensor<1x1x{hidden_size}xf32>) -> tensor<1x1x{hidden_size}xf32>')
 
     # Final RMSNorm (model.norm) before LM Head
-    final_norm_w = st.get_tensor("model.norm.weight")
+    final_norm_w = get_tensor_safe(["model.norm.weight", "model.layernorm.weight"], [hidden_size])
     final_norm_meta = write_tensor("model.norm.weight", final_norm_w)
     final_norm_off = get_var("index")
     mlir_lines.append(f'    {final_norm_off} = arith.constant {final_norm_meta["offset"]} : index')

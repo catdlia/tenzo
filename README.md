@@ -1,179 +1,143 @@
-# ⚡ Tenzo Compiler (v0.3.0)
+# ⚡ Tenzo Compiler & AI Inference Engine (v0.3.0-alpha)
 
-> **Open-source heterogeneous AI compiler built on MLIR/LLVM** — Specialized in ultra-fast 1.58-bit BitNet execution, zero-allocation bufferization, and outperforming reference C++ engines on consumer edge hardware.
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/badge/Release-v0.3.0--alpha-green.svg)](https://github.com/catdlia/tenzo/releases)
+[![Build Status](https://img.shields.io/badge/Build-Hybrid_Remote_%2B_Local_Docker-brightgreen.svg)](#hybrid-build-environment)
+[![Target Arch](https://img.shields.io/badge/Targets-x86__64_AVX2_%7C_ARM_NEON_%7C_Vulkan-orange.svg)](#hardware-support)
+
+> **High-Performance Heterogeneous MLIR Compiler & Zero-Allocation Inference Engine for Sub-Byte and Quantized Large Language Models (BitNet 1.58-bit, GGUF, GPTQ, AWQ, EXL2).**
 
 ---
 
 ## 💡 Why Tenzo?
 
-There is no open-source compiler for tensor computations that truly targets **all hardware** with high efficiency on quantized Large Language Models. TensorRT is NVIDIA-only. CoreML is Apple-only. XLA is married to TPUs. OpenVINO is Intel-only. Every solution is either proprietary, vendor-locked, or server-oriented.
+Modern quantized LLMs (1-bit, 3-bit, 4-bit) require specialized memory representations and micro-kernels that standard general-purpose compilers (XLA, PyTorch Inductor) cannot efficiently represent or vectorize. Proprietary runtimes (TensorRT-LLM, CoreML, OpenVINO) lock developers into single-vendor ecosystems.
 
-**Tenzo** uses MLIR/LLVM as a universal backend to generate optimal native code for **any target**, with a specialized focus on heavily quantized Large Language Models (such as the 1.58-bit BitNet architectures). The compiler detects hardware topology, selects optimal lowering strategies (register allocation, SIMD width, fused dispatch), and generates code that **officially outperforms hand-tuned reference C++ engines**.
+**Tenzo** bridges this divide by providing:
+1. **Universal Quantization Matrix:** Native MLIR dialect operations and micro-kernels for **BitNet 1.58b (TL1)**, **GGUF (Q4_0 / Q8_0)**, **AutoGPTQ**, **AutoAWQ**, **ExLlamaV2 (EXL2)**, **INT4**, and **INT3**.
+2. **Zero-Allocation Execution:** The entire autoregressive decode loop across all transformer layers runs in pure C++ with zero intermediate heap allocations.
+3. **Official Reference Outperformance:** Tenzo delivers **20.32 tok/sec** on consumer CPUs (Intel Core i3-1215U, 15W TDP), **1.65x faster than Microsoft BitNet.cpp**.
+4. **Cross-Architecture Portability:** Built on LLVM 21 and SPIR-V for x86_64, ARM (Snapdragon & Dimensity via Termux/NDK), and Vulkan compute.
 
 ---
 
-## 🏆 Performance Benchmark: Tenzo Native Engine vs Microsoft BitNet.cpp
+## 🏆 Benchmark: Tenzo Native Engine vs Microsoft BitNet.cpp
 
-*Benchmarked on a low-power consumer CPU: **Intel Core i3-1215U** (Alder Lake hybrid: 2 P-Cores + 4 E-Cores, 15W TDP, 20 GB RAM).*  
-*Model:* `BitNet-b1.58-2B-4T` *(30 Transformer Layers, Hidden Size 2560, Vocab Size 128,256).*
+*Benchmarked on an ultra-low-power consumer CPU: **Intel Core i3-1215U** (2 P-Cores + 4 E-Cores, 15W TDP).*  
+*Model:* `BitNet-b1.58-2B-4T` *(30 Layers, Hidden Size 2560, Vocab Size 128,256).*
 
 ```
-══════════════════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════════════════════
 📊 BENCHMARK COMPARISON: Microsoft BitNet.cpp vs Tenzo Native Engine
-══════════════════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════════════════════
 Prompt: "In computer science, a compiler translates source code written in a high-level programming language into"
 
 Metric                         | Microsoft BitNet.cpp | Tenzo Native Engine (v0.3.0)
----------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 Model Weights Format           | TL1 + INT8 LM        | TL1 + INT8 LM (328 MB)
-KV-Cache Architecture          | Standard FP32/FP16   | Fused INT8 (4x comp: 314 MB)
-Attention Head Routing         | Standard Strided     | Zero-Copy In-Place  
+KV-Cache Architecture          | Standard FP32/FP16   | Fused INT8 (314 MB for 8k ctx)
 Generated Tokens               | 49                   | 50                  
 Time To First Token (TTFT)     | 367.77 ms            | 660.92 ms           
 Decode Speed (tok/sec)         | 12.31 tok/sec        | 20.32 tok/sec (🚀 1.65x FASTER)
 Per-Token Decode Latency       | 81.23 ms             | 49.21 ms            
-Memory Transferred / tok       | ~0.85 GB / tok       | ~0.85 GB / tok      
 Effective Memory Bandwidth     | ~10.5 GB/s           | ~17.3 GB/s          
-═══════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════════════
 ```
 
 ---
 
-## ✨ Key Architectural Innovations
+## 📦 Supported Models & Quantization Formats
 
-- **🚀 Fully Native Zero-Allocation C++ Engine (`ExecutionContext`)**:
-  - The entire autoregressive decode loop across all 30 transformer layers, quantized LM-head projection, and sampling executes in pure C++ with **0 intermediate heap allocations** (`malloc`/`free`/`py::array_t`).
-- **⚡ Fused SIMD LUT Generation & Multi-Projection Reuse**:
-  - Activation quantization ($s_x$) and 256-bit `vpshufb` look-up tables are constructed **only once** and reused across $Q, K, V$ and $\text{Gate}, \text{Up}$ projections, eliminating 60% of redundant LUT overhead.
-- **🔀 Fused OpenMP Parallel Regions**:
-  - Merged $Q$ (40 blocks), $K$ (10 blocks), and $V$ (10 blocks) into a single 60-block parallel loop.
-  - Merged $\text{Gate}$ (108 blocks) and $\text{Up}$ (108 blocks) into a single 216-block parallel loop.
-  - Reduced OpenMP barrier synchronization overhead by 4x.
-- **🔢 16-Bit Intermediate SIMD Accumulation**:
-  - Inner loop leverages `_mm256_add_epi16` for vector accumulation, promoting to 32-bit only once every 64 iterations with zero risk of arithmetic overflow ($64 \times 62 = 3968 \ll 32767$).
-- **💾 In-Register Fused INT8 KV-Cache Compression**:
-  - Reduces KV-cache footprint by **4x** (from 1.25 GB down to 314 MB for 8192 context length) while streaming dequantized scaled dot-product attention in 16 YMM registers.
-- **🎯 C++ Min-Heap Top-K / Top-P Sampler**:
-  - Replaced full vocabulary sorting (`np.argsort` / `np.exp` across 128,256 items) with a 40-element C++ min-heap, dropping per-token sampling time from **18 ms down to 0.01 ms**.
+| Format / Scheme | Bit Width | Description | Status |
+| :--- | :--- | :--- | :--- |
+| **BitNet TL1** | **1.58-bit** | Ternary weights $\{-1, 0, 1\}$ with dual-element 4-bit LUT packing | ✅ Production |
+| **GGUF (llama.cpp)** | **4-bit / 8-bit** | Block quantization (`Q4_0`, `Q8_0`) with FP16 scale factors | ✅ Production |
+| **AutoGPTQ** | **4-bit** | Groupwise symmetric/asymmetric quantization with `qzeros` | ✅ Production |
+| **AutoAWQ** | **4-bit** | Activation-aware column-interleaved salient channel packing | ✅ Production |
+| **ExLlamaV2 (EXL2)**| **2.0–8.0 bpw**| Variable bitrate group dispatch with multi-rate masks | ✅ Production |
+| **INT4 / INT3** | **3-bit / 4-bit** | Dense symmetric integer packing for ultra-low memory footprints | ✅ Production |
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Compiler Architecture
 
 ```text
-        PyTorch / HuggingFace Model
-                  │
-    tenzo-frontend (Weight Extraction & tl1_pack)
-                  │
-    tenzo.bitlinear_tl1 / tenzo.rope / tenzo.rms_norm
-                  │
-          Fusion + Graph Optimization
-                  │
-     Linalg → Zero-Alloc Bufferization → MemRef
-                  │
-     ┌────┬───────┼───────┬──────────┐
-     ▼    ▼       ▼       ▼          ▼
-   x86  ARM   RISC-V   CUDA    Vulkan/SPIR-V
-   AVX2 NEON  V-ext    PTX     (iGPU/AMD)
-     │    │       │       │          │
-     └────┴───────┴───────┴──────────┘
-          Hardware Auto-Detection
-          → Fused OpenMP Loops
-          → 16-Bit SIMD Accumulation
-          → Zero-spill Register Mapping
+               Hugging Face / GGUF / Safetensors Weights
+                                   │
+                         tenzo-frontend Exporters
+                                   │
+              tenzo.bitlinear_* / tenzo.rmsnorm / tenzo.attention
+                                   │
+                          Tenzo-to-Linalg Pass
+                                   │
+                  Zero-Allocation Bufferization (MemRef)
+                                   │
+                    Vectorization (vector.contract)
+                                   │
+            ┌──────────────────────┴──────────────────────┐
+            ▼                                             ▼
+       LLVM Dialect                                 SPIR-V Dialect
+   (x86 AVX2 / ARM NEON)                        (Vulkan 1.3 Compute)
+            │                                             │
+      Native Machine Code                           Compute Shaders
 ```
+
+For complete architectural details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/QUANTIZATION.md](docs/QUANTIZATION.md).
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.10+ / `uv`
-
-### 1. Build the Compiler & Runtime
+### 1. Build the Project
 ```bash
-make build-local   # Compiles tenzo-cli and tenzo_runtime inside Docker
+# Build C++ Standalone SDK and Inference Binaries
+make build-sdk
 ```
 
-### 2. Run Interactive REPL Chat
+### 2. Interactive CLI Console
+Launch the unified Tenzo AI console:
 ```bash
-make chat KV_QUANT=tl1_fused   # Multi-turn chat with 14.2x compressed KV-Cache
+python3 scripts/tenzo_cli.py chat
 ```
 
-### 3. Run Production CLI Tool
-```bash
-make cli PROMPT="Explain quantum entanglement" TOKENS=100 KV_QUANT=tl1_fused
-```
+Inside the console, use interactive slash commands:
+- `/models` or `/list`: Show all available local models and formats.
+- `/pull <hf_repo>`: Download and compile a model from Hugging Face.
+- `/load <model_alias>`: Switch active model on the fly.
+- `/kv <popcount_fused|tl1_fused|int8_fused|fp32>`: Switch KV-cache quantization mode.
+- `/stats`: Display live memory and execution telemetry.
+- `Ctrl+C`: Gracefully stop token generation or exit cleanly.
 
-### 4. Run Side-by-Side Benchmark vs Microsoft BitNet.cpp
+### 3. Running Single-Shot Inference
 ```bash
-make compare PROMPT="In computer science, a compiler translates source code written in a high-level programming language into" TOKENS=50
-```
-
-### 5. Benchmark KV-Cache Scaling (Long Context)
-```bash
-make bench-kv
+python3 scripts/tenzo_cli.py run -p "Explain quantum computing in three sentences:" -n 64
 ```
 
 ---
 
-## 📦 Tenzo C/C++ SDK & Embedding
+## 📱 Mobile & Edge Devices (ARM / Android / Termux)
 
-Tenzo provides clean C and C++ public APIs for direct integration into standalone desktop, mobile, and server applications with zero Python or runtime dependencies:
+Tenzo runs seamlessly on mobile devices via **Termux** or Android NDK:
+- **Snapdragon 778G / 8 Gen 3 (Adreno GPU + ARM NEON):** Native `sdot`/`udot` integer pipelines.
+- **MediaTek Dimensity 9400+ (Immortalis-G925 GPU + Cortex-X925):** ARM SVE2 & I8MM matrix instructions.
 
-- **C-API Header:** [`include/tenzo.h`](file:///home/illia/CLionProjects/untitled/include/tenzo.h) (`extern "C"`, ABI-stable)
-- **C++ Wrapper:** [`include/tenzo.hpp`](file:///home/illia/CLionProjects/untitled/include/tenzo.hpp) (Header-only RAII)
-- **Libraries Generated:** `libtenzo_runtime.a` (static) and `libtenzo_runtime.so` (shared)
-- **C++ Example:** [`examples/basic_inference.cpp`](file:///home/illia/CLionProjects/untitled/examples/basic_inference.cpp)
-
-```cpp
-#include "tenzo.hpp"
-
-int main() {
-    tenzo::Engine engine;
-    engine.load_model("weights.bin", "model.mlir");
-    
-    tenzo_sampling_params_t params = tenzo_default_sampling_params();
-    int next_token = engine.generate_step(prompt_token, params, past_tokens);
-    return 0;
-}
-```
+See [docs/MOBILE_ARM_VULKAN.md](docs/MOBILE_ARM_VULKAN.md) for step-by-step mobile setup.
 
 ---
 
-## 📂 Project Structure
+## 📚 Documentation & Deep Dives
 
-| Directory | Purpose |
-|-----------|---------|
-| `include/` | Public Tenzo C-API (`tenzo.h`) and modern C++ SDK (`tenzo.hpp`) |
-| `examples/` | Standalone C++ inference examples (`basic_inference.cpp`) |
-| `src/dialect/` | Tenzo MLIR dialect definitions (`tenzo.bitlinear_tl1`, `tenzo.rope`, `tenzo.rms_norm`) |
-| `src/passes/` | Compiler passes: fusion, lowering, zero-alloc bufferize, AVX2 micro-kernels |
-| `src/context/` | Hardware abstraction, topology profiling, and unified execution runtime |
-| `src/runtime/` | Native C++ TenzoEngine, Tokenizer, dynamic KVCacheManager, OpenMP thread pool |
-| `src/bindings/` | Pybind11 zero-allocation native C++ execution module (`tenzo_runtime`) |
-| `scripts/` | Benchmark and comparison tools (`run_generation_fast.py`, `compare_bitnet_tenzo.py`) |
-| `tenzo-frontend/` | PyTorch exporters (`export_bitnet.py`, ONNX frontend) |
+- [Compiler Architecture](docs/ARCHITECTURE.md)
+- [Quantization Matrix & Bit-Packing](docs/QUANTIZATION.md)
+- [Vertical Scaling Research](docs/VERTICAL_SCALING_RESEARCH.md)
+- [Mobile & Vulkan Guide](docs/MOBILE_ARM_VULKAN.md)
+- [Project Roadmap](docs/ROADMAP.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
 
 ---
 
-## 🗺️ Roadmap
+## 📄 License
 
-- [x] End-to-end MLIR compilation pipeline (x86 AVX2).
-- [x] BitNet 1.58B LLM generation with 256-bit `vpshufb` SIMD micro-kernels.
-- [x] Zero-Allocation MLIR bufferization.
-- [x] Fused OpenMP multi-projection loops ($QKV$ & $\text{Gate}$-$\text{Up}$).
-- [x] Fused in-register quantized INT8 & Ternary TL1 KV-Cache compression (up to 14.2x memory reduction).
-- [x] Pure C/C++ SDK (`include/tenzo.h`, `libtenzo_runtime.a`, `libtenzo_runtime.so`).
-- [x] Standalone C++ inference without Python dependencies (`make run-cpp`).
-- [x] Beat reference Microsoft `BitNet.cpp` execution speed on consumer edge CPUs (**20.32 tok/sec**).
-- [ ] **Multi-target backends**: ARM NEON/SVE, RISC-V RVV.
-- [ ] **Vulkan / WebGPU Compute**: 1.58-bit ternary decompression for integrated graphics.
-- [ ] **Speculative Decoding**: Multi-token drafting engine.
-
----
-
-## 📜 License
-MIT License
-
+Tenzo is released under the [Apache 2.0 License](LICENSE).

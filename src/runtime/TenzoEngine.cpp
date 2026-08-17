@@ -783,6 +783,196 @@ void compute_linear_int3(
     }
 }
 
+// GGUF Q4_0 Block: 32 weights per block. 2 bytes FP16 scale 'd' + 16 bytes packed nibbles
+void compute_linear_gguf_q4_0(
+    const float* act_f32,
+    const uint8_t* w_gguf_q4_0,
+    float* out_f32,
+    int K, int N
+) {
+    const int block_size = 32;
+    const int bytes_per_block = 18; // 2 bytes fp16 + 16 bytes nibbles
+    int blocks_per_row = K / block_size;
+
+    #pragma omp parallel for schedule(dynamic, 8)
+    for (int n = 0; n < N; ++n) {
+        const uint8_t* row_base = w_gguf_q4_0 + n * (blocks_per_row * bytes_per_block);
+        __m256 sum_acc = _mm256_setzero_ps();
+
+        for (int b = 0; b < blocks_per_row; ++b) {
+            const uint8_t* blk = row_base + b * bytes_per_block;
+            uint16_t fp16_scale = *reinterpret_cast<const uint16_t*>(blk);
+            __m128 d_f32_vec = _mm_cvtph_ps(_mm_cvtsi32_si128(fp16_scale));
+            float d = _mm_cvtss_f32(d_f32_vec);
+            __m256 d_vec = _mm256_set1_ps(d);
+
+            const uint8_t* qs = blk + 2;
+            __m128i raw16 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(qs));
+            __m128i lo = _mm_and_si128(raw16, _mm_set1_epi8(0x0F));
+            __m128i hi = _mm_and_si128(_mm_srli_epi16(raw16, 4), _mm_set1_epi8(0x0F));
+
+            __m128i offset = _mm_set1_epi8(8);
+            lo = _mm_sub_epi8(lo, offset);
+            hi = _mm_sub_epi8(hi, offset);
+
+            const float* act_blk = act_f32 + b * block_size;
+            __m256 w0_f32 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(lo));
+            __m256 w1_f32 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_srli_si128(lo, 8)));
+            __m256 w2_f32 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(hi));
+            __m256 w3_f32 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_srli_si128(hi, 8)));
+
+            __m256 a0 = _mm256_loadu_ps(act_blk + 0);
+            __m256 a1 = _mm256_loadu_ps(act_blk + 8);
+            __m256 a2 = _mm256_loadu_ps(act_blk + 16);
+            __m256 a3 = _mm256_loadu_ps(act_blk + 24);
+
+            __m256 blk_dot = _mm256_fmadd_ps(a0, w0_f32, _mm256_setzero_ps());
+            blk_dot = _mm256_fmadd_ps(a1, w1_f32, blk_dot);
+            blk_dot = _mm256_fmadd_ps(a2, w2_f32, blk_dot);
+            blk_dot = _mm256_fmadd_ps(a3, w3_f32, blk_dot);
+
+            sum_acc = _mm256_fmadd_ps(blk_dot, d_vec, sum_acc);
+        }
+        alignas(32) float tmp[8];
+        _mm256_store_ps(tmp, sum_acc);
+        out_f32[n] = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+    }
+}
+
+// GGUF Q8_0 Block: 32 weights per block. 2 bytes FP16 scale 'd' + 32 bytes int8
+void compute_linear_gguf_q8_0(
+    const float* act_f32,
+    const uint8_t* w_gguf_q8_0,
+    float* out_f32,
+    int K, int N
+) {
+    const int block_size = 32;
+    const int bytes_per_block = 34;
+    int blocks_per_row = K / block_size;
+
+    #pragma omp parallel for schedule(dynamic, 8)
+    for (int n = 0; n < N; ++n) {
+        const uint8_t* row_base = w_gguf_q8_0 + n * (blocks_per_row * bytes_per_block);
+        __m256 sum_acc = _mm256_setzero_ps();
+
+        for (int b = 0; b < blocks_per_row; ++b) {
+            const uint8_t* blk = row_base + b * bytes_per_block;
+            uint16_t fp16_scale = *reinterpret_cast<const uint16_t*>(blk);
+            __m128 d_f32_vec = _mm_cvtph_ps(_mm_cvtsi32_si128(fp16_scale));
+            float d = _mm_cvtss_f32(d_f32_vec);
+            __m256 d_vec = _mm256_set1_ps(d);
+
+            const int8_t* qs = reinterpret_cast<const int8_t*>(blk + 2);
+            const float* act_blk = act_f32 + b * block_size;
+
+            for (int i = 0; i < 4; ++i) {
+                __m128i w8 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(qs + i * 8));
+                __m256 w_f32 = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(w8));
+                __m256 a = _mm256_loadu_ps(act_blk + i * 8);
+                sum_acc = _mm256_fmadd_ps(_mm256_mul_ps(a, w_f32), d_vec, sum_acc);
+            }
+        }
+        alignas(32) float tmp[8];
+        _mm256_store_ps(tmp, sum_acc);
+        out_f32[n] = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+    }
+}
+
+// GPTQ 4-bit Groupwise GEMV
+void compute_linear_gptq(
+    const float* act_f32,
+    const uint32_t* qweight,
+    const float* scales,
+    const uint32_t* qzeros,
+    float* out_f32,
+    int K, int N, int group_size = 128
+) {
+    #pragma omp parallel for schedule(dynamic, 8)
+    for (int n = 0; n < N; ++n) {
+        float total_sum = 0.0f;
+        for (int k = 0; k < K; k += 8) {
+            int group_idx = k / group_size;
+            float s = scales[group_idx * N + n];
+            uint32_t z_pack = qzeros[(group_idx / 8) * N + n];
+            int z = ((z_pack >> ((group_idx % 8) * 4)) & 0x0F) + 1;
+
+            uint32_t qw = qweight[(k / 8) * N + n];
+            for (int elem = 0; elem < 8; ++elem) {
+                int w = (qw >> (elem * 4)) & 0x0F;
+                float w_deq = static_cast<float>(w - z) * s;
+                total_sum += act_f32[k + elem] * w_deq;
+            }
+        }
+        out_f32[n] = total_sum;
+    }
+}
+
+// AWQ 4-bit Column-Interleaved GEMV
+void compute_linear_awq(
+    const float* act_f32,
+    const uint32_t* qweight,
+    const float* scales,
+    const uint32_t* qzeros,
+    float* out_f32,
+    int K, int N, int group_size = 128
+) {
+    static const int awq_order[8] = {0, 2, 4, 6, 1, 3, 5, 7};
+
+    #pragma omp parallel for schedule(dynamic, 8)
+    for (int n = 0; n < N; ++n) {
+        float total_sum = 0.0f;
+        for (int k = 0; k < K; k += 8) {
+            int group_idx = k / group_size;
+            float s = scales[group_idx * N + n];
+            uint32_t z_pack = qzeros[group_idx * (N / 8) + (n / 8)];
+            int z = (z_pack >> ((n % 8) * 4)) & 0x0F;
+
+            uint32_t qw = qweight[(k / 8) * N + n];
+            for (int elem = 0; elem < 8; ++elem) {
+                int orig_idx = awq_order[elem];
+                int w = (qw >> (elem * 4)) & 0x0F;
+                float w_deq = static_cast<float>(w - z) * s;
+                total_sum += act_f32[k + orig_idx] * w_deq;
+            }
+        }
+        out_f32[n] = total_sum;
+    }
+}
+
+// EXL2 Variable Bitrate GEMV
+void compute_linear_exl2(
+    const float* act_f32,
+    const uint32_t* qweight,
+    const float* scales,
+    const uint16_t* qgroups,
+    float* out_f32,
+    int K, int N, int num_groups
+) {
+    #pragma omp parallel for schedule(dynamic, 8)
+    for (int n = 0; n < N; ++n) {
+        float total_sum = 0.0f;
+        for (int g = 0; g < num_groups; ++g) {
+            int bits = qgroups[g * 4 + 0];
+            int k_start = qgroups[g * 4 + 1];
+            int k_len = qgroups[g * 4 + 2];
+            float s = scales[g * N + n];
+
+            uint32_t mask = (1U << bits) - 1;
+            int mid = 1 << (bits - 1);
+
+            for (int k = 0; k < k_len; ++k) {
+                int bit_pos = (k_start + k) * bits;
+                int word_idx = (bit_pos / 32) * N + n;
+                int shift = bit_pos % 32;
+                uint32_t raw_w = (qweight[word_idx] >> shift) & mask;
+                float w_deq = static_cast<float>(static_cast<int>(raw_w) - mid) * s;
+                total_sum += act_f32[k_start + k] * w_deq;
+            }
+        }
+        out_f32[n] = total_sum;
+    }
+}
+
 //===----------------------------------------------------------------------===//
 // TenzoEngineImpl Implementation
 //===----------------------------------------------------------------------===//

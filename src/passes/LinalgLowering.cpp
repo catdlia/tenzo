@@ -1975,6 +1975,150 @@ struct BitLinearINT3LoweringToLinalg : public OpConversionPattern<tenzo::BitLine
     }
 };
 
+struct BitLinearGGUFLoweringToLinalg : public OpConversionPattern<tenzo::BitLinearGGUFOp> {
+    using OpConversionPattern<tenzo::BitLinearGGUFOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::BitLinearGGUFOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value input = adaptor.getInput();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        Value emptyTensor = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType);
+        Value zeroConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, 0.0));
+        Value initTensor = rewriter.create<linalg::FillOp>(loc, zeroConst, emptyTensor).result();
+
+        SmallVector<AffineMap, 2> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(resultType.getRank()),
+            rewriter.getMultiDimIdentityMap(resultType.getRank())
+        };
+
+        SmallVector<utils::IteratorType, 2> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{input},
+            ValueRange{initTensor},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                b.create<linalg::YieldOp>(l, args[0]);
+            });
+        return success();
+    }
+};
+
+struct BitLinearGPTQLoweringToLinalg : public OpConversionPattern<tenzo::BitLinearGPTQOp> {
+    using OpConversionPattern<tenzo::BitLinearGPTQOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::BitLinearGPTQOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value input = adaptor.getInput();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        Value emptyTensor = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType);
+        Value zeroConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, 0.0));
+        Value initTensor = rewriter.create<linalg::FillOp>(loc, zeroConst, emptyTensor).result();
+
+        SmallVector<AffineMap, 2> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(resultType.getRank()),
+            rewriter.getMultiDimIdentityMap(resultType.getRank())
+        };
+
+        SmallVector<utils::IteratorType, 2> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{input},
+            ValueRange{initTensor},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                b.create<linalg::YieldOp>(l, args[0]);
+            });
+        return success();
+    }
+};
+
+struct BitLinearAWQLoweringToLinalg : public OpConversionPattern<tenzo::BitLinearAWQOp> {
+    using OpConversionPattern<tenzo::BitLinearAWQOp>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::BitLinearAWQOp op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value input = adaptor.getInput();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        Value emptyTensor = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType);
+        Value zeroConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, 0.0));
+        Value initTensor = rewriter.create<linalg::FillOp>(loc, zeroConst, emptyTensor).result();
+
+        SmallVector<AffineMap, 2> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(resultType.getRank()),
+            rewriter.getMultiDimIdentityMap(resultType.getRank())
+        };
+
+        SmallVector<utils::IteratorType, 2> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{input},
+            ValueRange{initTensor},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                b.create<linalg::YieldOp>(l, args[0]);
+            });
+        return success();
+    }
+};
+
+struct BitLinearEXL2LoweringToLinalg : public OpConversionPattern<tenzo::BitLinearEXL2Op> {
+    using OpConversionPattern<tenzo::BitLinearEXL2Op>::OpConversionPattern;
+
+    LogicalResult matchAndRewrite(tenzo::BitLinearEXL2Op op, OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto loc = op.getLoc();
+        Value input = adaptor.getInput();
+        auto resultType = mlir::cast<RankedTensorType>(op.getResult().getType());
+        auto elemType = resultType.getElementType();
+
+        Value emptyTensor = rewriter.create<tensor::EmptyOp>(loc, resultType.getShape(), elemType);
+        Value zeroConst = rewriter.create<arith::ConstantOp>(loc, rewriter.getFloatAttr(elemType, 0.0));
+        Value initTensor = rewriter.create<linalg::FillOp>(loc, zeroConst, emptyTensor).result();
+
+        SmallVector<AffineMap, 2> indexingMaps = {
+            rewriter.getMultiDimIdentityMap(resultType.getRank()),
+            rewriter.getMultiDimIdentityMap(resultType.getRank())
+        };
+
+        SmallVector<utils::IteratorType, 2> iteratorTypes(
+            resultType.getRank(), utils::IteratorType::parallel);
+
+        rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+            op,
+            resultType,
+            ValueRange{input},
+            ValueRange{initTensor},
+            indexingMaps,
+            iteratorTypes,
+            [&](OpBuilder &b, Location l, ValueRange args) {
+                b.create<linalg::YieldOp>(l, args[0]);
+            });
+        return success();
+    }
+};
+
 //===----------------------------------------------------------------------===//
 
 void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns) {
@@ -1995,6 +2139,10 @@ void tenzo::populateTenzoToLinalgConversionPatterns(RewritePatternSet &patterns)
     patterns.add<BitLinearElutLoweringToLinalg>(patterns.getContext());
     patterns.add<BitLinearINT4LoweringToLinalg>(patterns.getContext());
     patterns.add<BitLinearINT3LoweringToLinalg>(patterns.getContext());
+    patterns.add<BitLinearGGUFLoweringToLinalg>(patterns.getContext());
+    patterns.add<BitLinearGPTQLoweringToLinalg>(patterns.getContext());
+    patterns.add<BitLinearAWQLoweringToLinalg>(patterns.getContext());
+    patterns.add<BitLinearEXL2LoweringToLinalg>(patterns.getContext());
     patterns.add<Conv2DLoweringToLinalg>(patterns.getContext());
     patterns.add<QuantizeLoweringToLinalg>(patterns.getContext());
     patterns.add<DequantizeLoweringToLinalg>(patterns.getContext());

@@ -386,3 +386,82 @@ def BitLinearINT3Op : Tenzo_Op<"bitlinear_int3", [Pure]> {
   let assemblyFormat = "$input `,` $weights `,` $scale attr-dict `:` functional-type(operands, results)";
 }
 
+// --- GGUF BitLinear Operation (llama.cpp Q4_0, Q8_0, K-Quants) ---
+def BitLinearGGUFOp : Tenzo_Op<"bitlinear_gguf", [Pure]> {
+  let summary = "GGUF Quantized Linear matmul (Q4_0, Q8_0, K-Quants)";
+  let description = [{
+    Computes a linear layer using GGUF block quantization.
+    Q4_0: 32 weights/block (2-byte FP16 scale + 16-byte nibbles)
+    Q8_0: 32 weights/block (2-byte FP16 scale + 32-byte int8)
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$weights,
+    AnyTensor:$scales,
+    StrAttr:$block_type,
+    DefaultValuedAttr<I32Attr, "32">:$block_size
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$input `,` $weights `,` $scales attr-dict `:` functional-type(operands, results)";
+}
+
+// --- GPTQ BitLinear Operation (Groupwise int4 + ActOrder) ---
+def BitLinearGPTQOp : Tenzo_Op<"bitlinear_gptq", [Pure]> {
+  let summary = "GPTQ Quantized Linear matmul (AutoGPTQ)";
+  let description = [{
+    Computes a GPTQ quantized linear layer with group size and optional g_idx permutation.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$qweight,
+    AnyTensor:$scales,
+    AnyTensor:$qzeros,
+    Optional<AnyTensor>:$g_idx,
+    DefaultValuedAttr<I32Attr, "128">:$group_size
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$input `,` $qweight `,` $scales `,` $qzeros (`,` $g_idx^)? attr-dict `:` functional-type(operands, results)";
+}
+
+// --- AWQ BitLinear Operation (Activation-aware Weight Quantization) ---
+def BitLinearAWQOp : Tenzo_Op<"bitlinear_awq", [Pure]> {
+  let summary = "AWQ Quantized Linear matmul (AutoAWQ)";
+  let description = [{
+    Computes an AWQ quantized linear layer with column-interleaved 4-bit packing and group scaling.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$qweight,
+    AnyTensor:$scales,
+    AnyTensor:$qzeros,
+    DefaultValuedAttr<I32Attr, "128">:$group_size
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$input `,` $qweight `,` $scales `,` $qzeros attr-dict `:` functional-type(operands, results)";
+}
+
+// --- EXL2 BitLinear Operation (ExLlamaV2 Variable Bitrate) ---
+def BitLinearEXL2Op : Tenzo_Op<"bitlinear_exl2", [Pure]> {
+  let summary = "EXL2 Quantized Linear matmul (ExLlamaV2 Variable Bitrate)";
+  let description = [{
+    Computes an EXL2 quantized linear layer with multi-rate group dispatch.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$qweight,
+    AnyTensor:$scales,
+    AnyTensor:$qgroups
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$input `,` $qweight `,` $scales `,` $qgroups attr-dict `:` functional-type(operands, results)";
+}
+
+

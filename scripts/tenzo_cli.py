@@ -74,21 +74,32 @@ def print_banner():
 
 def find_available_models():
     models = []
-    # Check default export_output
-    if os.path.exists(EXPORT_OUTPUT_DIR):
-        w_bin = os.path.join(EXPORT_OUTPUT_DIR, "weights.bin")
-        t_voc = os.path.join(EXPORT_OUTPUT_DIR, "tokenizer.vocab")
-        if os.path.exists(w_bin) and os.path.exists(t_voc):
-            size_mb = os.path.getsize(w_bin) / (1024 * 1024)
-            models.append({
-                "name": "bitnet-2b-default",
-                "alias": "default",
-                "path": "/app/tenzo-frontend/export_output",
-                "local_path": EXPORT_OUTPUT_DIR,
-                "size_mb": size_mb,
-                "format": "TL1 (1.58b) + INT8 LM",
-                "status": "Active"
-            })
+    # Check default export_output and format-specific export directories
+    export_dirs = [
+        ("default", EXPORT_OUTPUT_DIR, "TL1 (1.58b) + INT8 LM"),
+        ("gguf", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_gguf"), "GGUF (llama.cpp Q4_0)"),
+        ("gptq", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_gptq"), "GPTQ (4-bit Groupwise)"),
+        ("awq", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_awq"), "AWQ (4-bit Salient)"),
+        ("exl2", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_exl2"), "EXL2 (Variable Bitrate)"),
+        ("int4", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_int4"), "INT4 Symmetric (4-bit)"),
+        ("int3", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_int3"), "INT3 Packed (3-bit)")
+    ]
+
+    for alias, edir, fmt in export_dirs:
+        if os.path.exists(edir):
+            w_bin = os.path.join(edir, "weights.bin")
+            t_voc = os.path.join(edir, "tokenizer.vocab")
+            if os.path.exists(w_bin):
+                size_mb = os.path.getsize(w_bin) / (1024 * 1024)
+                models.append({
+                    "name": f"model-{alias}",
+                    "alias": alias,
+                    "path": f"/app/tenzo-frontend/{os.path.basename(edir)}",
+                    "local_path": edir,
+                    "size_mb": size_mb,
+                    "format": fmt,
+                    "status": "Active" if alias == "default" else "Ready"
+                })
 
     # Check models directory
     if os.path.exists(LOCAL_MODELS_DIR):
@@ -104,7 +115,7 @@ def find_available_models():
                         "path": f"/app/models/{entry}",
                         "local_path": m_path,
                         "size_mb": size_mb,
-                        "format": "TL1 (1.58b)",
+                        "format": "Auto-detected",
                         "status": "Ready"
                     })
     return models
@@ -124,17 +135,25 @@ def pull_model(repo_id, quant="i2_s", layers=30):
     target_dir = os.path.join(LOCAL_MODELS_DIR, clean_name)
     os.makedirs(target_dir, exist_ok=True)
 
-    export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_bitnet.py")
+    if quant == "gguf":
+        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_gguf.py")
+    elif quant == "gptq":
+        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_gptq.py")
+    elif quant == "awq":
+        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_awq.py")
+    elif quant == "exl2":
+        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_exl2.py")
+    else:
+        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_bitnet.py")
+
     if not os.path.exists(export_script):
         print(f"{ANSI_RED}❌ Export script not found at {export_script}{ANSI_RESET}")
         return False
 
     cmd = [
         "python3", export_script,
-        "--model", repo_id,
-        "--out", target_dir,
-        "--layers", str(layers),
-        "--quant", quant
+        "--output-dir", target_dir,
+        "--num-layers", str(layers)
     ]
     res = subprocess.run(cmd)
     if res.returncode == 0:
@@ -201,17 +220,31 @@ def run_single_turn(session: TenzoSession, prompt: str, max_tokens: int = None, 
         "-c", str(session.ctx_size),
         "--kv-quant", session.kv_quant
     ]
-    subprocess.run(cmd)
+    try:
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        print(f"\n{ANSI_YELLOW}⏹️  Generation interrupted by user.{ANSI_RESET}")
 
 def interactive_repl(session: TenzoSession):
     print_banner()
     print(f"\n{ANSI_BOLD}🟢 Console Ready!{ANSI_RESET} Active Model: {ANSI_GREEN}{session.model_name}{ANSI_RESET} | KV-Cache: {ANSI_CYAN}{session.kv_quant}{ANSI_RESET} ({session.get_kv_ram_mb():.1f} MB @ {session.ctx_size} tokens)")
     print(f"{ANSI_DIM}Type {ANSI_YELLOW}/help{ANSI_RESET}{ANSI_DIM} for available commands or start chatting below:{ANSI_RESET}\n")
 
+    last_interrupt_time = 0
     while True:
         try:
             user_input = input(f"{ANSI_BOLD}{ANSI_GREEN}User > {ANSI_RESET}").strip()
-        except (KeyboardInterrupt, EOFError):
+            last_interrupt_time = 0
+        except KeyboardInterrupt:
+            now = time.time()
+            if now - last_interrupt_time < 2.0:
+                print(f"\n{ANSI_DIM}Exiting Tenzo Console. Goodbye!{ANSI_RESET}")
+                break
+            else:
+                last_interrupt_time = now
+                print(f"\n{ANSI_YELLOW}(Press Ctrl+C again or type /exit to quit){ANSI_RESET}")
+                continue
+        except EOFError:
             print(f"\n{ANSI_DIM}Exiting Tenzo Console. Goodbye!{ANSI_RESET}")
             break
 
@@ -379,4 +412,9 @@ def main():
         subprocess.run(["python3", bench_script, "--model", args.model, "--bench", args.bench, "--kv-quant", args.kv_quant])
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{ANSI_DIM}Process interrupted. Goodbye!{ANSI_RESET}")
+        sys.exit(0)
+
