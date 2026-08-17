@@ -101,12 +101,35 @@ run-cpp:
 cli:
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference $(if $(PROMPT),-p "$(PROMPT)") -n $(if $(TOKENS),$(TOKENS),128) -t $(if $(TEMP),$(TEMP),0.7) -m $(if $(MODEL),$(MODEL),/app/tenzo-frontend/export_output) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
 
-# Run interactive REPL multi-turn chat mode
-# Usage: make chat [KV_QUANT=int8_fused|tl1_fused|fp32] [MODEL=...]
+# Run interactive REPL multi-turn chat console (llama.cpp / Ollama style)
+# Usage: make chat [KV_QUANT=tl1_fused|int8_fused|fp32] [MODEL=...]
 chat:
-	docker compose run --rm -it -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference --chat -m $(if $(MODEL),$(MODEL),/app/tenzo-frontend/export_output) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
+	python3 scripts/tenzo_cli.py chat $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
 
-# Run comprehensive KV-Cache long context benchmark
+# List all local models and formats
+list:
+	python3 scripts/tenzo_cli.py list
+
+# Pull model from Hugging Face
+# Usage: make pull MODEL=microsoft/bitnet-b1.58-2B-4T [QUANT=i2_s]
+pull:
+	python3 scripts/tenzo_cli.py pull $(MODEL) $(if $(QUANT),--quant $(QUANT))
+
+# Run industry-standard LLM benchmark suite (Long generation, NIAH, PPL, Throughput)
+# Usage: make bench-suite [BENCH=all|long|niah|ppl|throughput] [MODEL=...] [KV_QUANT=tl1_fused]
+bench-suite:
+	python3 scripts/benchmark_suite.py $(if $(MODEL),--model $(MODEL)) $(if $(BENCH),--bench $(BENCH)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+bench-long:
+	python3 scripts/benchmark_suite.py --bench long $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+bench-niah:
+	python3 scripts/benchmark_suite.py --bench niah $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+bench-ppl:
+	python3 scripts/benchmark_suite.py --bench ppl $(if $(MODEL),--model $(MODEL)) $(if $(KV_QUANT),--kv-quant $(KV_QUANT))
+
+# Run comprehensive KV-Cache long context scaling benchmark
 bench-kv:
 	python3 scripts/benchmark_kv_cache_scaling.py
 
