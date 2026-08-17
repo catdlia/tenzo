@@ -249,6 +249,81 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
                 )
                 return out_v
 
+            elif quant_mode == "i4_s":
+                # INT4: 2 4-bit nibbles per byte along K axis [N, K/2]
+                w_f32 = tern.astype(np.float32)
+                amax = np.max(np.abs(w_f32), axis=1) / 7.0
+                amax[amax == 0] = 1.0
+                scale_val = np.mean(amax)
+                w_i4 = np.clip(np.round(w_f32 / amax[:, None]), -8, 7).astype(np.int8)
+                w_u4 = (w_i4 & 0x0F).astype(np.uint8)
+                c0 = w_u4[:, 0::2]
+                c1 = w_u4[:, 1::2]
+                packed = c0 | (c1 << 4)
+
+                packed_t = torch.from_numpy(packed.astype(np.int8))
+                meta = write_tensor(weight_key, packed_t, scale_val)
+
+                k_pack = in_features // 2
+                c_off = get_var("index")
+                mlir_lines.append(f'    {c_off} = arith.constant {meta["offset"]} : index')
+                w_mem = get_var(f"memref<{out_features}x{k_pack}xi8>")
+                mlir_lines.append(f'    {w_mem} = memref.view %arg1[{c_off}][] : memref<?xi8> to memref<{out_features}x{k_pack}xi8>')
+                w_tens = get_var(f"tensor<{out_features}x{k_pack}xi8>")
+                mlir_lines.append(f'    {w_tens} = bufferization.to_tensor {w_mem} restrict : memref<{out_features}x{k_pack}xi8> to tensor<{out_features}x{k_pack}xi8>')
+
+                sc_var = get_var("f32")
+                mlir_lines.append(f'    {sc_var} = arith.constant {scale_val:.8e} : f32')
+
+                out_v = get_var(f"tensor<1x1x{out_features}xf32>")
+                mlir_lines.append(
+                    f'    {out_v} = "tenzo.bitlinear_int4"({input_var}, {w_tens}, {sc_var}) '
+                    f'{{bit_width = 4 : i32, quant_scheme = "int4"}} : '
+                    f'(tensor<1x1x{in_features}xf32>, tensor<{out_features}x{k_pack}xi8>, f32) -> '
+                    f'tensor<1x1x{out_features}xf32>'
+                )
+                return out_v
+
+            elif quant_mode == "i3_s":
+                # INT3: 8 3-bit weights into 3 bytes along K axis [N, 3*K/8]
+                w_f32 = tern.astype(np.float32)
+                amax = np.max(np.abs(w_f32), axis=1) / 3.5
+                amax[amax == 0] = 1.0
+                scale_val = np.mean(amax)
+                w_i3 = np.clip(np.round(w_f32 / amax[:, None]) + 4, 0, 7).astype(np.uint8)
+                
+                N, K = w_i3.shape
+                packed = np.zeros((N, (K // 8) * 3), dtype=np.uint8)
+                for b in range(K // 8):
+                    w0, w1, w2, w3 = w_i3[:, b*8+0], w_i3[:, b*8+1], w_i3[:, b*8+2], w_i3[:, b*8+3]
+                    w4, w5, w6, w7 = w_i3[:, b*8+4], w_i3[:, b*8+5], w_i3[:, b*8+6], w_i3[:, b*8+7]
+                    packed[:, b*3+0] = w0 | (w1 << 3) | ((w2 & 0x03) << 6)
+                    packed[:, b*3+1] = (w2 >> 2) | (w3 << 1) | (w4 << 4) | ((w5 & 0x01) << 7)
+                    packed[:, b*3+2] = (w5 >> 1) | (w6 << 2) | (w7 << 5)
+
+                packed_t = torch.from_numpy(packed.astype(np.int8))
+                meta = write_tensor(weight_key, packed_t, scale_val)
+
+                k_pack = (in_features // 8) * 3
+                c_off = get_var("index")
+                mlir_lines.append(f'    {c_off} = arith.constant {meta["offset"]} : index')
+                w_mem = get_var(f"memref<{out_features}x{k_pack}xi8>")
+                mlir_lines.append(f'    {w_mem} = memref.view %arg1[{c_off}][] : memref<?xi8> to memref<{out_features}x{k_pack}xi8>')
+                w_tens = get_var(f"tensor<{out_features}x{k_pack}xi8>")
+                mlir_lines.append(f'    {w_tens} = bufferization.to_tensor {w_mem} restrict : memref<{out_features}x{k_pack}xi8> to tensor<{out_features}x{k_pack}xi8>')
+
+                sc_var = get_var("f32")
+                mlir_lines.append(f'    {sc_var} = arith.constant {scale_val:.8e} : f32')
+
+                out_v = get_var(f"tensor<1x1x{out_features}xf32>")
+                mlir_lines.append(
+                    f'    {out_v} = "tenzo.bitlinear_int3"({input_var}, {w_tens}, {sc_var}) '
+                    f'{{bit_width = 3 : i32, quant_scheme = "int3"}} : '
+                    f'(tensor<1x1x{in_features}xf32>, tensor<{out_features}x{k_pack}xi8>, f32) -> '
+                    f'tensor<1x1x{out_features}xf32>'
+                )
+                return out_v
+
             else:
                 # Default i2_s: Repack 4 contiguous ternary weights per byte along K axis
                 codes = (tern + 1).astype(np.uint8)                    # {-1,0,1} -> {0,1,2}
@@ -433,7 +508,7 @@ if __name__ == "__main__":
     parser.add_argument("--model-name", type=str, default="microsoft/bitnet-b1.58-2B-4T", help="Hugging Face model ID")
     parser.add_argument("--output-dir", type=str, default="export_output_bitnet", help="Directory to save exported files")
     parser.add_argument("--num-layers", type=int, default=2, help="Number of Transformer layers to export (default: 2)")
-    parser.add_argument("--quant-mode", type=str, choices=["i2_s", "tl1", "tl1_pack"], default="i2_s", help="Quantization mode: i2_s (default, MAD-based), tl1 (legacy LUT-based N-major), or tl1_pack (Microsoft LUT-based)")
+    parser.add_argument("--quant-mode", type=str, choices=["i2_s", "i4_s", "i3_s", "tl1", "tl1_pack"], default="i2_s", help="Quantization mode: i2_s (1.58b), i4_s (INT4), i3_s (INT3), tl1, tl1_pack")
     args = parser.parse_args()
 
     export_bitnet_model(model_name=args.model_name, output_dir=args.output_dir, num_layers=args.num_layers, quant_mode=args.quant_mode)

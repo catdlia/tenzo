@@ -341,3 +341,48 @@ def BitLinearTL1PackOp : Tenzo_Op<"bitlinear_tl1_pack", [Pure]> {
 
   let assemblyFormat = "$input `,` $weights (`,` $scale^)? attr-dict `:` functional-type(operands, results)";
 }
+
+// --- INT4 BitLinear Operation (4-bit asymmetric/symmetric matmul) ---
+def BitLinearINT4Op : Tenzo_Op<"bitlinear_int4", [Pure]> {
+  let summary = "INT4 4-bit Quantized Linear matmul";
+  let description = [{
+    Computes a 4-bit quantized linear layer.
+    Weights are packed 2 nibbles per byte: [N, K/2].
+    Scale: FP32 per-channel or per-tensor scale [N] or [1].
+    Optional zero-point: INT8/FP32 [N] or [1].
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$weights,
+    AnyTensor:$scale,
+    Optional<AnyTensor>:$zero_point,
+    DefaultValuedAttr<I32Attr, "4">:$bit_width,
+    DefaultValuedAttr<StrAttr, "\"int4\"">:$quant_scheme
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$input `,` $weights `,` $scale (`,` $zero_point^)? attr-dict `:` functional-type(operands, results)";
+}
+
+// --- INT3 BitLinear Operation (3-bit packed matmul) ---
+def BitLinearINT3Op : Tenzo_Op<"bitlinear_int3", [Pure]> {
+  let summary = "INT3 3-bit Quantized Linear matmul";
+  let description = [{
+    Computes a 3-bit quantized linear layer.
+    Weights are packed 8 weights per 3 bytes: [N, 3*K/8].
+    Scale: FP32 per-channel or per-tensor scale [N] or [1].
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    AnyTensor:$weights,
+    AnyTensor:$scale,
+    DefaultValuedAttr<I32Attr, "3">:$bit_width,
+    DefaultValuedAttr<StrAttr, "\"int3\"">:$quant_scheme
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$input `,` $weights `,` $scale attr-dict `:` functional-type(operands, results)";
+}
+

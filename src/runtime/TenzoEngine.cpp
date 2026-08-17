@@ -191,6 +191,14 @@ FusedKVCache::FusedKVCache(
         tl1_v.resize(total_tl1_bytes);
         tl1_k_scales.resize(total_scales);
         tl1_v_scales.resize(total_scales);
+    } else if (kv_mode == "popcount_fused") {
+        // Popcount bitplanes: 32 bytes per token head (contiguous struct)
+        size_t total_heads_tokens = static_cast<size_t>(num_layers) * num_kv_heads * max_seq_len;
+        size_t total_tl1_v_bytes = total_elements / 4;
+        popcount_k.resize(total_heads_tokens);
+        popcount_k_scales.resize(total_scales);
+        popcount_v.resize(total_tl1_v_bytes);
+        popcount_v_scales.resize(total_scales);
     } else {
         fp32_k.resize(total_elements);
         fp32_v.resize(total_elements);
@@ -342,6 +350,67 @@ void FusedKVCache::forward_attention_raw(
                 v_dst[d / 4] = static_cast<uint8_t>((wv0 + 1) | ((wv1 + 1) << 2) | ((wv2 + 1) << 4) | ((wv3 + 1) << 6));
             }
         }
+    } else if (kv_mode == "popcount_fused") {
+        for (int h = 0; h < num_kv_heads; ++h) {
+            size_t head_k_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len + pos;
+            size_t head_v_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len * (head_dim / 4) + pos * (head_dim / 4);
+            size_t scale_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len + pos;
+
+            const float* k_src = k_ptr + h * head_dim;
+            const float* v_src = v_ptr + h * head_dim;
+
+            float mean_k = 0.0f, mean_v = 0.0f;
+            for (int d = 0; d < head_dim; ++d) {
+                mean_k += std::abs(k_src[d]);
+                mean_v += std::abs(v_src[d]);
+            }
+            mean_k /= static_cast<float>(head_dim);
+            mean_v /= static_cast<float>(head_dim);
+
+            float th_k = 0.5f * mean_k;
+            float th_v = 0.5f * mean_v;
+
+            float sum_k_nz = 0.0f; int cnt_k = 0;
+            float sum_v_nz = 0.0f; int cnt_v = 0;
+            for (int d = 0; d < head_dim; ++d) {
+                float ak = std::abs(k_src[d]);
+                if (ak > th_k) { sum_k_nz += ak; cnt_k++; }
+                float av = std::abs(v_src[d]);
+                if (av > th_v) { sum_v_nz += av; cnt_v++; }
+            }
+            float s_k = (cnt_k > 0) ? (sum_k_nz / static_cast<float>(cnt_k)) : (mean_k + 1e-6f);
+            float s_v = (cnt_v > 0) ? (sum_v_nz / static_cast<float>(cnt_v)) : (mean_v + 1e-6f);
+
+            popcount_k_scales[scale_off] = s_k;
+            popcount_v_scales[scale_off] = s_v;
+
+            // Pack K into positive and negative bitplanes (64 bits per uint64)
+            uint64_t kp0 = 0, kn0 = 0, kp1 = 0, kn1 = 0;
+            for (int d = 0; d < 64; ++d) {
+                if (k_src[d] > th_k) kp0 |= (1ULL << d);
+                else if (k_src[d] < -th_k) kn0 |= (1ULL << d);
+            }
+            for (int d = 0; d < 64; ++d) {
+                if (k_src[64 + d] > th_k) kp1 |= (1ULL << d);
+                else if (k_src[64 + d] < -th_k) kn1 |= (1ULL << d);
+            }
+            popcount_k[head_k_off] = {kp0, kp1, kn0, kn1};
+
+            // Pack V into TL1 format (32 bytes)
+            uint8_t* v_dst = popcount_v.data() + head_v_off;
+            for (int d = 0; d < head_dim; d += 4) {
+                auto quant_tern = [](float val, float th) -> int {
+                    if (val > th) return 1;
+                    if (val < -th) return -1;
+                    return 0;
+                };
+                int wv0 = quant_tern(v_src[d + 0], th_v);
+                int wv1 = quant_tern(v_src[d + 1], th_v);
+                int wv2 = quant_tern(v_src[d + 2], th_v);
+                int wv3 = quant_tern(v_src[d + 3], th_v);
+                v_dst[d / 4] = static_cast<uint8_t>((wv0 + 1) | ((wv1 + 1) << 2) | ((wv2 + 1) << 4) | ((wv3 + 1) << 6));
+            }
+        }
     } else {
         for (int h = 0; h < num_kv_heads; ++h) {
             size_t head_off = (static_cast<size_t>(layer_idx) * num_kv_heads + h) * max_seq_len * head_dim + pos * head_dim;
@@ -457,6 +526,48 @@ void FusedKVCache::forward_attention_raw(
                 scores[t] = dot;
                 if (dot > max_score) max_score = dot;
             }
+        } else if (kv_mode == "popcount_fused") {
+            // SIMD Popcount Attention: 0 FMA multiplications, pure bitwise AND + POPCNT!
+            float mean_q = 0.0f;
+            for (int d = 0; d < head_dim; ++d) mean_q += std::abs(q_vec[d]);
+            mean_q /= static_cast<float>(head_dim);
+            float th_q = 0.5f * mean_q;
+
+            float sum_q_nz = 0.0f; int cnt_q = 0;
+            for (int d = 0; d < head_dim; ++d) {
+                float aq = std::abs(q_vec[d]);
+                if (aq > th_q) { sum_q_nz += aq; cnt_q++; }
+            }
+            float s_q = (cnt_q > 0) ? (sum_q_nz / static_cast<float>(cnt_q)) : (mean_q + 1e-6f);
+            float q_eff_scale = s_q * scale_factor;
+
+            uint64_t q_pos0 = 0, q_neg0 = 0, q_pos1 = 0, q_neg1 = 0;
+            for (int d = 0; d < 64; ++d) {
+                if (q_vec[d] > th_q) q_pos0 |= (1ULL << d);
+                else if (q_vec[d] < -th_q) q_neg0 |= (1ULL << d);
+            }
+            for (int d = 0; d < 64; ++d) {
+                if (q_vec[64 + d] > th_q) q_pos1 |= (1ULL << d);
+                else if (q_vec[64 + d] < -th_q) q_neg1 |= (1ULL << d);
+            }
+
+            size_t base_k_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len;
+            size_t base_s_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len;
+            const PopcountBitplanes* k_base = popcount_k.data() + base_k_off;
+            const float* s_base = popcount_k_scales.data() + base_s_off;
+
+            for (int t = 0; t < seq_len; ++t) {
+                const PopcountBitplanes& bp = k_base[t];
+
+                int pos_match = __builtin_popcountll(q_pos0 & bp.kp0) + __builtin_popcountll(q_pos1 & bp.kp1)
+                              + __builtin_popcountll(q_neg0 & bp.kn0) + __builtin_popcountll(q_neg1 & bp.kn1);
+                int neg_match = __builtin_popcountll(q_pos0 & bp.kn0) + __builtin_popcountll(q_pos1 & bp.kn1)
+                              + __builtin_popcountll(q_neg0 & bp.kp0) + __builtin_popcountll(q_neg1 & bp.kp1);
+                int dot_int = pos_match - neg_match;
+                float dot = static_cast<float>(dot_int) * (q_eff_scale * s_base[t]);
+                scores[t] = dot;
+                if (dot > max_score) max_score = dot;
+            }
         } else {
             size_t base_k_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * head_dim;
             const float* k_base = fp32_k.data() + base_k_off;
@@ -503,7 +614,7 @@ void FusedKVCache::forward_attention_raw(
                     acc[i] = _mm256_fmadd_ps(v_f32, weight_scale, acc[i]);
                 }
             }
-        } else if (kv_mode == "tl1_fused") {
+        } else if (kv_mode == "tl1_fused" || kv_mode == "popcount_fused") {
             alignas(16) static const int8_t LUT_W0[16] = { -1,  0,  1, 0,  -1,  0,  1, 0,  -1,  0,  1, 0,  -1,  0,  1, 0 };
             alignas(16) static const int8_t LUT_W1[16] = { -1, -1, -1, 0,   0,  0,  0, 0,   1,  1,  1, 0,   0,  0,  0, 0 };
             const __m128i lut0 = _mm_load_si128(reinterpret_cast<const __m128i*>(LUT_W0));
@@ -512,8 +623,8 @@ void FusedKVCache::forward_attention_raw(
 
             size_t base_v_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len * (head_dim / 4);
             size_t base_sv_off = (static_cast<size_t>(layer_idx) * num_kv_heads + kv_h) * max_seq_len;
-            const uint8_t* v_base = tl1_v.data() + base_v_off;
-            const float* sv_base = tl1_v_scales.data() + base_sv_off;
+            const uint8_t* v_base = (kv_mode == "popcount_fused") ? (popcount_v.data() + base_v_off) : (tl1_v.data() + base_v_off);
+            const float* sv_base = (kv_mode == "popcount_fused") ? (popcount_v_scales.data() + base_sv_off) : (tl1_v_scales.data() + base_sv_off);
 
             for (int t = 0; t < seq_len; ++t) {
                 const uint8_t* v_cached = v_base + t * (head_dim / 4);
@@ -569,6 +680,106 @@ void FusedKVCache::forward_attention_raw(
         if (scores != scores_buf) {
             delete[] scores;
         }
+    }
+}
+
+//===----------------------------------------------------------------------===//
+// INT4 and INT3 AVX2 Matrix-Multiplication Micro-Kernels
+//===----------------------------------------------------------------------===//
+
+void compute_linear_int4(
+    const float* act_f32,
+    const uint8_t* w_int4,
+    const float* scales,
+    float* out_f32,
+    int K, int N
+) {
+    alignas(32) std::vector<int16_t> act_i16(K);
+    float amax = 1e-8f;
+    for (int k = 0; k < K; ++k) amax = std::max(amax, std::abs(act_f32[k]));
+    float act_scale = amax / 127.0f;
+    float inv_act_scale = 1.0f / act_scale;
+    for (int k = 0; k < K; ++k) act_i16[k] = static_cast<int16_t>(std::round(act_f32[k] * inv_act_scale));
+    const __m256i* act_i16_vec = reinterpret_cast<const __m256i*>(act_i16.data());
+
+    #pragma omp parallel for schedule(dynamic, 8)
+    for (int n = 0; n < N; ++n) {
+        const uint8_t* row_w = w_int4 + n * (K / 2);
+        float s_w = scales[n];
+        float eff_scale = s_w * act_scale;
+
+        __m256i acc = _mm256_setzero_si256();
+        for (int k = 0; k < K; k += 32) {
+            __m128i raw16 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(row_w + k / 2));
+            __m128i lo_nib = _mm_and_si128(raw16, _mm_set1_epi8(0x0F));
+            __m128i hi_nib = _mm_and_si128(_mm_srli_epi16(raw16, 4), _mm_set1_epi8(0x0F));
+
+            __m128i unpacked_lo = _mm_unpacklo_epi8(lo_nib, hi_nib);
+            __m128i unpacked_hi = _mm_unpackhi_epi8(lo_nib, hi_nib);
+
+            __m256i w_i16_0 = _mm256_cvtepi8_epi16(unpacked_lo);
+            __m256i w_i16_1 = _mm256_cvtepi8_epi16(unpacked_hi);
+
+            __m256i prod0 = _mm256_madd_epi16(act_i16_vec[(k + 0) / 16], w_i16_0);
+            __m256i prod1 = _mm256_madd_epi16(act_i16_vec[(k + 16) / 16], w_i16_1);
+
+            acc = _mm256_add_epi32(acc, _mm256_add_epi32(prod0, prod1));
+        }
+        alignas(32) int32_t tmp[8];
+        _mm256_store_si256(reinterpret_cast<__m256i*>(tmp), acc);
+        int32_t isum = tmp[0] + tmp[1] + tmp[2] + tmp[3] + tmp[4] + tmp[5] + tmp[6] + tmp[7];
+        out_f32[n] = static_cast<float>(isum) * eff_scale;
+    }
+}
+
+void compute_linear_int3(
+    const float* act_f32,
+    const uint8_t* w_int3,
+    const float* scales,
+    float* out_f32,
+    int K, int N
+) {
+    alignas(32) std::vector<int16_t> act_i16(K);
+    float amax = 1e-8f;
+    for (int k = 0; k < K; ++k) amax = std::max(amax, std::abs(act_f32[k]));
+    float act_scale = amax / 127.0f;
+    float inv_act_scale = 1.0f / act_scale;
+    for (int k = 0; k < K; ++k) act_i16[k] = static_cast<int16_t>(std::round(act_f32[k] * inv_act_scale));
+    const __m256i* act_i16_vec = reinterpret_cast<const __m256i*>(act_i16.data());
+
+    #pragma omp parallel for schedule(dynamic, 8)
+    for (int n = 0; n < N; ++n) {
+        const uint8_t* row_w = w_int3 + n * (3 * K / 8);
+        float s_w = scales[n];
+        float eff_scale = s_w * act_scale;
+
+        int32_t total_sum = 0;
+        for (int k = 0; k < K; k += 8) {
+            int byte_idx = (k / 8) * 3;
+            uint32_t b0 = row_w[byte_idx + 0];
+            uint32_t b1 = row_w[byte_idx + 1];
+            uint32_t b2 = row_w[byte_idx + 2];
+            uint32_t packed24 = b0 | (b1 << 8) | (b2 << 16);
+
+            int32_t w0 = (packed24 >> 0) & 0x07;
+            int32_t w1 = (packed24 >> 3) & 0x07;
+            int32_t w2 = (packed24 >> 6) & 0x07;
+            int32_t w3 = (packed24 >> 9) & 0x07;
+            int32_t w4 = (packed24 >> 12) & 0x07;
+            int32_t w5 = (packed24 >> 15) & 0x07;
+            int32_t w6 = (packed24 >> 18) & 0x07;
+            int32_t w7 = (packed24 >> 21) & 0x07;
+
+            total_sum += act_i16[k + 0] * (w0 - 4);
+            total_sum += act_i16[k + 1] * (w1 - 4);
+            total_sum += act_i16[k + 2] * (w2 - 4);
+            total_sum += act_i16[k + 3] * (w3 - 4);
+            total_sum += act_i16[k + 4] * (w4 - 4);
+            total_sum += act_i16[k + 5] * (w5 - 4);
+            total_sum += act_i16[k + 6] * (w6 - 4);
+            total_sum += act_i16[k + 7] * (w7 - 4);
+        }
+        out_f32[n] = static_cast<float>(total_sum) * eff_scale;
     }
 }
 

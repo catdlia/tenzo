@@ -253,14 +253,14 @@ def interactive_repl(session: TenzoSession):
                     session.model_path = new_path
                     print(f"{ANSI_GREEN}✅ Switched active model to: {args[0]} ({new_path}){ANSI_RESET}")
             elif cmd == "/kv":
-                if not args or args[0] not in ("tl1_fused", "int8_fused", "fp32"):
-                    print(f"{ANSI_RED}Usage: /kv <tl1_fused|int8_fused|fp32>{ANSI_RESET}")
+                if not args or args[0] not in ("popcount_fused", "tl1_fused", "int8_fused", "fp32"):
+                    print(f"{ANSI_RED}Usage: /kv <popcount_fused|tl1_fused|int8_fused|fp32>{ANSI_RESET}")
                 else:
                     session.kv_quant = args[0]
                     print(f"{ANSI_GREEN}✅ KV-Cache Quantization switched to: {args[0]} (RAM for {session.ctx_size} ctx: {session.get_kv_ram_mb():.1f} MB){ANSI_RESET}")
             elif cmd == "/quant":
-                if not args or args[0] not in ("i2_s", "i8_s", "f32"):
-                    print(f"{ANSI_RED}Usage: /quant <i2_s|i8_s|f32>{ANSI_RESET}")
+                if not args or args[0] not in ("i2_s", "i4_s", "i3_s", "i8_s", "f32"):
+                    print(f"{ANSI_RED}Usage: /quant <i2_s|i4_s|i3_s|i8_s|f32>{ANSI_RESET}")
                 else:
                     session.model_quant = args[0]
                     print(f"{ANSI_GREEN}✅ Model Weight Quantization format set to: {args[0]}{ANSI_RESET}")
@@ -317,7 +317,7 @@ def main():
     sub_pull = subparsers.add_parser("pull", help="Download and compile a model from Hugging Face")
     sub_pull.add_argument("model_id", type=str, help="Hugging Face repo ID (e.g. microsoft/bitnet-b1.58-2B-4T)")
     sub_pull.add_argument("--layers", type=int, default=30, help="Number of layers (default: 30)")
-    sub_pull.add_argument("--quant", type=str, default="i2_s", choices=["i2_s", "i8_s", "f32"], help="Quantization mode")
+    sub_pull.add_argument("--quant", type=str, default="i2_s", choices=["i2_s", "i4_s", "i3_s", "i8_s", "f32"], help="Quantization mode")
 
     # 3. run
     sub_run = subparsers.add_parser("run", help="Run single-shot prompt generation")
@@ -329,18 +329,18 @@ def main():
     sub_run.add_argument("--top-k", type=int, default=40, help="Top-K filter")
     sub_run.add_argument("--rep-penalty", type=float, default=1.15, help="Repetition penalty multiplier")
     sub_run.add_argument("-c", "--ctx-size", type=int, default=8192, help="Context window capacity")
-    sub_run.add_argument("--kv-quant", type=str, default="tl1_fused", choices=["tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
+    sub_run.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
 
     # 4. chat
     sub_chat = subparsers.add_parser("chat", help="Launch interactive multi-turn REPL chat")
     sub_chat.add_argument("-m", "--model", type=str, default="default", help="Model name or path")
-    sub_chat.add_argument("--kv-quant", type=str, default="tl1_fused", choices=["tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
+    sub_chat.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
 
     # 5. bench
     sub_bench = subparsers.add_parser("bench", help="Run industry-standard LLM benchmarks")
     sub_bench.add_argument("--model", type=str, default="default", help="Model name to benchmark")
     sub_bench.add_argument("--bench", type=str, default="all", choices=["all", "long", "niah", "ppl", "throughput"], help="Benchmark type")
-    sub_bench.add_argument("--kv-quant", type=str, default="tl1_fused", choices=["tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
+    sub_bench.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
 
     args = parser.parse_args()
 

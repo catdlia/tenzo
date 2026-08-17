@@ -70,7 +70,7 @@ def calculate_kv_memory_mb(num_layers=30, num_kv_heads=5, head_dim=128, seq_len=
         bytes_total = 2 * total_elements * 4
     elif kv_mode == "int8_fused":
         bytes_total = 2 * total_elements * 1 + 2 * total_scales * 4
-    elif kv_mode == "tl1_fused":
+    elif kv_mode in ("tl1_fused", "popcount_fused"):
         bytes_total = 2 * (total_elements // 4) + 2 * total_scales * 4
     else:
         bytes_total = 0
@@ -231,7 +231,7 @@ def main():
     parser = argparse.ArgumentParser(description="Tenzo Industry-Standard LLM & Quantization Benchmark Suite")
     parser.add_argument("--model", type=str, default="default", help="Model name or path to benchmark")
     parser.add_argument("--bench", type=str, default="all", choices=["all", "long", "niah", "ppl", "throughput"], help="Benchmark type to run")
-    parser.add_argument("--kv-quant", type=str, default="tl1_fused", choices=["tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
+    parser.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "fp32"], help="KV-Cache quantization mode")
 
     args = parser.parse_args()
     model_path = resolve_model_path(args.model)

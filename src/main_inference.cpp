@@ -390,8 +390,8 @@ int main(int argc, char** argv) {
     auto t_dec_1 = std::chrono::high_resolution_clock::now();
     double dec_ms = std::chrono::duration<double, std::milli>(t_dec_1 - t_dec_0).count();
     double tok_per_sec = (gen_tokens.size() > 0 && dec_ms > 0) ? (gen_tokens.size() / (dec_ms / 1000.0)) : 0.0;
-
-    double kv_mem_mb = (30.0 * 8192 * 5 * 128 * (opt.kv_mode == "tl1_fused" ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : 4.0)) * 2) / (1024.0 * 1024.0);
+    double bytes_per_weight = (opt.kv_mode == "tl1_fused" || opt.kv_mode == "popcount_fused") ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : 4.0);
+    double kv_mem_mb = (30.0 * 8192 * 5 * 128 * bytes_per_weight * 2) / (1024.0 * 1024.0);
 
     std::cout << "\n\n" << ANSI_BOLD << "╔════════════════════════════════════════════════════════╗\n";
     std::cout << "║             Tenzo Engine Inference Profile             ║\n";

@@ -83,6 +83,15 @@ public:
     std::vector<float> tl1_k_scales;
     std::vector<float> tl1_v_scales;
 
+    // SIMD Popcount Bitplanes Buffers (Zero-FMA Attention: 32 bytes/head)
+    struct alignas(32) PopcountBitplanes {
+        uint64_t kp0, kp1, kn0, kn1;
+    };
+    std::vector<PopcountBitplanes> popcount_k;
+    std::vector<float> popcount_k_scales;
+    std::vector<uint8_t> popcount_v;
+    std::vector<float> popcount_v_scales;
+
     FusedKVCache(
         int num_layers = 30,
         int num_q_heads = 20,
