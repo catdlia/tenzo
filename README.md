@@ -96,19 +96,24 @@ Effective Memory Bandwidth     | ~10.5 GB/s           | ~17.3 GB/s
 make build-local   # Compiles tenzo-cli and tenzo_runtime inside Docker
 ```
 
-### 2. Run Ultra-Fast Text Generation (Python CLI)
+### 2. Run Interactive REPL Chat
 ```bash
-make run-fast PROMPT="Explain quantum entanglement and its role in computing" TOKENS=50
+make chat KV_QUANT=tl1_fused   # Multi-turn chat with 14.2x compressed KV-Cache
 ```
 
-### 3. Run Standalone Pure C++ Inference (Zero Python Dependency)
+### 3. Run Production CLI Tool
 ```bash
-make run-cpp PROMPT="In computer science, a compiler translates source code written in a high-level programming language into" TOKENS=50
+make cli PROMPT="Explain quantum entanglement" TOKENS=100 KV_QUANT=tl1_fused
 ```
 
 ### 4. Run Side-by-Side Benchmark vs Microsoft BitNet.cpp
 ```bash
 make compare PROMPT="In computer science, a compiler translates source code written in a high-level programming language into" TOKENS=50
+```
+
+### 5. Benchmark KV-Cache Scaling (Long Context)
+```bash
+make bench-kv
 ```
 
 ---

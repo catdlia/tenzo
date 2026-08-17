@@ -443,6 +443,7 @@ void FusedKVCache::forward_attention_raw(
                 }
             }
         } else if (kv_mode == "tl1_fused") {
+            std::memset(out_vec, 0, head_dim * sizeof(float));
             for (int t = 0; t < seq_len; ++t) {
                 size_t offset_v = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads * (head_dim / 4) + kv_h * (head_dim / 4);
                 size_t offset_s = (static_cast<size_t>(layer_idx) * max_seq_len + t) * num_kv_heads + kv_h;

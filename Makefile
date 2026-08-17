@@ -18,12 +18,12 @@ build:
 # Локальний білд компілятора та SDK
 build-local:
 	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
 
 # Збірка лише автономного C/C++ SDK та прикладів (швидко)
 build-sdk:
 	@echo "📦 Збірка Tenzo C/C++ SDK та standalone runtime..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
 
 # ==========================================
 # 🧪 TESTING & RUNNING (via Docker)
@@ -95,6 +95,20 @@ run-fast:
 # Usage: make run-cpp PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [KV_QUANT=int8_fused|tl1_fused|fp32]
 run-cpp:
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo_basic_inference -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) -m /app/tenzo-frontend/export_output --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
+
+# Run full-featured Tenzo CLI inference tool
+# Usage: make cli [PROMPT="..."] [TOKENS=128] [TEMP=0.7] [KV_QUANT=int8_fused|tl1_fused|fp32] [MODEL=...]
+cli:
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference $(if $(PROMPT),-p "$(PROMPT)") -n $(if $(TOKENS),$(TOKENS),128) -t $(if $(TEMP),$(TEMP),0.7) -m $(if $(MODEL),$(MODEL),/app/tenzo-frontend/export_output) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
+
+# Run interactive REPL multi-turn chat mode
+# Usage: make chat [KV_QUANT=int8_fused|tl1_fused|fp32] [MODEL=...]
+chat:
+	docker compose run --rm -it -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference --chat -m $(if $(MODEL),$(MODEL),/app/tenzo-frontend/export_output) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
+
+# Run comprehensive KV-Cache long context benchmark
+bench-kv:
+	python3 scripts/benchmark_kv_cache_scaling.py
 
 # Run side-by-side comparison: Microsoft BitNet.cpp vs Tenzo Native Engine
 # Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|tl1_fused|fp32]

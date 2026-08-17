@@ -399,7 +399,7 @@ target_link_libraries(tenzo_runtime_shared PUBLIC
 )
 set_target_properties(tenzo_runtime_shared PROPERTIES OUTPUT_NAME "tenzo_runtime")
 
-# Standalone C++ Inference Executable
+# Standalone C++ Inference Executable (Example)
 add_executable(tenzo_basic_inference
     examples/basic_inference.cpp
 )
@@ -410,6 +410,22 @@ target_compile_options(tenzo_basic_inference PRIVATE
     -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
 )
 target_link_libraries(tenzo_basic_inference PRIVATE
+    tenzo_runtime_static
+    OpenMP::OpenMP_CXX
+    m
+)
+
+# Production Tenzo CLI Inference Tool
+add_executable(tenzo-inference
+    src/main_inference.cpp
+)
+target_include_directories(tenzo-inference PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+target_compile_options(tenzo-inference PRIVATE
+    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
+)
+target_link_libraries(tenzo-inference PRIVATE
     tenzo_runtime_static
     OpenMP::OpenMP_CXX
     m
