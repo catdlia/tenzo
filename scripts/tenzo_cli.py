@@ -148,9 +148,25 @@ def find_available_models():
 def resolve_model_path(model_arg):
     in_docker = is_running_in_docker_host()
     models = find_available_models()
+    arg_clean = model_arg.strip().lower().replace("_", "-")
+    
+    # 1. Exact match
     for m in models:
         if model_arg in (m['name'], m['alias'], m['path'], m['local_path']):
             return m['path'] if in_docker else m['local_path']
+            
+    # 2. Case-insensitive and prefix/contains fuzzy match
+    for m in models:
+        m_name = m['name'].lower().replace("_", "-")
+        m_alias = m['alias'].lower().replace("_", "-")
+        m_base = os.path.basename(m['local_path']).lower().replace("_", "-")
+        if (arg_clean in (m_name, m_alias, m_base)
+            or m_name.startswith(arg_clean)
+            or m_alias.startswith(arg_clean)
+            or arg_clean in m_name
+            or arg_clean in m_base):
+            return m['path'] if in_docker else m['local_path']
+
     if os.path.exists(model_arg):
         if in_docker:
             rel = os.path.relpath(os.path.abspath(model_arg), os.getcwd())
