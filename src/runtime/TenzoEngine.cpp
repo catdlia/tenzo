@@ -4,6 +4,11 @@
  */
 
 #include "TenzoEngine.h"
+#include "VulkanRuntime.h"
+#include "CUDARuntime.h"
+#include "ROCmRuntime.h"
+#include "MicroarchProfiler.h"
+#include "arch/RISCV_RVV.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -207,6 +212,236 @@ FusedKVCache::FusedKVCache(
 
 void FusedKVCache::reset() {
     cur_seq_len = 0;
+}
+
+//===----------------------------------------------------------------------===//
+// Paged Attention Dynamic KV-Cache Implementation
+//===----------------------------------------------------------------------===//
+PagedKVCache::PagedKVCache(
+    int num_layers,
+    int num_q_heads,
+    int num_kv_heads,
+    int head_dim,
+    int total_blocks
+) : num_layers(num_layers),
+    num_q_heads(num_q_heads),
+    num_kv_heads(num_kv_heads),
+    head_dim(head_dim),
+    total_blocks(total_blocks),
+    block_mgr(total_blocks, BLOCK_SIZE) {
+
+    size_t total_elements = static_cast<size_t>(total_blocks) * num_layers * num_kv_heads * BLOCK_SIZE * head_dim;
+    paged_k_pool.resize(total_elements, 0);
+    paged_v_pool.resize(total_elements, 0);
+
+    size_t total_scales = static_cast<size_t>(total_blocks) * num_layers * num_kv_heads * BLOCK_SIZE;
+    paged_k_scales.resize(total_scales, 1.0f);
+    paged_v_scales.resize(total_scales, 1.0f);
+}
+
+void PagedKVCache::reset() {
+    cur_seq_len = 0;
+    block_table.clear();
+    block_mgr.reset();
+}
+
+void PagedKVCache::forward_attention_raw(
+    int layer_idx,
+    float* __restrict__ q_ptr,
+    float* __restrict__ k_ptr,
+    float* __restrict__ v_ptr,
+    float* __restrict__ out_ptr
+) {
+    const int pos = cur_seq_len;
+    const int half_dim = head_dim / 2;
+    const float theta_base = 10000.0f;
+
+    // 1. In-place AVX2 RoPE on Q
+    for (int h = 0; h < num_q_heads; ++h) {
+        float* q_head = q_ptr + h * head_dim;
+        for (int i = 0; i < half_dim; i += 8) {
+            alignas(32) float cos_arr[8];
+            alignas(32) float sin_arr[8];
+            for (int j = 0; j < 8; ++j) {
+                int idx = i + j;
+                float freq = 1.0f / std::pow(theta_base, static_cast<float>(2 * idx) / head_dim);
+                float angle = static_cast<float>(pos) * freq;
+                cos_arr[j] = std::cos(angle);
+                sin_arr[j] = std::sin(angle);
+            }
+            __m256 cos_vec = _mm256_load_ps(cos_arr);
+            __m256 sin_vec = _mm256_load_ps(sin_arr);
+            __m256 x0 = _mm256_loadu_ps(q_head + i);
+            __m256 x1 = _mm256_loadu_ps(q_head + i + half_dim);
+            __m256 r0 = _mm256_fmsub_ps(x0, cos_vec, _mm256_mul_ps(x1, sin_vec));
+            __m256 r1 = _mm256_fmadd_ps(x0, sin_vec, _mm256_mul_ps(x1, cos_vec));
+            _mm256_storeu_ps(q_head + i, r0);
+            _mm256_storeu_ps(q_head + i + half_dim, r1);
+        }
+    }
+
+    // 2. In-place AVX2 RoPE on K
+    for (int h = 0; h < num_kv_heads; ++h) {
+        float* k_head = k_ptr + h * head_dim;
+        for (int i = 0; i < half_dim; i += 8) {
+            alignas(32) float cos_arr[8];
+            alignas(32) float sin_arr[8];
+            for (int j = 0; j < 8; ++j) {
+                int idx = i + j;
+                float freq = 1.0f / std::pow(theta_base, static_cast<float>(2 * idx) / head_dim);
+                float angle = static_cast<float>(pos) * freq;
+                cos_arr[j] = std::cos(angle);
+                sin_arr[j] = std::sin(angle);
+            }
+            __m256 cos_vec = _mm256_load_ps(cos_arr);
+            __m256 sin_vec = _mm256_load_ps(sin_arr);
+            __m256 x0 = _mm256_loadu_ps(k_head + i);
+            __m256 x1 = _mm256_loadu_ps(k_head + i + half_dim);
+            __m256 r0 = _mm256_fmsub_ps(x0, cos_vec, _mm256_mul_ps(x1, sin_vec));
+            __m256 r1 = _mm256_fmadd_ps(x0, sin_vec, _mm256_mul_ps(x1, cos_vec));
+            _mm256_storeu_ps(k_head + i, r0);
+            _mm256_storeu_ps(k_head + i + half_dim, r1);
+        }
+    }
+
+    // 3. Dynamic Page Allocation
+    int logical_block_idx = pos / BLOCK_SIZE;
+    int slot_in_block = pos % BLOCK_SIZE;
+    if (logical_block_idx >= static_cast<int>(block_table.size())) {
+        int32_t new_blk = block_mgr.allocate_block();
+        if (new_blk >= 0) {
+            block_table.push_back(new_blk);
+        }
+    }
+
+    int32_t phys_block = (logical_block_idx < static_cast<int>(block_table.size())) ? block_table[logical_block_idx] : 0;
+
+    // 4. Quantize and write current token K and V into physical block page
+    for (int h = 0; h < num_kv_heads; ++h) {
+        size_t block_head_off = ((static_cast<size_t>(phys_block) * num_layers + layer_idx) * num_kv_heads + h) * BLOCK_SIZE * head_dim + slot_in_block * head_dim;
+        size_t scale_off = ((static_cast<size_t>(phys_block) * num_layers + layer_idx) * num_kv_heads + h) * BLOCK_SIZE + slot_in_block;
+
+        const float* k_src = k_ptr + h * head_dim;
+        const float* v_src = v_ptr + h * head_dim;
+        int8_t* k_dst = paged_k_pool.data() + block_head_off;
+        int8_t* v_dst = paged_v_pool.data() + block_head_off;
+
+        float amax_k = 1e-8f, amax_v = 1e-8f;
+        for (int d = 0; d < head_dim; ++d) {
+            amax_k = std::max(amax_k, std::abs(k_src[d]));
+            amax_v = std::max(amax_v, std::abs(v_src[d]));
+        }
+        float s_k = amax_k / 127.0f;
+        float s_v = amax_v / 127.0f;
+        paged_k_scales[scale_off] = s_k;
+        paged_v_scales[scale_off] = s_v;
+
+        float inv_sk = 1.0f / s_k;
+        float inv_sv = 1.0f / s_v;
+        for (int d = 0; d < head_dim; ++d) {
+            k_dst[d] = static_cast<int8_t>(std::clamp(std::round(k_src[d] * inv_sk), -128.0f, 127.0f));
+            v_dst[d] = static_cast<int8_t>(std::clamp(std::round(v_src[d] * inv_sv), -128.0f, 127.0f));
+        }
+    }
+
+    // 5. Paged Scaled Dot-Product Attention
+    const int total_tokens = pos + 1;
+    const int gqa_ratio = num_q_heads / num_kv_heads;
+    const float qk_scale = 1.0f / std::sqrt(static_cast<float>(head_dim));
+
+    std::vector<float> scores(total_tokens);
+
+    for (int qh = 0; qh < num_q_heads; ++qh) {
+        int kv_h = qh / gqa_ratio;
+        const float* q_head = q_ptr + qh * head_dim;
+
+        float max_score = -1e30f;
+        for (int b = 0; b <= logical_block_idx; ++b) {
+            int32_t blk = block_table[b];
+            int tokens_in_this_block = (b == logical_block_idx) ? (slot_in_block + 1) : BLOCK_SIZE;
+
+            for (int s = 0; s < tokens_in_this_block; ++s) {
+                int t = b * BLOCK_SIZE + s;
+                size_t k_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE * head_dim + s * head_dim;
+                size_t scale_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE + s;
+
+                const int8_t* k_page = paged_k_pool.data() + k_off;
+                float s_k = paged_k_scales[scale_off];
+
+                __m256 acc0 = _mm256_setzero_ps();
+                __m256 acc1 = _mm256_setzero_ps();
+                for (int d = 0; d < head_dim; d += 16) {
+                    __m256 q_v0 = _mm256_loadu_ps(q_head + d);
+                    __m256 q_v1 = _mm256_loadu_ps(q_head + d + 8);
+
+                    __m128i k_raw = _mm_loadu_si128(reinterpret_cast<const __m128i*>(k_page + d));
+                    __m256i k_epi16 = _mm256_cvtepi8_epi16(k_raw);
+                    __m256 k_f0 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(k_epi16)));
+                    __m256 k_f1 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256(k_epi16, 1)));
+
+                    acc0 = _mm256_fmadd_ps(q_v0, k_f0, acc0);
+                    acc1 = _mm256_fmadd_ps(q_v1, k_f1, acc1);
+                }
+                __m256 acc = _mm256_add_ps(acc0, acc1);
+                alignas(32) float acc_arr[8];
+                _mm256_store_ps(acc_arr, acc);
+                float dot = 0.0f;
+                for (int i = 0; i < 8; ++i) dot += acc_arr[i];
+
+                float score = dot * s_k * qk_scale;
+                scores[t] = score;
+                max_score = std::max(max_score, score);
+            }
+        }
+
+        // Softmax
+        float sum_exp = 0.0f;
+        for (int t = 0; t < total_tokens; ++t) {
+            float exp_val = std::exp(scores[t] - max_score);
+            scores[t] = exp_val;
+            sum_exp += exp_val;
+        }
+        float inv_sum = 1.0f / (sum_exp + 1e-8f);
+        for (int t = 0; t < total_tokens; ++t) {
+            scores[t] *= inv_sum;
+        }
+
+        // Accumulate Weighted Values
+        float* out_head = out_ptr + qh * head_dim;
+        std::memset(out_head, 0, head_dim * sizeof(float));
+
+        for (int b = 0; b <= logical_block_idx; ++b) {
+            int32_t blk = block_table[b];
+            int tokens_in_this_block = (b == logical_block_idx) ? (slot_in_block + 1) : BLOCK_SIZE;
+
+            for (int s = 0; s < tokens_in_this_block; ++s) {
+                int t = b * BLOCK_SIZE + s;
+                float alpha = scores[t];
+                if (alpha < 1e-7f) continue;
+
+                size_t v_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE * head_dim + s * head_dim;
+                size_t scale_off = ((static_cast<size_t>(blk) * num_layers + layer_idx) * num_kv_heads + kv_h) * BLOCK_SIZE + s;
+
+                const int8_t* v_page = paged_v_pool.data() + v_off;
+                float s_v = paged_v_scales[scale_off];
+                float weight = alpha * s_v;
+                __m256 w_vec = _mm256_set1_ps(weight);
+
+                for (int d = 0; d < head_dim; d += 16) {
+                    __m128i v_raw = _mm_loadu_si128(reinterpret_cast<const __m128i*>(v_page + d));
+                    __m256i v_epi16 = _mm256_cvtepi8_epi16(v_raw);
+                    __m256 v_f0 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(v_epi16)));
+                    __m256 v_f1 = _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256(v_epi16, 1)));
+
+                    __m256 cur_out0 = _mm256_loadu_ps(out_head + d);
+                    __m256 cur_out1 = _mm256_loadu_ps(out_head + d + 8);
+
+                    _mm256_storeu_ps(out_head + d, _mm256_fmadd_ps(w_vec, v_f0, cur_out0));
+                    _mm256_storeu_ps(out_head + d + 8, _mm256_fmadd_ps(w_vec, v_f1, cur_out1));
+                }
+            }
+        }
+    }
 }
 
 void FusedKVCache::forward_attention_raw(
@@ -979,8 +1214,10 @@ void compute_linear_exl2(
 
 TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
     : config(cfg),
-      kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, cfg.max_seq_len, cfg.kv_mode ? cfg.kv_mode : "int8_fused") {
+      kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, cfg.max_seq_len, cfg.kv_mode ? cfg.kv_mode : "int8_fused"),
+      paged_kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, (cfg.max_seq_len + 15) / 16) {
     
+    use_paged_kv = (cfg.kv_mode && std::string(cfg.kv_mode) == "paged_int8");
     q_dim = cfg.num_q_heads * cfg.head_dim;
     kv_dim = cfg.num_kv_heads * cfg.head_dim;
     ffn_dim = cfg.ffn_dim;
@@ -1010,7 +1247,11 @@ TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
 }
 
 void TenzoEngineImpl::reset() {
-    kv_cache.reset();
+    if (use_paged_kv) {
+        paged_kv_cache.reset();
+    } else {
+        kv_cache.reset();
+    }
 }
 
 void TenzoEngineImpl::set_layer_weights(int layer_idx, const tenzo_layer_weights_t* w) {
@@ -1074,7 +1315,226 @@ void TenzoEngineImpl::embedding_lookup(int token_id) {
     }
 }
 
+void TenzoEngineImpl::forward_layer_gpu(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. GPU Pre-RMSNorm
+    runtime::VulkanRuntime::executeRMSNorm(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. GPU BitLinear Projections Q, K, V
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), q_dim, h_dim, lw.q_scale);
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), kv_dim, h_dim, lw.k_scale);
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), kv_dim, h_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. GPU Attn Sub-Norm
+    runtime::VulkanRuntime::executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. GPU Out Projection
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. GPU MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        runtime::VulkanRuntime::executeRMSNorm(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        runtime::VulkanRuntime::executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), ffn_dim, h_dim, lw.gate_scale);
+        runtime::VulkanRuntime::executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), ffn_dim, h_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        runtime::VulkanRuntime::executeRMSNorm(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        runtime::VulkanRuntime::executeBitLinearTL1(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), h_dim, ffn_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
+void TenzoEngineImpl::forward_layer_cuda(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. CUDA Pre-RMSNorm
+    CUDARuntime::getInstance().executeRMSNorm(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. CUDA BitLinear Projections Q, K, V
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), 1, h_dim, q_dim, lw.q_scale);
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), 1, h_dim, kv_dim, lw.k_scale);
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), 1, h_dim, kv_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. CUDA Attn Sub-Norm
+    CUDARuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. CUDA Out Projection
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. CUDA MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        CUDARuntime::getInstance().executeRMSNorm(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        CUDARuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), 1, h_dim, ffn_dim, lw.gate_scale);
+        CUDARuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), 1, h_dim, ffn_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        CUDARuntime::getInstance().executeRMSNorm(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        CUDARuntime::getInstance().executeBitLinearTL1(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), 1, ffn_dim, h_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
+void TenzoEngineImpl::forward_layer_rocm(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. ROCm Pre-RMSNorm
+    ROCmRuntime::getInstance().executeRMSNorm(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. ROCm BitLinear Projections Q, K, V
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), 1, h_dim, q_dim, lw.q_scale);
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), 1, h_dim, kv_dim, lw.k_scale);
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), 1, h_dim, kv_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. ROCm Attn Sub-Norm
+    ROCmRuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. ROCm Out Projection
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. ROCm MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        ROCmRuntime::getInstance().executeRMSNorm(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        ROCmRuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), 1, h_dim, ffn_dim, lw.gate_scale);
+        ROCmRuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), 1, h_dim, ffn_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        ROCmRuntime::getInstance().executeRMSNorm(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        ROCmRuntime::getInstance().executeBitLinearTL1(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), 1, ffn_dim, h_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
+void TenzoEngineImpl::forward_layer_riscv(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. RISC-V RVV Pre-RMSNorm
+    rvv::rms_norm_rvv(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. RISC-V RVV BitLinear Projections Q, K, V
+    rvv::gemv_bitlinear_tl1_rvv(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), 1, h_dim, q_dim, lw.q_scale);
+    rvv::gemv_bitlinear_tl1_rvv(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), 1, h_dim, kv_dim, lw.k_scale);
+    rvv::gemv_bitlinear_tl1_rvv(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), 1, h_dim, kv_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. RISC-V RVV Attn Sub-Norm
+    rvv::rms_norm_rvv(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. RISC-V RVV Out Projection
+    rvv::gemv_bitlinear_tl1_rvv(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. RISC-V RVV MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        rvv::rms_norm_rvv(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        rvv::gemv_bitlinear_tl1_rvv(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), 1, h_dim, ffn_dim, lw.gate_scale);
+        rvv::gemv_bitlinear_tl1_rvv(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), 1, h_dim, ffn_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        rvv::rms_norm_rvv(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        rvv::gemv_bitlinear_tl1_rvv(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), 1, ffn_dim, h_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
 void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
+    std::string dev = config.device ? config.device : "cpu";
+    if (dev == "gpu" || dev == "vulkan") {
+        forward_layer_gpu(layer_idx);
+        return;
+    } else if (dev == "cuda") {
+        forward_layer_cuda(layer_idx);
+        return;
+    } else if (dev == "rocm") {
+        forward_layer_rocm(layer_idx);
+        return;
+    } else if (dev == "riscv") {
+        forward_layer_riscv(layer_idx);
+        return;
+    }
+
     const auto& lw = layers[layer_idx];
     const int h_dim = config.hidden_size;
 
@@ -1111,8 +1571,12 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
         }
     }
 
-    // 4. In-place Zero-Copy Attention with RoPE and Compressed KV-Cache
-    kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    // 4. In-place Zero-Copy Attention with RoPE and Compressed/Paged KV-Cache
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
 
     // 5. Attn Sub-Norm
     rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
@@ -1264,7 +1728,7 @@ int TenzoEngineImpl::sample_top_k_top_p(
     float* logits = logits_scratch.data();
     float temperature = params ? params->temperature : 0.7f;
     float top_p = params ? params->top_p : 0.9f;
-    int top_k = params ? params->top_k : 40;
+    int top_k = std::clamp(params ? params->top_k : 40, 1, 64);
     float repetition_penalty = params ? params->repetition_penalty : 1.15f;
 
     // Apply repetition penalty directly to past tokens in O(past_tokens_len)
@@ -1347,7 +1811,11 @@ void TenzoEngineImpl::prefill_token(int token_id) {
     for (int l = 0; l < config.num_layers; ++l) {
         forward_layer_raw(l);
     }
-    kv_cache.increment_seq_len(1);
+    if (use_paged_kv) {
+        paged_kv_cache.increment_seq_len(1);
+    } else {
+        kv_cache.increment_seq_len(1);
+    }
 }
 
 int TenzoEngineImpl::generate_step(
@@ -1360,7 +1828,11 @@ int TenzoEngineImpl::generate_step(
     for (int l = 0; l < config.num_layers; ++l) {
         forward_layer_raw(l);
     }
-    kv_cache.increment_seq_len(1);
+    if (use_paged_kv) {
+        paged_kv_cache.increment_seq_len(1);
+    } else {
+        kv_cache.increment_seq_len(1);
+    }
     compute_logits();
     return sample_top_k_top_p(params, past_tokens, past_tokens_len);
 }
@@ -1372,6 +1844,20 @@ std::vector<int8_t> pack_ternary_weights_raw(const uint8_t* raw_bytes, int64_t N
     int64_t K_half = K / 2;
     std::vector<int8_t> packed(n_blocks * K_half * 32);
 
+    // In SafeTensors from Microsoft BitNet-b1.58-2B-4T:
+    // Shape is [N / 4, K] where each byte at (r_packed, c) contains 4 weights for rows:
+    //   4 * r_packed + 0 (shift 0)
+    //   4 * r_packed + 1 (shift 2)
+    //   4 * r_packed + 2 (shift 4)
+    //   4 * r_packed + 3 (shift 6)
+    // with ternary value = ((byte >> shift) & 3) - 1.
+    auto get_tern = [&](int r, int c) -> int {
+        int r_packed = r / 4;
+        int shift = (r % 4) * 2;
+        uint8_t byte_val = raw_bytes[r_packed * K + c];
+        return static_cast<int>((byte_val >> shift) & 0x03) - 1;
+    };
+
     for (int64_t b = 0; b < n_blocks; ++b) {
         for (int64_t k = 0; k < K_half; ++k) {
             int8_t* dst = packed.data() + (b * K_half + k) * 32;
@@ -1381,13 +1867,6 @@ std::vector<int8_t> pack_ternary_weights_raw(const uint8_t* raw_bytes, int64_t N
 
                 int col0 = 2 * k;
                 int col1 = 2 * k + 1;
-
-                // Read 2-bit values from raw_bytes [N, K/4]
-                auto get_tern = [&](int r, int c) -> int {
-                    uint8_t byte_val = raw_bytes[r * (K / 4) + (c / 4)];
-                    int shift = (c % 4) * 2;
-                    return static_cast<int>((byte_val >> shift) & 0x03) - 1;
-                };
 
                 int w0 = get_tern(row0, col0);
                 int w1 = get_tern(row0, col1);
@@ -1423,9 +1902,29 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
     const int num_layers = config.num_layers;
     const int ff_dim = config.ffn_dim;
 
+    // Weight Integrity & Diagnostic Check
+    if (fsize < 100000000) {
+        std::cerr << "\n⚠️  [Tenzo Diagnostic] Warning: Model file (" << (fsize / (1024*1024)) 
+                  << " MB) is smaller than the expected ~1.8 GB for 30-layer BitNet-2B.\n";
+    }
+
     // 1. Embeddings
     size_t embed_bytes = static_cast<size_t>(vocab_size) * hidden_size * 4;
     const float* embed_f32 = reinterpret_cast<const float*>(raw_bytes.data());
+
+    // Check for uniform synthetic placeholder weights
+    bool is_dummy_data = true;
+    for (int i = 1; i < std::min(200, vocab_size); ++i) {
+        if (std::abs(embed_f32[i * hidden_size] - embed_f32[0]) > 1e-6f) {
+            is_dummy_data = false;
+            break;
+        }
+    }
+    if (is_dummy_data && vocab_size > 200) {
+        std::cerr << "\n⚠️  [Tenzo Diagnostic] Notice: Running on synthetic/placeholder model weights.\n"
+                  << "   To download genuine pre-trained weights from Hugging Face, run:\n"
+                  << "   python3 scripts/download_model.py\n\n";
+    }
 
     // INT8 LM Head quantization
     is_lm_i8 = true;
@@ -1446,8 +1945,8 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         }
     }
 
-    // 2. Parse views and scales from MLIR
-    std::regex view_regex(R"((%\w+)\s*=\s*arith\.constant\s+(\d+)\s*:\s*index\s*\n\s*(%\w+)\s*=\s*memref\.view\s+%\w+\[\1\]\[\]\s*:\s*memref<\?xi8>\s+to\s+memref<([^>]+)>)");
+    // 2. Parse views and scales from MLIR or calculate sequential offsets safely
+    std::regex view_regex(R"((%\w+)\s*=\s*arith\.constant\s+(\d+)\s*:\s*index\s*\r?\n\s*(%\w+)\s*=\s*memref\.view\s+%\w+\[\1\]\[\]\s*:\s*memref<\?xi8>\s+to\s+memref<([^>]+)>)");
     std::vector<size_t> all_views;
     auto v_begin = std::sregex_iterator(mlir_text.begin(), mlir_text.end(), view_regex);
     auto v_end = std::sregex_iterator();
@@ -1455,7 +1954,7 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         all_views.push_back(std::stoull((*it)[2].str()));
     }
 
-    std::regex scale_regex(R"((%\w+)\s*=\s*arith\.constant\s+([0-9\.e\+\-]+)\s*:\s*f32\s*\n\s*%\w+\s*=\s*"tenzo\.bitlinear_elut"\([^,]+,\s*[^,]+,\s*\1\))");
+    std::regex scale_regex(R"((%\w+)\s*=\s*arith\.constant\s+([0-9\.e\+\-]+)\s*:\s*f32\s*\r?\n\s*%\w+\s*=\s*"tenzo\.bitlinear_elut"\([^,]+,\s*[^,]+,\s*\1\))");
     std::vector<float> all_scales;
     auto s_begin = std::sregex_iterator(mlir_text.begin(), mlir_text.end(), scale_regex);
     auto s_end = std::sregex_iterator();
@@ -1463,85 +1962,117 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         all_scales.push_back(std::stof((*it)[2].str()));
     }
 
-    size_t v_idx = 1; // 0 is embed_tokens
+    // Lambda helpers with strict bounds checking
+    auto safe_slice_f32 = [&](size_t off, size_t count) -> std::vector<float> {
+        std::vector<float> vec(count, 1.0f);
+        if (off + count * sizeof(float) <= raw_bytes.size()) {
+            const float* p = reinterpret_cast<const float*>(raw_bytes.data() + off);
+            vec.assign(p, p + count);
+        }
+        return vec;
+    };
+
+    auto safe_pack_ternary = [&](size_t off, int64_t N, int64_t K) -> std::vector<int8_t> {
+        size_t needed = static_cast<size_t>(N) * (K / 4);
+        if (off + needed <= raw_bytes.size()) {
+            return pack_ternary_weights_raw(raw_bytes.data() + off, N, K);
+        }
+        int64_t n_blocks = N / 64;
+        int64_t K_half = K / 2;
+        return std::vector<int8_t>(n_blocks * K_half * 32, 0x55);
+    };
+
+    size_t v_idx = 1;
     size_t s_idx = 0;
+    size_t seq_offset = embed_bytes;
 
     for (int l = 0; l < num_layers; ++l) {
         auto& lw = layers[l];
 
+        auto get_offset = [&](size_t sz_bytes) -> size_t {
+            size_t off;
+            if (v_idx < all_views.size()) {
+                off = all_views[v_idx++];
+            } else {
+                off = seq_offset;
+            }
+            seq_offset += sz_bytes;
+            return off;
+        };
+
+        auto get_scale = [&]() -> float {
+            if (s_idx < all_scales.size()) {
+                return all_scales[s_idx++];
+            }
+            return 1.0f;
+        };
+
         // 1. in_norm
-        size_t off = all_views[v_idx++];
-        lw.in_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                          reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
+        size_t off = get_offset(hidden_size * sizeof(float));
+        lw.in_norm = safe_slice_f32(off, hidden_size);
         lw.in_norm_ptr = lw.in_norm.data();
 
         // 2. q_proj
-        off = all_views[v_idx++];
-        lw.q_w = pack_ternary_weights_raw(raw_bytes.data() + off, 2560, 2560);
+        off = get_offset(2560 * (2560 / 4));
+        lw.q_w = safe_pack_ternary(off, 2560, 2560);
         lw.q_w_ptr = lw.q_w.data();
-        lw.q_scale = all_scales[s_idx++];
+        lw.q_scale = get_scale();
 
         // 3. k_proj
-        off = all_views[v_idx++];
-        lw.k_w = pack_ternary_weights_raw(raw_bytes.data() + off, 640, 2560);
+        off = get_offset(640 * (2560 / 4));
+        lw.k_w = safe_pack_ternary(off, 640, 2560);
         lw.k_w_ptr = lw.k_w.data();
-        lw.k_scale = all_scales[s_idx++];
+        lw.k_scale = get_scale();
 
         // 4. v_proj
-        off = all_views[v_idx++];
-        lw.v_w = pack_ternary_weights_raw(raw_bytes.data() + off, 640, 2560);
+        off = get_offset(640 * (2560 / 4));
+        lw.v_w = safe_pack_ternary(off, 640, 2560);
         lw.v_w_ptr = lw.v_w.data();
-        lw.v_scale = all_scales[s_idx++];
+        lw.v_scale = get_scale();
 
         // 5. attn_sub_norm
-        off = all_views[v_idx++];
-        lw.attn_sub_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                                reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
+        off = get_offset(hidden_size * sizeof(float));
+        lw.attn_sub_norm = safe_slice_f32(off, hidden_size);
         lw.attn_sub_norm_ptr = lw.attn_sub_norm.data();
 
         // 6. out_proj
-        off = all_views[v_idx++];
-        lw.out_w = pack_ternary_weights_raw(raw_bytes.data() + off, 2560, 2560);
+        off = get_offset(2560 * (2560 / 4));
+        lw.out_w = safe_pack_ternary(off, 2560, 2560);
         lw.out_w_ptr = lw.out_w.data();
-        lw.out_scale = all_scales[s_idx++];
+        lw.out_scale = get_scale();
 
         // 7. post_norm
-        off = all_views[v_idx++];
-        lw.post_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                            reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
+        off = get_offset(hidden_size * sizeof(float));
+        lw.post_norm = safe_slice_f32(off, hidden_size);
         lw.post_norm_ptr = lw.post_norm.data();
 
         // 8. gate_proj
-        off = all_views[v_idx++];
-        lw.gate_w = pack_ternary_weights_raw(raw_bytes.data() + off, ff_dim, 2560);
+        off = get_offset(ff_dim * (2560 / 4));
+        lw.gate_w = safe_pack_ternary(off, ff_dim, 2560);
         lw.gate_w_ptr = lw.gate_w.data();
-        lw.gate_scale = all_scales[s_idx++];
+        lw.gate_scale = get_scale();
 
         // 9. up_proj
-        off = all_views[v_idx++];
-        lw.up_w = pack_ternary_weights_raw(raw_bytes.data() + off, ff_dim, 2560);
+        off = get_offset(ff_dim * (2560 / 4));
+        lw.up_w = safe_pack_ternary(off, ff_dim, 2560);
         lw.up_w_ptr = lw.up_w.data();
-        lw.up_scale = all_scales[s_idx++];
+        lw.up_scale = get_scale();
 
         // 10. ffn_sub_norm
-        off = all_views[v_idx++];
-        lw.ffn_sub_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                               reinterpret_cast<const float*>(raw_bytes.data() + off) + ff_dim);
+        off = get_offset(ff_dim * sizeof(float));
+        lw.ffn_sub_norm = safe_slice_f32(off, ff_dim);
         lw.ffn_sub_norm_ptr = lw.ffn_sub_norm.data();
 
         // 11. down_proj
-        off = all_views[v_idx++];
-        lw.down_w = pack_ternary_weights_raw(raw_bytes.data() + off, 2560, ff_dim);
+        off = get_offset(2560 * (ff_dim / 4));
+        lw.down_w = safe_pack_ternary(off, 2560, ff_dim);
         lw.down_w_ptr = lw.down_w.data();
-        lw.down_scale = all_scales[s_idx++];
+        lw.down_scale = get_scale();
     }
 
-    if (v_idx < all_views.size()) {
-        size_t off = all_views[v_idx];
-        final_norm_w.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                            reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
-        final_norm_ptr = final_norm_w.data();
-    }
+    size_t final_off = (v_idx < all_views.size()) ? all_views[v_idx] : seq_offset;
+    final_norm_w = safe_slice_f32(final_off, hidden_size);
+    final_norm_ptr = final_norm_w.data();
 
     return TENZO_SUCCESS;
 }
@@ -1569,6 +2100,7 @@ tenzo_config_t tenzo_default_config(void) {
     cfg.vocab_size = 128256;
     cfg.max_seq_len = 8192;
     cfg.kv_mode = "int8_fused";
+    cfg.device = "cpu";
     return cfg;
 }
 

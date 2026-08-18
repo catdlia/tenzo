@@ -4,7 +4,7 @@
 
 **Tenzo** is a domain-specific, high-performance compiler and inference runtime for low-bit Large Language Models (BitNet 1.58-bit, 3-bit, 4-bit, GGUF, GPTQ, AWQ, EXL2). Built on the **MLIR (Multi-Level Intermediate Representation)** framework and LLVM 21 infrastructure, Tenzo provides ahead-of-time (AOT) and just-in-time (JIT) compilation tailored for extreme latency reduction and minimal memory footprints.
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        Tenzo Frontend Exporters                        │
 │   (PyTorch FX / SafeTensors / GGUF Binaries / AutoGPTQ / AutoAWQ / EXL2)│
@@ -33,15 +33,17 @@
                     ▼ [LLVM Lowering]                ▼ [SPIR-V Lowering]
 ┌───────────────────────────────────────┐ ┌──────────────────────────────┐
 │             LLVM Dialect              │ │        SPIR-V Dialect        │
-│    (x86_64 AVX2 / ARM NEON / SVE)     │ │  (Vulkan 1.3 Compute Shader) │
+│   (x86_64 AVX2 / ARM NEON / SVE / RVV)│ │  (Vulkan 1.3 Compute Shader) │
 └───────────────────┬───────────────────┘ └──────────────┬───────────────┘
                     │                                    │
                     ▼                                    ▼
 ┌───────────────────────────────────────┐ ┌──────────────────────────────┐
-│           Tenzo CPU Runtime           │ │      Tenzo Vulkan Runtime    │
-│   - AVX2/AVX-512 Micro-Kernels        │ │  - Async Compute Queue       │
-│   - Fused Zero-Copy KV-Cache          │ │  - Push Constants Dispatch   │
-│   - Parallel OpenMP Thread Pool       │ │  - Subgroup Matrix Shaders   │
+│       Tenzo Multi-Backend CPU HAL     │ │    Tenzo Heterogeneous GPU   │
+│   - AVX2 / VNNI Micro-Kernels         │ │  - Native Vulkan 1.3 Compute │
+│   - ARM NEON / DotProd / SVE2 / I8MM  │ │  - CUDA Translation Layer    │
+│   - RISC-V RVV 1.0 Vector Kernels     │ │  - ROCm Translation Layer    │
+│   - MicroarchProfiler (Auto-Tiling)   │ │  - Push Constants Dispatch   │
+│   - Fused Zero-Copy KV-Cache          │ │  - Async Compute Pipelines   │
 └───────────────────────────────────────┘ └──────────────────────────────┘
 ```
 
@@ -52,8 +54,8 @@
 The Tenzo dialect encapsulates specialized tensor operators for quantized and sub-byte neural representations:
 
 ### Linear Transformations
-- `tenzo.bitlinear_tl1`: Microsoft TL1 dense 2-bit ternary mapping.
-- `tenzo.bitlinear_tl1_pack`: Dual-element nibble packed lookup matmul.
+- `tenzo.bitlinear_tl1`: Microsoft TL1 dense 2-bit ternary mapping $\{-1, 0, 1\}$.
+- `tenzo.bitlinear_tl1_pack`: Dual-element nibble packed lookup matmul (64 channels per YMM register).
 - `tenzo.bitlinear_elut`: ELUT exponent-separated LUT matmul.
 - `tenzo.bitlinear_int4`: 4-bit symmetric linear layer.
 - `tenzo.bitlinear_int3`: 3-bit packed linear layer.
@@ -77,15 +79,20 @@ The Tenzo dialect encapsulates specialized tensor operators for quantized and su
 3. **Bufferization & Memory Planning:** Replaces abstract `tensor` values with explicit `memref` allocations, views, and subviews, eliminating unnecessary allocations.
 4. **Vectorization Pass:** Tiles compute loops to vector sizes matching hardware registers (`vector<8xf32>`, `vector<32xi8>`).
 5. **Target Code Generation:**
-   - **CPU:** Lowered via LLVM dialect to native machine code with `-O3`, vectorizing to AVX2/FMA instructions.
+   - **CPU:** Lowered via LLVM dialect to native machine code with `-O3`, vectorizing to AVX2/FMA/VNNI, ARM NEON, or RISC-V RVV instructions.
    - **GPU:** Lowered to SPIR-V dialect, compiled to `.spv` compute shaders executed via Vulkan runtime pipelines.
 
 ---
 
-## 3. Runtime Engine (`TenzoEngine`)
+## 3. Runtime Engine (`TenzoEngine`) & HAL
 
 The runtime architecture is designed for zero heap allocation during token generation:
 - **Preallocated Scratchpads:** Activations, norms, logits, and attention caches are pre-allocated during engine initialization.
-- **Fused KV-Cache:** Supports `popcount_fused`, `tl1_fused`, `int8_fused`, and `fp32` representations.
+- **Fused KV-Cache:** Supports `popcount_fused`, `tl1_fused` (14.2x compression), `int8_fused` (4x compression), and `fp32` representations.
+- **PagedAttention:** Virtual block table allocation (`BLOCK_SIZE = 16`) to eliminate dynamic memory fragmentation during 32k+ context scaling.
 - **High-Performance Sampling:** Hardware-accelerated Top-K, Top-P (nucleus), Temperature, and Repetition Penalty filtering.
-- **C/C++ Foreign Function Interface (FFI):** Clean C API exposed via `libtenzo_runtime.so` for integration into Python, Rust, Go, or mobile apps.
+- **Hardware Autotuning (`MicroarchProfiler`):** Probes CPU L1/L2/L3 cache capacities and dynamically selects optimal $(M, N, K)$ GEMV tiling parameters.
+- **Heterogeneous GPU Dispatch:**
+  - **Vulkan 1.3:** Direct execution of SPIR-V compute shaders (`bitlinear_tl1.comp`, `gemm_f32.comp`, `rmsnorm.comp`).
+  - **CUDA & ROCm Translation Layers:** Dynamic driver detection with seamless Vulkan fallback.
+- **C/C++ Foreign Function Interface (FFI):** Clean C ABI exposed via `libtenzo_runtime.so` / `tenzo.h` for integration into Python, Rust, Go, or mobile apps.

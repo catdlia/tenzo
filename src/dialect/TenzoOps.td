@@ -204,6 +204,26 @@ def RopeOp : Tenzo_Op<"rope", [Pure]> {
   let assemblyFormat = "$input `,` $seq_pos attr-dict `:` functional-type(operands, results)";
 }
 
+def PagedAttentionOp : Tenzo_Op<"paged_attention", [Pure]> {
+  let summary = "Paged Dot-Product Attention with Block Table";
+  let description = [{
+    Computes Scaled Dot-Product Attention using non-contiguous physical KV block pages
+    indexed by a sequence block table.
+  }];
+  
+  let arguments = (ins 
+    AnyTensor:$query,
+    AnyTensor:$k_block_pool,
+    AnyTensor:$v_block_pool,
+    AnyTensor:$block_table,
+    AnyTensor:$seq_len,
+    DefaultValuedAttr<I64Attr, "16">:$block_size
+  );
+  let results = (outs AnyTensor:$result);
+  
+  let assemblyFormat = "$query `,` $k_block_pool `,` $v_block_pool `,` $block_table `,` $seq_len attr-dict `:` functional-type(operands, results)";
+}
+
 def KVCacheUpdateOp : Tenzo_Op<"kv_cache_update", []> {
   let summary = "Update KV Cache";
   let description = [{

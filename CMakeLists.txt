@@ -23,72 +23,85 @@ if(LLD_PATH)
 endif()
 
 # ============================================================
-
-find_package(LLVM REQUIRED CONFIG)
-find_package(MLIR REQUIRED CONFIG)
-
-# Optional Vulkan support - try to find it automatically
-find_package(Vulkan QUIET)
-if(Vulkan_FOUND)
-    option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" ON)
-else()
-    option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" OFF)
-endif()
-
-if(TENZO_HAS_VULKAN AND Vulkan_FOUND)
-    add_definitions(-DTENZO_HAS_VULKAN)
-    message(STATUS "Vulkan support enabled: ${Vulkan_LIBRARY}")
-else()
-    message(STATUS "Vulkan support disabled (SDK not found)")
-endif()
-
-list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
-list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
-
-include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
-include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-
-link_directories(${LLVM_BUILD_LIBRARY_DIR})
-add_definitions(${LLVM_DEFINITIONS})
-
-include(TableGen)
-include(AddMLIR)
-
+# Architecture & Optimization Flags
 # ============================================================
-# 🚀 MICRO-ARCHITECTURE OPTIMIZATION FLAGS (Phase 3)
-# ============================================================
-# These flags enable aggressive optimizations for the host CPU
-
-# Use native CPU instructions (AVX2, AVX-512, etc.)
+option(TENZO_STANDALONE_RUNTIME "Build standalone C++ inference engine without MLIR compiler" OFF)
 option(TENZO_USE_NATIVE_ARCH "Use -march=native for host CPU optimizations" ON)
-
-# Enable fast-math for aggressive floating-point optimizations
 option(TENZO_FAST_MATH "Enable -ffast-math (sacrifices precision for speed)" ON)
 
-if(TENZO_USE_NATIVE_ARCH)
-    add_compile_options(-march=native)
-    message(STATUS "🚀 Using native CPU architecture optimizations")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64" OR ANDROID)
+    set(TENZO_RUNTIME_FLAGS -O3 -funroll-loops -fopenmp)
+    message(STATUS "🚀 Target Architecture: ARM64 / AArch64 (NEON / DotProd)")
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    set(TENZO_RUNTIME_FLAGS -mavx2 -mavxvnni -mfma -mf16c -O3 -funroll-loops -fopenmp)
+    message(STATUS "🚀 Target Architecture: x86_64 (AVX2 / FMA / VNNI / F16C)")
+else()
+    set(TENZO_RUNTIME_FLAGS -O3 -funroll-loops -fopenmp)
+    message(STATUS "🚀 Target Architecture: Generic CPU")
 endif()
 
 if(TENZO_FAST_MATH)
     add_compile_options(-ffast-math -fno-math-errno)
-    message(STATUS "🚀 Fast-math enabled (reduced precision)")
 endif()
-
-# Always enable these safe optimizations
 add_compile_options(-funroll-loops)
 
-# For Release builds, enable LTO (Link-Time Optimization)
-if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    include(CheckIPOSupported)
-    check_ipo_supported(RESULT IPO_SUPPORTED OUTPUT IPO_ERROR)
-    # LTO disabled to fix linker error (undefined symbol: main)
-    # if(IPO_SUPPORTED)
-    #     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-    #     message(STATUS "🚀 Link-Time Optimization (LTO) enabled")
-    # endif()
+# ============================================================
+# LLVM / MLIR Detection (Full Compiler vs Standalone Runtime)
+# ============================================================
+if(NOT TENZO_STANDALONE_RUNTIME)
+    find_package(LLVM QUIET CONFIG)
+    find_package(MLIR QUIET CONFIG)
+endif()
+
+# Optional Vulkan support
+include(CheckIncludeFileCXX)
+find_package(Vulkan QUIET)
+if(Vulkan_FOUND)
+    check_include_file_cxx("vulkan/vulkan.h" HAVE_VULKAN_H)
+    if(HAVE_VULKAN_H)
+        option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" ON)
+        add_definitions(-DTENZO_HAS_VULKAN)
+        message(STATUS "🚀 Vulkan GPU runtime enabled: ${Vulkan_LIBRARY}")
+    else()
+        option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" OFF)
+    endif()
+else()
+    # Check Android /system/lib64/libvulkan.so fallback
+    find_library(ANDROID_VULKAN_LIB vulkan PATHS /system/lib64 /system/lib)
+    check_include_file_cxx("vulkan/vulkan.h" HAVE_VULKAN_H)
+    if(ANDROID_VULKAN_LIB AND HAVE_VULKAN_H)
+        option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" ON)
+        add_definitions(-DTENZO_HAS_VULKAN)
+        set(Vulkan_LIBRARIES ${ANDROID_VULKAN_LIB})
+        message(STATUS "🚀 Android Vulkan GPU runtime enabled: ${ANDROID_VULKAN_LIB}")
+    else()
+        option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" OFF)
+    endif()
+endif()
+
+if(LLVM_FOUND AND MLIR_FOUND AND NOT TENZO_STANDALONE_RUNTIME)
+    set(TENZO_HAS_MLIR_COMPILER ON)
+    message(STATUS "🚀 Full MLIR Compiler Pipeline Enabled")
+
+    list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
+    list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+
+    include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+    include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
+    include_directories(${CMAKE_CURRENT_BINARY_DIR})
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+    link_directories(${LLVM_BUILD_LIBRARY_DIR})
+    add_definitions(${LLVM_DEFINITIONS})
+
+    include(TableGen)
+    include(AddMLIR)
+else()
+    set(TENZO_HAS_MLIR_COMPILER OFF)
+    message(STATUS "⚡ Building Tenzo Standalone C++ Runtime & CLI (Zero LLVM/MLIR dependency)")
+    include_directories(${CMAKE_CURRENT_BINARY_DIR})
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
 
 # OpenMP for parallel loops
@@ -98,305 +111,220 @@ if(OpenMP_CXX_FOUND)
 endif()
 
 # ============================================================
-
-# --- TABLEGEN ---
-set(LLVM_TARGET_DEFINITIONS src/dialect/TenzoOps.td)
-mlir_tablegen(TenzoOps.h.inc -gen-op-decls)
-mlir_tablegen(TenzoOps.cpp.inc -gen-op-defs)
-mlir_tablegen(TenzoDialect.h.inc -gen-dialect-decls)
-mlir_tablegen(TenzoDialect.cpp.inc -gen-dialect-defs)
-
-add_custom_target(TenzoOpsIncGen DEPENDS
-        TenzoOps.h.inc TenzoOps.cpp.inc
-        TenzoDialect.h.inc TenzoDialect.cpp.inc)
-
-# --- БІНАРНИК ---
-add_executable(tenzo-cli
-        src/main.cpp
-        src/dialect/TenzoDialect.cpp
-        src/passes/Lowering.cpp
-        src/context/TenzoContext.cpp
-        src/context/HardwareProfile.cpp
-        src/context/X86HardwareProfile.cpp
-        src/context/ARMHardwareProfile.cpp
-        src/tests/PipelineTests.cpp
-        src/tests/MicroKernelBench.cpp
-        src/tests/BLISBenchmark.cpp
-        src/tests/GenerateMicroKernel.cpp
-        src/passes/FusionPass.cpp
-        src/passes/LinalgLowering.cpp
-        src/passes/Bufferization.cpp
-        src/passes/LLVMLowering.cpp
-        src/passes/TransformStrategy.cpp
-        src/passes/OptimalVectorization.cpp
-        src/passes/PackingPass.cpp
-        src/passes/ExplicitMicroKernelPass.cpp
-        src/passes/FusedTernaryKernelPass.cpp
-        src/passes/PackingKernels.cpp
-        src/passes/MacroKernelPass.cpp
-        # Tests
-        src/tests/PackingBenchmark.cpp
-        src/tests/FullGEMMBenchmark.cpp
-        src/tests/GEMMEndToEnd.cpp
-        src/tests/LinearLayer.cpp
-        # GPU/SPIR-V
-        src/passes/gpu/GPULowering.cpp
-        src/runtime/VulkanRuntime.cpp
-        src/runtime/ThreadPool.cpp
-        src/runtime/ExecutionContext.cpp
-        src/runtime/KVCacheManager.cpp
-        src/runtime/Sampler.cpp
-        src/runtime/Tokenizer.cpp
-        src/context/AutoTuner.cpp
-        src/tests/GPUTests.cpp
-        src/tests/DynamicInferenceTest.cpp
-        src/tests/ZeroCopyBridgeTest.cpp
-        src/tests/EndToEndMathTest.cpp src/tests/TestTL1.cpp
-        src/tests/GenerationTest.cpp
-)
-
-add_dependencies(tenzo-cli TenzoOpsIncGen)
-target_link_libraries(tenzo-cli PRIVATE
-        # --- MLIR Ліби ---
-        MLIRIR
-        MLIRParser
-        MLIRSupport
-        MLIRInferTypeOpInterface
-        MLIRBytecodeOpInterface
-        MLIRFuncDialect
-        MLIRArithDialect
-        MLIRPass
-        MLIRTransforms
-        MLIRLinalgDialect
-        MLIRTensorDialect
-        MLIRAffineDialect
-        MLIRAffineTransforms
-        MLIRAffineUtils
-        MLIRAffineToStandard
-        MLIRVectorDialect
-        MLIRLinalgTransforms
-        MLIRBufferizationDialect
-        MLIRBufferizationTransforms
-        MLIRBufferizationToMemRef
-        MLIRMemRefDialect
-        MLIRMemRefTransforms
-        MLIRLLVMDialect
-        MLIRMemRefToLLVM
-        MLIRFuncToLLVM
-        MLIRArithToLLVM
-        MLIRControlFlowToLLVM
-        MLIRReconcileUnrealizedCasts
-        MLIRLinalgToStandard
-        MLIRSCFToControlFlow
-        MLIRTargetLLVMIRExport
-        MLIRExecutionEngine
-        MLIRBuiltinToLLVMIRTranslation
-        MLIRLLVMToLLVMIRTranslation
-
-        # Index dialect and conversion
-        MLIRIndexDialect
-        MLIRIndexToLLVM
-
-        # SCF dialect
-        MLIRSCFDialect
-        MLIRSCFTransforms
-
-        # Transform Dialect
-        MLIRTransformDialect
-        MLIRTransformDialectTransforms
-        MLIRLinalgTransformOps
-        MLIRSCFTransformOps
-        MLIRTensorTransformOps
-
-        # Vector Pass Dependencies
-        MLIRVectorToLLVMPass
-        MLIRVectorToLLVM
-        MLIRVectorToSCF
-        MLIRVectorTransforms
-
-        # --- ASYNC & PARALLELISM LIBS ---
-        MLIRAsyncDialect
-        MLIRAsyncTransforms
-        MLIRAsyncToLLVM
-
-        # --- OpenMP for Parallelism ---
-        MLIROpenMPDialect
-        MLIRSCFToOpenMP
-        MLIROpenMPToLLVM
-        MLIROpenMPToLLVMIRTranslation
-
-        # GPU Dialect and Transforms
-        MLIRGPUDialect
-        MLIRGPUTransforms
-        MLIRGPUToSPIRV
-        MLIRSCFToGPU
-
-        # SPIR-V Dialect and Transforms
-        MLIRSPIRVDialect
-        MLIRSPIRVTransforms
-        MLIRSPIRVConversion
-        MLIRSPIRVSerialization
-        MLIRArithToSPIRV
-        MLIRFuncToSPIRV
-        MLIRMemRefToSPIRV
-        MLIRSCFToSPIRV
-        MLIRControlFlowToSPIRV
-
-        # --- LLVM Ліби ---
-        ${LLVM_LIBRARIES}
-)
-
-# Link Vulkan if available
-if(TENZO_HAS_VULKAN AND Vulkan_FOUND)
-    target_link_libraries(tenzo-cli PRIVATE Vulkan::Vulkan)
-endif()
-
-# Link OpenMP for parallel loop execution
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(tenzo-cli PRIVATE OpenMP::OpenMP_CXX)
-endif()
-
-# Link OpenBLAS for GEMM comparison benchmarks (optional)
-find_library(OPENBLAS_LIB openblas)
-if(OPENBLAS_LIB)
-    target_compile_definitions(tenzo-cli PRIVATE TENZO_HAS_OPENBLAS)
-    target_link_libraries(tenzo-cli PRIVATE ${OPENBLAS_LIB})
-    message(STATUS "OpenBLAS found: ${OPENBLAS_LIB}")
-else()
-    message(STATUS "OpenBLAS not found — comparison benchmarks disabled")
-endif()
-
+# Full Compiler Targets (Only when MLIR is present)
 # ============================================================
-# 🔬 MICRO-KERNEL ISOLATED BENCHMARK
 # ============================================================
-# This is a standalone benchmark for measuring pure micro-kernel performance
-# WITHOUT any MLIR/JIT overhead. Goal: 45-50 GFLOPS on 6x16x256.
+# Full Compiler Targets (Only when MLIR is present)
+# ============================================================
+if(TENZO_HAS_MLIR_COMPILER)
+    # --- TABLEGEN ---
+    set(LLVM_TARGET_DEFINITIONS src/dialect/TenzoOps.td)
+    mlir_tablegen(TenzoOps.h.inc -gen-op-decls)
+    mlir_tablegen(TenzoOps.cpp.inc -gen-op-defs)
+    mlir_tablegen(TenzoDialect.h.inc -gen-dialect-decls)
+    mlir_tablegen(TenzoDialect.cpp.inc -gen-dialect-defs)
 
-add_executable(micro_bench
-    src/tests/IsolatedMicroKernel.cpp
-)
+    add_custom_target(TenzoOpsIncGen DEPENDS
+            TenzoOps.h.inc TenzoOps.cpp.inc
+            TenzoDialect.h.inc TenzoDialect.cpp.inc)
 
-# Disable LTO for this target (conflicts with standalone benchmark)
-set_property(TARGET micro_bench PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
+    # --- БІНАРНИК ---
+    add_executable(tenzo-cli
+            src/main.cpp
+            src/dialect/TenzoDialect.cpp
+            src/passes/Lowering.cpp
+            src/context/TenzoContext.cpp
+            src/context/HardwareProfile.cpp
+            src/context/X86HardwareProfile.cpp
+            src/context/ARMHardwareProfile.cpp
+            src/tests/PipelineTests.cpp
+            src/tests/MicroKernelBench.cpp
+            src/tests/BLISBenchmark.cpp
+            src/tests/GenerateMicroKernel.cpp
+            src/passes/FusionPass.cpp
+            src/passes/LinalgLowering.cpp
+            src/passes/Bufferization.cpp
+            src/passes/LLVMLowering.cpp
+            src/passes/TransformStrategy.cpp
+            src/passes/OptimalVectorization.cpp
+            src/passes/PackingPass.cpp
+            src/passes/ExplicitMicroKernelPass.cpp
+            src/passes/FusedTernaryKernelPass.cpp
+            src/passes/PackingKernels.cpp
+            src/passes/MacroKernelPass.cpp
+            # Tests
+            src/tests/PackingBenchmark.cpp
+            src/tests/FullGEMMBenchmark.cpp
+            src/tests/GEMMEndToEnd.cpp
+            src/tests/LinearLayer.cpp
+            # GPU/SPIR-V
+            src/passes/gpu/GPULowering.cpp
+            src/runtime/VulkanRuntime.cpp
+            src/runtime/ThreadPool.cpp
+            src/runtime/ExecutionContext.cpp
+            src/runtime/KVCacheManager.cpp
+            src/runtime/Sampler.cpp
+            src/runtime/Tokenizer.cpp
+            src/context/AutoTuner.cpp
+            src/tests/GPUTests.cpp
+            src/tests/DynamicInferenceTest.cpp
+            src/tests/ZeroCopyBridgeTest.cpp
+            src/tests/EndToEndMathTest.cpp src/tests/TestTL1.cpp
+            src/tests/GenerationTest.cpp
+    )
 
-# Enable AVX2 + FMA for intrinsics baseline
-target_compile_options(micro_bench PRIVATE
-    -mavx2
-    -mfma
-    -O3
-    -funroll-loops
-    -ffast-math
-    -fno-lto
-)
+    add_dependencies(tenzo-cli TenzoOpsIncGen)
+    target_link_libraries(tenzo-cli PRIVATE
+            MLIRIR
+            MLIRParser
+            MLIRSupport
+            MLIRInferTypeOpInterface
+            MLIRBytecodeOpInterface
+            MLIRFuncDialect
+            MLIRArithDialect
+            MLIRPass
+            MLIRTransforms
+            MLIRLinalgDialect
+            MLIRTensorDialect
+            MLIRAffineDialect
+            MLIRAffineTransforms
+            MLIRAffineUtils
+            MLIRAffineToStandard
+            MLIRVectorDialect
+            MLIRLinalgTransforms
+            MLIRBufferizationDialect
+            MLIRBufferizationTransforms
+            MLIRBufferizationToMemRef
+            MLIRMemRefDialect
+            MLIRMemRefTransforms
+            MLIRLLVMDialect
+            MLIRMemRefToLLVM
+            MLIRFuncToLLVM
+            MLIRArithToLLVM
+            MLIRControlFlowToLLVM
+            MLIRReconcileUnrealizedCasts
+            MLIRLinalgToStandard
+            MLIRSCFToControlFlow
+            MLIRTargetLLVMIRExport
+            MLIRExecutionEngine
+            MLIRBuiltinToLLVMIRTranslation
+            MLIRLLVMToLLVMIRTranslation
+            MLIRIndexDialect
+            MLIRIndexToLLVM
+            MLIRSCFDialect
+            MLIRSCFTransforms
+            MLIRTransformDialect
+            MLIRTransformDialectTransforms
+            MLIRLinalgTransformOps
+            MLIRSCFTransformOps
+            MLIRTensorTransformOps
+            MLIRVectorToLLVMPass
+            MLIRVectorToLLVM
+            MLIRVectorToSCF
+            MLIRVectorTransforms
+            MLIRAsyncDialect
+            MLIRAsyncTransforms
+            MLIRAsyncToLLVM
+            MLIROpenMPDialect
+            MLIRSCFToOpenMP
+            MLIROpenMPToLLVM
+            MLIROpenMPToLLVMIRTranslation
+            MLIRGPUDialect
+            MLIRGPUTransforms
+            MLIRGPUToSPIRV
+            MLIRSCFToGPU
+            MLIRSPIRVDialect
+            MLIRSPIRVTransforms
+            MLIRSPIRVConversion
+            MLIRSPIRVSerialization
+            MLIRArithToSPIRV
+            MLIRFuncToSPIRV
+            MLIRMemRefToSPIRV
+            MLIRSCFToSPIRV
+            MLIRControlFlowToSPIRV
+            ${LLVM_LIBRARIES}
+    )
 
-# Link math library
-target_link_libraries(micro_bench PRIVATE m)
-
-# Optional: Link MLIR-generated kernel if available
-# To enable: cmake -DUSE_MLIR_KERNEL=ON ..
-option(USE_MLIR_KERNEL "Link MLIR-generated micro-kernel" OFF)
-if(USE_MLIR_KERNEL)
-    # Check for pre-compiled MLIR object file first
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/micro_kernel_mlir.o")
-        message(STATUS "🔗 Linking pre-compiled MLIR micro-kernel: micro_kernel_mlir.o")
-        target_compile_definitions(micro_bench PRIVATE HAS_MLIR_KERNEL)
-        target_sources(micro_bench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/micro_kernel_mlir.o)
-        set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/micro_kernel_mlir.o
-            PROPERTIES EXTERNAL_OBJECT TRUE GENERATED FALSE)
-    else()
-        # Try to compile from MLIR source
-        find_program(MLIR_OPT mlir-opt HINTS /usr/lib/llvm-21/bin)
-        find_program(MLIR_TRANSLATE mlir-translate HINTS /usr/lib/llvm-21/bin)
-        find_program(LLC_PROGRAM llc-21 llc HINTS /usr/lib/llvm-21/bin)
-
-        if(MLIR_OPT AND MLIR_TRANSLATE AND LLC_PROGRAM)
-            message(STATUS "🔧 Found MLIR tools, will compile from source")
-            message(STATUS "   mlir-opt: ${MLIR_OPT}")
-            message(STATUS "   mlir-translate: ${MLIR_TRANSLATE}")
-            message(STATUS "   llc: ${LLC_PROGRAM}")
-
-            set(MLIR_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/micro_kernel.mlir)
-            set(MLIR_LLVM ${CMAKE_CURRENT_BINARY_DIR}/micro_kernel_llvm.mlir)
-            set(LLVM_IR ${CMAKE_CURRENT_BINARY_DIR}/micro_kernel.ll)
-            set(OBJECT_FILE ${CMAKE_CURRENT_BINARY_DIR}/micro_kernel_mlir.o)
-
-            # Step 1: MLIR → LLVM Dialect
-            add_custom_command(
-                OUTPUT ${MLIR_LLVM}
-                COMMAND ${MLIR_OPT} ${MLIR_SOURCE}
-                        --convert-to-llvm
-                        --reconcile-unrealized-casts
-                        -o ${MLIR_LLVM}
-                DEPENDS ${MLIR_SOURCE}
-                COMMENT "🔄 Converting MLIR to LLVM Dialect"
-            )
-
-            # Step 2: LLVM Dialect → LLVM IR
-            add_custom_command(
-                OUTPUT ${LLVM_IR}
-                COMMAND ${MLIR_TRANSLATE} --mlir-to-llvmir ${MLIR_LLVM} -o ${LLVM_IR}
-                DEPENDS ${MLIR_LLVM}
-                COMMENT "🔄 Translating LLVM Dialect to LLVM IR"
-            )
-
-            # Step 3: LLVM IR → Object File
-            add_custom_command(
-                OUTPUT ${OBJECT_FILE}
-                COMMAND ${LLC_PROGRAM} ${LLVM_IR}
-                        -O3 -mcpu=native -mattr=+avx2,+fma
-                        -filetype=obj -o ${OBJECT_FILE}
-                DEPENDS ${LLVM_IR}
-                COMMENT "🔄 Compiling LLVM IR to object file"
-            )
-
-            # Add to micro_bench
-            target_compile_definitions(micro_bench PRIVATE HAS_MLIR_KERNEL)
-            target_sources(micro_bench PRIVATE ${OBJECT_FILE})
-            set_source_files_properties(${OBJECT_FILE}
-                PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
-        else()
-            message(WARNING "⚠️ MLIR tools not found, cannot compile micro-kernel")
-            message(WARNING "   Please compile manually and provide micro_kernel_mlir.o")
-        endif()
+    if(TENZO_HAS_VULKAN AND Vulkan_FOUND)
+        target_link_libraries(tenzo-cli PRIVATE Vulkan::Vulkan)
     endif()
+
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(tenzo-cli PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+
+    add_executable(micro_bench
+        src/tests/IsolatedMicroKernel.cpp
+    )
+    set_property(TARGET micro_bench PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE)
+    target_compile_options(micro_bench PRIVATE
+        ${TENZO_RUNTIME_FLAGS}
+        -fno-lto
+    )
+    target_link_libraries(micro_bench PRIVATE m)
 endif()
 
 # ============================================================
-# 📦 Tenzo C/C++ SDK Runtime Libraries (Phase E)
+# 📦 Tenzo C/C++ Standalone Runtime Libraries & Executables
+# (Zero-dependency on LLVM/MLIR, builds natively on ARM, Termux, Android, x86)
 # ============================================================
 
 # Static runtime library
 add_library(tenzo_runtime_static STATIC
     src/runtime/TenzoEngine.cpp
+    src/runtime/VulkanRuntime.cpp
+    src/runtime/CUDARuntime.cpp
+    src/runtime/ROCmRuntime.cpp
+    src/runtime/MicroarchProfiler.cpp
 )
 target_include_directories(tenzo_runtime_static PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_compile_options(tenzo_runtime_static PRIVATE
-    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
+    ${TENZO_RUNTIME_FLAGS}
 )
 target_link_libraries(tenzo_runtime_static PUBLIC
     OpenMP::OpenMP_CXX
     m
+    ${CMAKE_DL_LIBS}
 )
+if(TENZO_HAS_VULKAN)
+    if(Vulkan_FOUND)
+        target_link_libraries(tenzo_runtime_static PUBLIC Vulkan::Vulkan)
+    elseif(Vulkan_LIBRARIES)
+        target_link_libraries(tenzo_runtime_static PUBLIC ${Vulkan_LIBRARIES})
+    endif()
+endif()
 set_target_properties(tenzo_runtime_static PROPERTIES OUTPUT_NAME "tenzo_runtime")
 
 # Shared runtime library
 add_library(tenzo_runtime_shared SHARED
     src/runtime/TenzoEngine.cpp
+    src/runtime/VulkanRuntime.cpp
+    src/runtime/CUDARuntime.cpp
+    src/runtime/ROCmRuntime.cpp
+    src/runtime/MicroarchProfiler.cpp
 )
 target_include_directories(tenzo_runtime_shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_compile_options(tenzo_runtime_shared PRIVATE
-    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp -DTENZO_BUILD_SHARED
+    ${TENZO_RUNTIME_FLAGS} -DTENZO_BUILD_SHARED
 )
 target_link_libraries(tenzo_runtime_shared PUBLIC
     OpenMP::OpenMP_CXX
     m
+    ${CMAKE_DL_LIBS}
 )
+if(TENZO_HAS_VULKAN)
+    if(Vulkan_FOUND)
+        target_link_libraries(tenzo_runtime_shared PUBLIC Vulkan::Vulkan)
+    elseif(Vulkan_LIBRARIES)
+        target_link_libraries(tenzo_runtime_shared PUBLIC ${Vulkan_LIBRARIES})
+    endif()
+endif()
 set_target_properties(tenzo_runtime_shared PROPERTIES OUTPUT_NAME "tenzo_runtime")
 
 # Standalone C++ Inference Executable (Example)
@@ -407,7 +335,7 @@ target_include_directories(tenzo_basic_inference PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(tenzo_basic_inference PRIVATE
-    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
+    ${TENZO_RUNTIME_FLAGS}
 )
 target_link_libraries(tenzo_basic_inference PRIVATE
     tenzo_runtime_static
@@ -423,7 +351,7 @@ target_include_directories(tenzo-inference PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_compile_options(tenzo-inference PRIVATE
-    -mavx2 -mavxvnni -mfma -O3 -funroll-loops -fopenmp
+    ${TENZO_RUNTIME_FLAGS}
 )
 target_link_libraries(tenzo-inference PRIVATE
     tenzo_runtime_static
@@ -431,32 +359,45 @@ target_link_libraries(tenzo-inference PRIVATE
     m
 )
 
-# ============================================================
-# 🐍 Python Bridge (pybind11)
-# ============================================================
-
-include(FetchContent)
-FetchContent_Declare(
-  pybind11
-  GIT_REPOSITORY https://github.com/pybind/pybind11.git
-  GIT_TAG        v2.11.1
+# Hardware & System Diagnostic Tool
+add_executable(tenzo-diag
+    src/tests/DeviceDiagnosticTest.cpp
 )
-FetchContent_MakeAvailable(pybind11)
-
-find_package(Python COMPONENTS Interpreter Development REQUIRED)
-
-pybind11_add_module(tenzo_runtime src/bindings/PybindModule.cpp)
-
-# Clear global include directories (LLVM/MLIR) for this target to avoid GCC vs LLVM cxxabi.h conflicts
-set_target_properties(tenzo_runtime PROPERTIES INCLUDE_DIRECTORIES "")
-target_include_directories(tenzo_runtime PRIVATE
+target_include_directories(tenzo-diag PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-
-target_compile_options(tenzo_runtime PRIVATE -mavx2 -mavxvnni -mfma -O3 -fopenmp)
-
-target_link_libraries(tenzo_runtime PRIVATE
-    OpenMP::OpenMP_CXX
+target_compile_options(tenzo-diag PRIVATE
+    ${TENZO_RUNTIME_FLAGS}
 )
+target_link_libraries(tenzo-diag PRIVATE
+    tenzo_runtime_static
+    OpenMP::OpenMP_CXX
+    m
+)
+
+# ============================================================
+# 🐍 Python Bridge (pybind11 - optional)
+# ============================================================
+find_package(Python COMPONENTS Interpreter Development QUIET)
+if(Python_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+      pybind11
+      GIT_REPOSITORY https://github.com/pybind/pybind11.git
+      GIT_TAG        v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
+
+    pybind11_add_module(tenzo_runtime src/bindings/PybindModule.cpp)
+    set_target_properties(tenzo_runtime PROPERTIES INCLUDE_DIRECTORIES "")
+    target_include_directories(tenzo_runtime PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_compile_options(tenzo_runtime PRIVATE ${TENZO_RUNTIME_FLAGS})
+    target_link_libraries(tenzo_runtime PRIVATE
+        OpenMP::OpenMP_CXX
+    )
+endif()
 

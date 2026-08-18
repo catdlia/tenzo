@@ -1,0 +1,53 @@
+#version 450
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// Push constants for dimensions and scale
+layout(push_constant) uniform PushConstants {
+    uint N;       // Number of output rows (e.g. 2560 or 6912)
+    uint K;       // Number of input columns (e.g. 2560 or 6912)
+    float scale;  // BitLinear layer scale
+    float quant_scale; // Input activation scale (1.0 / in_scale)
+} pc;
+
+// Buffer bindings
+layout(std430, binding = 0) readonly buffer InputActivation {
+    float x[];
+};
+
+layout(std430, binding = 1) readonly buffer PackedWeights {
+    uint w_data[]; // Packed 2-bit weights: 16 weights per uint32
+};
+
+layout(std430, binding = 2) writeonly buffer OutputActivation {
+    float y[];
+};
+
+void main() {
+    uint row = gl_GlobalInvocationID.x;
+    if (row >= pc.N) return;
+
+    float sum = 0.0;
+    uint K = pc.K;
+
+    // Each byte in weights contains 4 ternary weights along rows or columns
+    // We iterate through K columns in steps of 16 (1 uint32 = 16 2-bit trits)
+    uint words_per_row = (K + 15) / 16;
+    uint row_offset = row * words_per_row;
+
+    for (uint w_idx = 0; w_idx < words_per_row; ++w_idx) {
+        uint word = w_data[row_offset + w_idx];
+        uint col_base = w_idx * 16;
+
+        for (uint i = 0; i < 16; ++i) {
+            uint col = col_base + i;
+            if (col >= K) break;
+
+            uint trit_code = (word >> (i * 2)) & 0x3;
+            // Decode ternary: 00 -> -1, 01 -> 0, 10 -> +1 (or 00 -> 0, 01 -> +1, 10 -> -1)
+            float w_val = (trit_code == 2) ? 1.0 : ((trit_code == 0) ? -1.0 : 0.0);
+            sum += x[col] * w_val;
+        }
+    }
+
+    y[row] = sum * pc.scale;
+}

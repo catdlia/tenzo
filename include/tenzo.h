@@ -1,6 +1,6 @@
 /**
  * @file tenzo.h
- * @brief Tenzo High-Performance AI Compiler & Inference Engine C-API (v0.3.0)
+ * @brief Tenzo High-Performance AI Compiler & Inference Engine C-API (v1.1.0-beta)
  * 
  * Provides an ABI-stable, pure C interface for embedding the Tenzo native runtime
  * in C, C++, Rust, Swift, Go, and mobile/edge applications with zero Python dependencies.
@@ -31,10 +31,10 @@ extern "C" {
   #endif
 #endif
 
-#define TENZO_VERSION_MAJOR 0
-#define TENZO_VERSION_MINOR 3
+#define TENZO_VERSION_MAJOR 1
+#define TENZO_VERSION_MINOR 0
 #define TENZO_VERSION_PATCH 0
-#define TENZO_VERSION_STRING "0.3.0"
+#define TENZO_VERSION_STRING "1.0.0-beta.1"
 
 /* Opaque handle to the Tenzo Native Execution Engine */
 typedef struct tenzo_engine_opaque* tenzo_engine_t;
@@ -60,6 +60,7 @@ typedef struct {
     int vocab_size;      /* Default: 128256 */
     int max_seq_len;     /* Default: 8192 */
     const char* kv_mode; /* "int8_fused", "tl1_fused", or "fp32" */
+    const char* device;  /* "cpu" (default) or "gpu" (Vulkan compute) */
 } tenzo_config_t;
 
 /* Sampling parameters */

@@ -11,6 +11,7 @@
  */
 
 #include "tenzo.hpp"
+#include "runtime/MicroarchProfiler.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -78,10 +79,9 @@ public:
         }
 
         size_t i = 0;
-        while (i < text.length()) {
+        while (i < text.size()) {
             bool matched = false;
-            size_t max_len = std::min(static_cast<size_t>(64), text.length() - i);
-            for (size_t len = max_len; len > 0; --len) {
+            for (size_t len = std::min((size_t)32, text.size() - i); len >= 1; --len) {
                 std::string sub = text.substr(i, len);
                 auto it = token_to_id.find(sub);
                 if (it != token_to_id.end()) {
@@ -92,10 +92,23 @@ public:
                 }
             }
             if (!matched) {
+                unsigned char c = text[i];
+                std::string byte_str(1, c);
+                if (token_to_id.count(byte_str)) {
+                    tokens.push_back(token_to_id.at(byte_str));
+                }
                 i += 1;
             }
         }
         return tokens;
+    }
+
+    std::string decode_token(int token_id) const {
+        auto it = id_to_token.find(token_id);
+        if (it != id_to_token.end()) {
+            return it->second;
+        }
+        return "";
     }
 
     std::string decode(const std::vector<int>& token_ids) const {
@@ -110,11 +123,15 @@ public:
     }
 
     bool is_stop_token(int tid) const {
+        if (tid >= 128000 && tid <= 128256) return true;
         if (tid == eos_token || tid == eot_token) return true;
         auto it = id_to_token.find(tid);
         if (it != id_to_token.end()) {
             const std::string& s = it->second;
-            if (s == "<|endoftext|>" || s == "<|eot_id|>" || s == "</s>" || s == "<eos>") return true;
+            if (s == "<|end_of_text|>" || s == "<|endoftext|>" || s == "<|eot_id|>" || s == "</s>" || s == "<eos>") return true;
+            if (s.find("endoftext") != std::string::npos || s.find("eot_id") != std::string::npos || 
+                s.find("end_of_eot") != std::string::npos || s.find("end_of_text") != std::string::npos ||
+                s.find("end_header_id") != std::string::npos) return true;
         }
         return false;
     }
@@ -125,6 +142,7 @@ struct CliOptions {
     std::string prompt = "";
     std::string system_prompt = "You are Tenzo, a fast and helpful AI assistant powered by 1.58-bit native MLIR execution.";
     std::string kv_mode = "int8_fused";
+    std::string device = "cpu";
     int max_tokens = 128;
     int ctx_size = 8192;
     float temp = 0.7f;
@@ -134,6 +152,7 @@ struct CliOptions {
     bool chat_mode = false;
     bool show_banner = true;
     bool benchmark = false;
+    bool profile = false;
 };
 
 void print_banner() {
@@ -143,8 +162,8 @@ void print_banner() {
     std::cout << "   | | |  _| |  \\| | / / |  | |\n";
     std::cout << "   | | | |___| |\\  |/ /| |__| |\n";
     std::cout << "   |_| |_____|_| \\_/____\\____/ \n" << ANSI_RESET;
-    std::cout << ANSI_BOLD << " ⚡ Tenzo Native LLM Inference Engine " << ANSI_GREEN << "v0.3.0" << ANSI_RESET << "\n";
-    std::cout << ANSI_DIM << " High-performance MLIR/AVX2 runtime for 1.58-bit BitNet architectures\n" << ANSI_RESET;
+    std::cout << ANSI_BOLD << " ⚡ Tenzo Native LLM Inference Engine " << ANSI_GREEN << "v1.0.0-beta.1 (Beta-1.0)" << ANSI_RESET << "\n";
+    std::cout << ANSI_DIM << " Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)\n" << ANSI_RESET;
     std::cout << "────────────────────────────────────────────────────────────────────────────\n" << std::endl;
 }
 
@@ -158,7 +177,12 @@ void print_help(const char* prog_name) {
     std::cout << "  -m, --model <path>          Path to exported model folder (default: /app/tenzo-frontend/export_output)\n";
     std::cout << "  --chat                      Enter interactive multi-turn REPL chat mode\n";
     std::cout << "  --system <str>              Custom system prompt (default: Tenzo Assistant)\n\n";
-    std::cout << ANSI_BOLD << "QUANTIZATION & MEMORY:" << ANSI_RESET << "\n";
+    std::cout << ANSI_BOLD << "HETEROGENEOUS COMPUTE & BACKENDS:" << ANSI_RESET << "\n";
+    std::cout << "  -d, --device <backend>      Compute backend: " << ANSI_GREEN << "cpu" << ANSI_RESET << " (AVX2/NEON), "
+              << ANSI_GREEN << "gpu / vulkan" << ANSI_RESET << " (Vulkan SPIR-V), "
+              << ANSI_GREEN << "cuda" << ANSI_RESET << " (NVPTX/Vulkan), "
+              << ANSI_GREEN << "rocm" << ANSI_RESET << " (AMDGCN/Vulkan), "
+              << ANSI_GREEN << "riscv" << ANSI_RESET << " (RVV 1.0)\n";
     std::cout << "  --kv-quant <mode>           KV-Cache Quantization mode (default: int8_fused)\n";
     std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (14.2x comp, 84MB), " 
               << ANSI_GREEN << "int8_fused" << ANSI_RESET << " (4x comp, 309MB), " 
@@ -170,14 +194,17 @@ void print_help(const char* prog_name) {
     std::cout << "  --top-k <int>               Top-K candidate filter (default: 40)\n";
     std::cout << "  --rep-penalty <float>       Repetition penalty multiplier (default: 1.15)\n\n";
     std::cout << ANSI_BOLD << "UTILITIES:" << ANSI_RESET << "\n";
+    std::cout << "  --profile                   Print hardware microarchitecture topology & cache analysis\n";
     std::cout << "  -b, --benchmark             Run automated performance benchmark across sequence lengths\n";
     std::cout << "  -h, --help                  Show this help message and exit\n";
     std::cout << "  -v, --version               Show version information\n\n";
     std::cout << ANSI_BOLD << "EXAMPLES:" << ANSI_RESET << "\n";
-    std::cout << "  # Interactive chat:\n";
-    std::cout << "  " << prog_name << " --chat --kv-quant tl1_fused\n\n";
-    std::cout << "  # Single prompt generation:\n";
-    std::cout << "  " << prog_name << " -p \"Explain the importance of compilers\" -n 50 -t 0.7\n\n";
+    std::cout << "  # Interactive chat on Vulkan GPU:\n";
+    std::cout << "  " << prog_name << " --chat --device vulkan\n\n";
+    std::cout << "  # CUDA translation mode:\n";
+    std::cout << "  " << prog_name << " -p \"Hello CUDA\" --device cuda\n\n";
+    std::cout << "  # RISC-V RVV vector emulation:\n";
+    std::cout << "  " << prog_name << " -p \"Hello RISC-V\" --device riscv\n\n";
 }
 
 int main(int argc, char** argv) {
@@ -197,6 +224,8 @@ int main(int argc, char** argv) {
             opt.max_tokens = std::atoi(argv[++i]);
         } else if ((arg == "-m" || arg == "--model") && i + 1 < argc) {
             opt.model_dir = argv[++i];
+        } else if ((arg == "-d" || arg == "--device") && i + 1 < argc) {
+            opt.device = argv[++i];
         } else if ((arg == "-t" || arg == "--temp" || arg == "--temperature") && i + 1 < argc) {
             opt.temp = std::atof(argv[++i]);
         } else if (arg == "--top-p" && i + 1 < argc) {
@@ -227,6 +256,25 @@ int main(int argc, char** argv) {
     std::string mlir_path = opt.model_dir + "/model.mlir";
     std::string weights_path = opt.model_dir + "/weights.bin";
 
+    // Auto-fallback search if model path is not directly accessible
+    if (!std::ifstream(vocab_path).is_open()) {
+        std::vector<std::string> candidates = {
+            "tenzo-frontend/export_output",
+            "./tenzo-frontend/export_output",
+            "/app/tenzo-frontend/export_output"
+        };
+        for (const auto& c : candidates) {
+            std::string test_v = c + "/tokenizer.vocab";
+            if (std::ifstream(test_v).is_open()) {
+                opt.model_dir = c;
+                vocab_path = c + "/tokenizer.vocab";
+                mlir_path = c + "/model.mlir";
+                weights_path = c + "/weights.bin";
+                break;
+            }
+        }
+    }
+
     BpeTokenizer tokenizer;
     std::cout << ANSI_CYAN << "📖 Loading vocabulary..." << ANSI_RESET;
     if (!tokenizer.load_vocab(vocab_path)) {
@@ -236,13 +284,20 @@ int main(int argc, char** argv) {
     }
     std::cout << ANSI_GREEN << " [OK] " << ANSI_RESET << "(" << tokenizer.id_to_token.size() << " tokens)\n";
 
+    if (opt.profile) {
+        auto& prof = tenzo::MicroarchProfiler::getProfile();
+        tenzo::MicroarchProfiler::printReport(prof);
+    }
+
     // Initialize Tenzo Engine
     tenzo_config_t config = tenzo_default_config();
     config.kv_mode = opt.kv_mode.c_str();
     config.max_seq_len = opt.ctx_size;
+    config.device = opt.device.c_str();
 
     std::cout << ANSI_CYAN << "⚙️  Initializing Execution Engine (" 
-              << ANSI_BOLD << "KV-Cache: " << opt.kv_mode << ANSI_RESET << ANSI_CYAN << ", Max Context: " 
+              << ANSI_BOLD << "Backend: " << opt.device 
+              << ", KV-Cache: " << opt.kv_mode << ANSI_RESET << ANSI_CYAN << ", Max Context: " 
               << opt.ctx_size << ")..." << ANSI_RESET;
     tenzo::Engine engine(config);
     std::cout << ANSI_GREEN << " [OK]\n" << ANSI_RESET;
@@ -289,28 +344,76 @@ int main(int argc, char** argv) {
             if (!std::getline(std::cin, user_input)) break;
             if (user_input.empty()) continue;
 
-            if (user_input == "/exit" || user_input == "/quit") {
-                std::cout << ANSI_DIM << "Exiting Tenzo REPL. Goodbye!\n" << ANSI_RESET;
-                break;
-            } else if (user_input == "/reset" || user_input == "/clear") {
-                engine.reset();
-                conversation_tokens.clear();
-                std::cout << ANSI_YELLOW << "🧹 Conversation context & KV-cache reset.\n" << ANSI_RESET;
-                if (!opt.system_prompt.empty()) {
-                    std::string sys_formatted = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + opt.system_prompt + "<|eot_id|>";
-                    std::vector<int> sys_tokens = tokenizer.encode(sys_formatted, false);
-                    for (int t : sys_tokens) {
-                        engine.prefill_token(t);
-                        conversation_tokens.push_back(t);
+            if (user_input[0] == '/') {
+                std::istringstream iss(user_input);
+                std::string cmd;
+                iss >> cmd;
+
+                if (cmd == "/exit" || cmd == "/quit" || cmd == "/bye") {
+                    std::cout << ANSI_DIM << "Exiting Tenzo REPL. Goodbye!\n" << ANSI_RESET;
+                    break;
+                } else if (cmd == "/help") {
+                    std::cout << ANSI_BOLD << "\n📖 Interactive Chat Commands:\n" << ANSI_RESET;
+                    std::cout << "  /help                       Show this help message\n";
+                    std::cout << "  /stats                      Display active token count & KV-cache RAM\n";
+                    std::cout << "  /reset, /clear              Clear conversation history & reset KV-Cache\n";
+                    std::cout << "  /temp <float>               Set sampling temperature (e.g. /temp 0.7)\n";
+                    std::cout << "  /top_p <float>              Set top-p nucleus sampling (e.g. /top_p 0.9)\n";
+                    std::cout << "  /top_k <int>                Set top-k candidates (e.g. /top_k 40)\n";
+                    std::cout << "  /rep <float>                Set repetition penalty (e.g. /rep 1.15)\n";
+                    std::cout << "  /max_tokens <int>           Set max generation tokens per turn\n";
+                    std::cout << "  /exit, /quit                Exit chat session\n\n";
+                    continue;
+                } else if (cmd == "/reset" || cmd == "/clear") {
+                    engine.reset();
+                    conversation_tokens.clear();
+                    std::cout << ANSI_YELLOW << "🧹 Conversation context & KV-cache reset.\n" << ANSI_RESET;
+                    if (!opt.system_prompt.empty()) {
+                        std::string sys_formatted = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + opt.system_prompt + "<|eot_id|>";
+                        std::vector<int> sys_tokens = tokenizer.encode(sys_formatted, false);
+                        for (int t : sys_tokens) {
+                            engine.prefill_token(t);
+                            conversation_tokens.push_back(t);
+                        }
                     }
+                    continue;
+                } else if (cmd == "/stats") {
+                    int cur_len = engine.get_seq_len();
+                    double kv_mb = (30.0 * cur_len * 5 * 128 * (opt.kv_mode == "tl1_fused" ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : 4.0)) * 2) / (1024.0 * 1024.0);
+                    std::cout << ANSI_CYAN << "📊 Stats: Active Tokens: " << cur_len << " / " << opt.ctx_size 
+                              << " | KV-Cache RAM: " << std::fixed << std::setprecision(2) << kv_mb << " MB"
+                              << " | Temp: " << params.temperature << " | Top-P: " << params.top_p 
+                              << " | Top-K: " << params.top_k << "\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/temp" || cmd == "/temperature") {
+                    float v;
+                    if (iss >> v) { params.temperature = v; std::cout << ANSI_GREEN << "✅ Temperature set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /temp <float>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/top_p" || cmd == "/topp") {
+                    float v;
+                    if (iss >> v) { params.top_p = v; std::cout << ANSI_GREEN << "✅ Top-P set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /top_p <float>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/top_k" || cmd == "/topk") {
+                    int v;
+                    if (iss >> v) { params.top_k = v; std::cout << ANSI_GREEN << "✅ Top-K set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /top_k <int>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/rep" || cmd == "/repetition_penalty") {
+                    float v;
+                    if (iss >> v) { params.repetition_penalty = v; std::cout << ANSI_GREEN << "✅ Repetition penalty set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /rep <float>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/max_tokens" || cmd == "/tokens") {
+                    int v;
+                    if (iss >> v) { opt.max_tokens = v; std::cout << ANSI_GREEN << "✅ Max tokens set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /max_tokens <int>\n" << ANSI_RESET;
+                    continue;
+                } else {
+                    std::cout << ANSI_RED << "Unknown command: " << cmd << ". Type /help for available commands.\n" << ANSI_RESET;
+                    continue;
                 }
-                continue;
-            } else if (user_input == "/stats") {
-                int cur_len = engine.get_seq_len();
-                double kv_mb = (30.0 * cur_len * 5 * 128 * (opt.kv_mode == "tl1_fused" ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : 4.0)) * 2) / (1024.0 * 1024.0);
-                std::cout << ANSI_CYAN << "📊 Stats: Active Tokens: " << cur_len << " / " << opt.ctx_size 
-                          << " | KV-Cache RAM: " << std::fixed << std::setprecision(2) << kv_mb << " MB\n" << ANSI_RESET;
-                continue;
             }
 
             std::string turn_formatted = "<|start_header_id|>user<|end_header_id|>\n\n" + user_input + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";

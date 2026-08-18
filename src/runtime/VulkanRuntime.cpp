@@ -1,4 +1,5 @@
 #include "VulkanRuntime.h"
+#include "VulkanShaders.h"
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -15,7 +16,6 @@ bool VulkanRuntime::s_initialized = false;
 std::string VulkanRuntime::s_deviceName = "Unknown";
 
 #ifdef TENZO_HAS_VULKAN
-// Static Vulkan objects
 static VkInstance s_instance = VK_NULL_HANDLE;
 static VkPhysicalDevice s_physicalDevice = VK_NULL_HANDLE;
 static VkDevice s_device = VK_NULL_HANDLE;
@@ -59,8 +59,8 @@ bool VulkanRuntime::initialize() {
 
     VkApplicationInfo appInfo = {};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Tenzo";
-    appInfo.apiVersion = VK_API_VERSION_1_2;
+    appInfo.pApplicationName = "Tenzo LLM Engine";
+    appInfo.apiVersion = VK_API_VERSION_1_1;
 
     VkInstanceCreateInfo instInfo = {};
     instInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -69,7 +69,10 @@ bool VulkanRuntime::initialize() {
 
     uint32_t devCount = 0;
     vkEnumeratePhysicalDevices(s_instance, &devCount, nullptr);
-    if (devCount == 0) { std::cerr << "[Vulkan] No GPU!\n"; return false; }
+    if (devCount == 0) { 
+        std::cerr << "[Vulkan] No GPU device found!\n"; 
+        return false; 
+    }
 
     std::vector<VkPhysicalDevice> devs(devCount);
     vkEnumeratePhysicalDevices(s_instance, &devCount, devs.data());
@@ -78,7 +81,7 @@ bool VulkanRuntime::initialize() {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(s_physicalDevice, &props);
     s_deviceName = props.deviceName;
-    std::cout << "[Vulkan] Device: " << s_deviceName << "\n";
+    std::cout << "[Vulkan] GPU Compute Device: " << s_deviceName << "\n";
 
     s_computeQueueFamily = findComputeQueueFamily(s_physicalDevice);
     float prio = 1.0f;
@@ -98,13 +101,12 @@ bool VulkanRuntime::initialize() {
     VkCommandPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex = s_computeQueueFamily;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     VK_CHECK(vkCreateCommandPool(s_device, &poolInfo, nullptr, &s_commandPool));
 
     s_initialized = true;
-    std::cout << "[Vulkan] Initialized!\n";
     return true;
 #else
-    std::cerr << "[Vulkan] Not compiled!\n";
     return false;
 #endif
 }
@@ -122,17 +124,16 @@ void VulkanRuntime::cleanup() {
 bool VulkanRuntime::isAvailable() { return s_initialized; }
 std::string VulkanRuntime::getDeviceName() { return s_deviceName; }
 
-bool VulkanRuntime::execute(
+bool VulkanRuntime::executeShader(
     const std::vector<uint32_t>& spirv,
     const std::vector<std::pair<void*, size_t>>& inputs,
     std::pair<void*, size_t> output,
-    std::array<uint32_t, 3> wgSize,
+    const void* pushConstantsData,
+    size_t pushConstantsSize,
     std::array<uint32_t, 3> numWG
 ) {
 #ifdef TENZO_HAS_VULKAN
-    if (!s_initialized) return false;
-    std::cout << "[Vulkan] Execute: " << spirv.size()*4 << " bytes, "
-              << numWG[0] << "x" << numWG[1] << " workgroups\n";
+    if (!s_initialized && !initialize()) return false;
 
     // 1. Shader module
     VkShaderModuleCreateInfo smInfo = {};
@@ -143,7 +144,7 @@ bool VulkanRuntime::execute(
     VK_CHECK(vkCreateShaderModule(s_device, &smInfo, nullptr, &shader));
 
     // 2. Descriptor layout
-    uint32_t nBufs = inputs.size() + 1;
+    uint32_t nBufs = static_cast<uint32_t>(inputs.size() + 1);
     std::vector<VkDescriptorSetLayoutBinding> bindings(nBufs);
     for (uint32_t i = 0; i < nBufs; i++) {
         bindings[i] = {i, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr};
@@ -155,11 +156,20 @@ bool VulkanRuntime::execute(
     VkDescriptorSetLayout dsl;
     VK_CHECK(vkCreateDescriptorSetLayout(s_device, &dslInfo, nullptr, &dsl));
 
-    // 3. Pipeline layout
+    // 3. Pipeline layout with Push Constants
+    VkPushConstantRange pcRange = {};
+    pcRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pcRange.offset = 0;
+    pcRange.size = static_cast<uint32_t>(pushConstantsSize);
+
     VkPipelineLayoutCreateInfo plInfo = {};
     plInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     plInfo.setLayoutCount = 1;
     plInfo.pSetLayouts = &dsl;
+    if (pushConstantsSize > 0) {
+        plInfo.pushConstantRangeCount = 1;
+        plInfo.pPushConstantRanges = &pcRange;
+    }
     VkPipelineLayout pipeLayout;
     VK_CHECK(vkCreatePipelineLayout(s_device, &plInfo, nullptr, &pipeLayout));
 
@@ -169,7 +179,7 @@ bool VulkanRuntime::execute(
     cpInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     cpInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     cpInfo.stage.module = shader;
-    cpInfo.stage.pName = "elemwise_add_kernel";
+    cpInfo.stage.pName = "main";
     cpInfo.layout = pipeLayout;
     VkPipeline pipeline;
     VK_CHECK(vkCreateComputePipelines(s_device, VK_NULL_HANDLE, 1, &cpInfo, nullptr, &pipeline));
@@ -195,7 +205,7 @@ bool VulkanRuntime::execute(
     // 6. Create buffers
     std::vector<VkBuffer> bufs;
     std::vector<VkDeviceMemory> mems;
-    auto mkBuf = [&](size_t sz, void* data) {
+    auto mkBuf = [&](size_t sz, const void* data) {
         VkBufferCreateInfo bi = {};
         bi.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         bi.size = sz;
@@ -209,8 +219,14 @@ bool VulkanRuntime::execute(
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         VkDeviceMemory m; vkAllocateMemory(s_device, &mai, nullptr, &m);
         vkBindBufferMemory(s_device, b, m, 0);
-        if (data) { void* p; vkMapMemory(s_device, m, 0, sz, 0, &p); memcpy(p, data, sz); vkUnmapMemory(s_device, m); }
-        bufs.push_back(b); mems.push_back(m);
+        if (data) { 
+            void* p; 
+            vkMapMemory(s_device, m, 0, sz, 0, &p); 
+            memcpy(p, data, sz); 
+            vkUnmapMemory(s_device, m); 
+        }
+        bufs.push_back(b); 
+        mems.push_back(m);
     };
     for (auto& in : inputs) mkBuf(in.second, in.first);
     mkBuf(output.second, nullptr);
@@ -220,10 +236,13 @@ bool VulkanRuntime::execute(
     std::vector<VkWriteDescriptorSet> wds(nBufs);
     for (uint32_t i = 0; i < nBufs; i++) {
         dbis[i] = {bufs[i], 0, VK_WHOLE_SIZE};
-        wds[i] = {}; wds[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        wds[i].dstSet = descSet; wds[i].dstBinding = i;
+        wds[i] = {}; 
+        wds[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        wds[i].dstSet = descSet; 
+        wds[i].dstBinding = i;
         wds[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        wds[i].descriptorCount = 1; wds[i].pBufferInfo = &dbis[i];
+        wds[i].descriptorCount = 1; 
+        wds[i].pBufferInfo = &dbis[i];
     }
     vkUpdateDescriptorSets(s_device, nBufs, wds.data(), 0, nullptr);
 
@@ -233,30 +252,37 @@ bool VulkanRuntime::execute(
     cbai.commandPool = s_commandPool;
     cbai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cbai.commandBufferCount = 1;
-    VkCommandBuffer cmd; vkAllocateCommandBuffers(s_device, &cbai, &cmd);
+    VkCommandBuffer cmd; 
+    vkAllocateCommandBuffers(s_device, &cbai, &cmd);
 
     VkCommandBufferBeginInfo cbbi = {};
     cbbi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     vkBeginCommandBuffer(cmd, &cbbi);
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeLayout, 0, 1, &descSet, 0, nullptr);
+    if (pushConstantsSize > 0 && pushConstantsData) {
+        vkCmdPushConstants(cmd, pipeLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, static_cast<uint32_t>(pushConstantsSize), pushConstantsData);
+    }
     vkCmdDispatch(cmd, numWG[0], numWG[1], numWG[2]);
     vkEndCommandBuffer(cmd);
 
-    // 9. Submit
-    VkSubmitInfo si = {}; si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    si.commandBufferCount = 1; si.pCommandBuffers = &cmd;
-    VkFence fence; VkFenceCreateInfo fi = {}; fi.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    // 9. Submit & Wait
+    VkSubmitInfo si = {}; 
+    si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    si.commandBufferCount = 1; 
+    si.pCommandBuffers = &cmd;
+    VkFence fence; 
+    VkFenceCreateInfo fi = {}; 
+    fi.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     vkCreateFence(s_device, &fi, nullptr, &fence);
     vkQueueSubmit(s_computeQueue, 1, &si, fence);
     vkWaitForFences(s_device, 1, &fence, VK_TRUE, UINT64_MAX);
 
     // 10. Read back
-    void* p; vkMapMemory(s_device, mems.back(), 0, output.second, 0, &p);
+    void* p; 
+    vkMapMemory(s_device, mems.back(), 0, output.second, 0, &p);
     memcpy(output.first, p, output.second);
     vkUnmapMemory(s_device, mems.back());
-
-    std::cout << "[Vulkan] Done!\n";
 
     // Cleanup
     vkDestroyFence(s_device, fence, nullptr);
@@ -276,17 +302,81 @@ bool VulkanRuntime::execute(
 #endif
 }
 
-bool VulkanRuntime::executeMatMul(
-    const std::vector<uint32_t>& spirv,
-    const float* A, const float* B, float* C,
-    uint32_t M, uint32_t N, uint32_t K
+bool VulkanRuntime::executeBitLinearTL1(
+    const float* x,
+    const uint8_t* W_packed,
+    float* y,
+    uint32_t N,
+    uint32_t K,
+    float scale
 ) {
-    std::vector<std::pair<void*, size_t>> ins = {
-        {(void*)A, M*K*sizeof(float)}, {(void*)B, K*N*sizeof(float)}
+    struct BitLinearPC {
+        uint32_t N;
+        uint32_t K;
+        float scale;
+        float quant_scale;
+    } pc = {N, K, scale, 1.0f};
+
+    size_t x_bytes = K * sizeof(float);
+    size_t w_bytes = (static_cast<size_t>(N) * K) / 4; // 2-bit packed
+    size_t y_bytes = N * sizeof(float);
+
+    std::vector<std::pair<void*, size_t>> inputs = {
+        {(void*)x, x_bytes},
+        {(void*)W_packed, w_bytes}
     };
-    return execute(spirv, ins, {C, M*N*sizeof(float)}, {16,16,1}, {(M+15)/16,(N+15)/16,1});
+
+    uint32_t wg_x = (N + 63) / 64;
+    return executeShader(shaders::get_bitlinear_tl1_spirv(), inputs, {y, y_bytes}, &pc, sizeof(pc), {wg_x, 1, 1});
+}
+
+bool VulkanRuntime::executeGemmF32(
+    const float* x,
+    const float* W,
+    float* y,
+    uint32_t N,
+    uint32_t K,
+    float alpha
+) {
+    struct GemmPC {
+        uint32_t N;
+        uint32_t K;
+        float alpha;
+    } pc = {N, K, alpha};
+
+    size_t x_bytes = K * sizeof(float);
+    size_t w_bytes = static_cast<size_t>(N) * K * sizeof(float);
+    size_t y_bytes = N * sizeof(float);
+
+    std::vector<std::pair<void*, size_t>> inputs = {
+        {(void*)x, x_bytes},
+        {(void*)W, w_bytes}
+    };
+
+    uint32_t wg_x = (N + 63) / 64;
+    return executeShader(shaders::get_gemm_f32_spirv(), inputs, {y, y_bytes}, &pc, sizeof(pc), {wg_x, 1, 1});
+}
+
+bool VulkanRuntime::executeRMSNorm(
+    const float* x,
+    const float* w,
+    float* y,
+    uint32_t dim,
+    float eps
+) {
+    struct RMSNormPC {
+        uint32_t dim;
+        float eps;
+    } pc = {dim, eps};
+
+    size_t bytes = dim * sizeof(float);
+    std::vector<std::pair<void*, size_t>> inputs = {
+        {(void*)x, bytes},
+        {(void*)w, bytes}
+    };
+
+    return executeShader(shaders::get_rmsnorm_spirv(), inputs, {y, bytes}, &pc, sizeof(pc), {1, 1, 1});
 }
 
 } // namespace runtime
 } // namespace tenzo
-
