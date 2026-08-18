@@ -14,8 +14,8 @@ import termios
 import subprocess
 
 TARGETS = {
-    "phone": "pDSa3YryVJZ8T2FTr56Egvq8L@nyc1.tmate.io",
-    "tablet": "UFFn6rRTjNmeP8D5u9x99L5Yn@sfo2.tmate.io",
+    "phone": "qPzEE7SMDX3c7h4hn7aeRezKz@nyc1.tmate.io",
+    "tablet": "hhWa46e3Syw4fGqxXJpe3v9c8@nyc1.tmate.io",
 }
 
 def exec_remote(target_name, command, timeout=120):
