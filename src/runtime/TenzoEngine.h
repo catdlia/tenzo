@@ -10,7 +10,11 @@
 #include <vector>
 #include <string>
 #include <memory>
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #include <immintrin.h>
+#elif defined(__ARM_NEON) || defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#endif
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -20,6 +24,7 @@
 namespace tenzo {
 
 // 256-bit SIMD vector wrapper with 32-byte alignment
+#if defined(__x86_64__) || defined(_M_X64)
 struct alignas(32) Vec256i {
     __m256i v;
     Vec256i() : v(_mm256_setzero_si256()) {}
@@ -27,6 +32,18 @@ struct alignas(32) Vec256i {
     operator __m256i() const { return v; }
     Vec256i& operator=(__m256i val) { v = val; return *this; }
 };
+#elif defined(__ARM_NEON) || defined(__aarch64__)
+struct alignas(32) Vec256i {
+    int8x16_t v0;
+    int8x16_t v1;
+    Vec256i() : v0(vdupq_n_s8(0)), v1(vdupq_n_s8(0)) {}
+    Vec256i(int8x16_t a, int8x16_t b) : v0(a), v1(b) {}
+};
+#else
+struct alignas(32) Vec256i {
+    int8_t data[32] = {0};
+};
+#endif
 
 struct LayerWeightsInternal {
     std::vector<int8_t> q_w; float q_scale = 1.0f;

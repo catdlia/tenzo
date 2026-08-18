@@ -19,10 +19,17 @@ echo "   | | | |___| |\  |/ /| |__| |"
 echo "   |_| |_____|_| \_/____\____/ "
 echo -e " ⚡ Tenzo Android Native Build Tool (Termux ARM64)${ANSI_RESET}\n"
 
-# 1. Update and install required dependencies in Termux
+# 1. Update and install required dependencies in Termux (NO non-existent libomp)
 echo -e "${ANSI_YELLOW}📦 [1/4] Checking and installing Termux build tools...${ANSI_RESET}"
 pkg update -y
-pkg install -y git clang cmake ninja make python ndk-sysroot libomp vulkan-loader-generic libllvm-static
+pkg install -y git clang cmake ninja make python ndk-sysroot
+
+# Fix OpenMP symlink if libomp.a is present but libomp.so is missing in Termux sysroot
+if [ -d "$PREFIX/lib" ]; then
+    if [ -f "$PREFIX/lib/libomp.a" ] && [ ! -f "$PREFIX/lib/libomp.so" ]; then
+        ln -sf "$PREFIX/lib/libomp.a" "$PREFIX/lib/libomp.so" 2>/dev/null || true
+    fi
+fi
 
 # 2. Setup Build Directory
 BUILD_DIR="build-termux"
@@ -42,6 +49,7 @@ fi
 
 cmake -B "${BUILD_DIR}" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
+    -DTENZO_STANDALONE_RUNTIME=ON \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_CXX_FLAGS="${ARCH_FLAGS} -O3 -ffast-math -fopenmp" \

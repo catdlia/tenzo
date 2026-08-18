@@ -8,13 +8,21 @@ set -e
 
 echo "⚡ Starting Tenzo 1-Click Setup on Android Termux..."
 
-# 1. Install dependencies
-pkg update -y && pkg install -y git clang cmake ninja make python libomp ndk-sysroot
+# 1. Update and install required dependencies in Termux (no libomp)
+pkg update -y
+pkg install -y git clang cmake ninja make python ndk-sysroot
 
-# 2. Build
+# 2. OpenMP symlink safeguard
+if [ -d "$PREFIX/lib" ]; then
+    if [ -f "$PREFIX/lib/libomp.a" ] && [ ! -f "$PREFIX/lib/libomp.so" ]; then
+        ln -sf "$PREFIX/lib/libomp.a" "$PREFIX/lib/libomp.so" 2>/dev/null || true
+    fi
+fi
+
+# 3. Build standalone runtime
 if [ ! -f "build-termux/tenzo-inference" ]; then
     ./scripts/android/build_termux.sh
 fi
 
-# 3. Launch interactive chat
+# 4. Launch interactive chat
 python3 scripts/tenzo_cli.py chat
