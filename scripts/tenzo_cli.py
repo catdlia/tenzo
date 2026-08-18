@@ -197,6 +197,27 @@ def pull_model(repo_id, quant="i2_s", layers=30):
         setup_demo_model(target_dir, num_layers=layers)
         return True
 
+def delete_model(model_name: str):
+    clean_name = model_name.split("/")[-1].lower().replace("_", "-")
+    target_dir = os.path.join(LOCAL_MODELS_DIR, clean_name)
+    if os.path.exists(target_dir):
+        import shutil
+        shutil.rmtree(target_dir)
+        print(f"{ANSI_GREEN}✅ Successfully deleted model '{clean_name}' from {target_dir}.{ANSI_RESET}")
+        return True
+    
+    if os.path.exists(model_name) and model_name not in ("default", "model-default"):
+        import shutil
+        if os.path.isdir(model_name):
+            shutil.rmtree(model_name)
+        else:
+            os.remove(model_name)
+        print(f"{ANSI_GREEN}✅ Successfully deleted '{model_name}'.{ANSI_RESET}")
+        return True
+        
+    print(f"{ANSI_RED}Model '{model_name}' not found in local registries. Type /list to see available models.{ANSI_RESET}")
+    return False
+
 def show_help():
     print(f"""
 {ANSI_BOLD}📖 Tenzo Interactive Console Commands:{ANSI_RESET}
@@ -204,6 +225,8 @@ def show_help():
   {ANSI_CYAN}/models{ANSI_RESET}, {ANSI_CYAN}/list{ANSI_RESET}                     List all available local models and formats
   {ANSI_CYAN}/pull <hf_repo>{ANSI_RESET}                    Download, compile MLIR graph, and pack weights from Hugging Face
   {ANSI_CYAN}/load <model>{ANSI_RESET}, {ANSI_CYAN}/model <name>{ANSI_RESET}        Switch active model dynamically
+  {ANSI_CYAN}/delete <model>{ANSI_RESET}, {ANSI_CYAN}/remove <name>{ANSI_RESET}    Delete a local model from storage
+  {ANSI_CYAN}/chat{ANSI_RESET}                              Launch persistent high-speed C++ multi-turn REPL
   {ANSI_CYAN}/kv <tl1_fused|int8_fused|paged_int8|fp32>{ANSI_RESET} Switch KV-Cache quantization mode
   {ANSI_CYAN}/quant <i2_s|i8_s|f32>{ANSI_RESET}              Switch model weights quantization mode
   {ANSI_CYAN}/set <param> <val>{ANSI_RESET}                  Set parameters: temp, top_p, top_k, rep_penalty, ctx, max_tokens
@@ -260,8 +283,7 @@ def run_single_turn(session: TenzoSession, prompt: str, max_tokens: int = None, 
     except KeyboardInterrupt:
         print(f"\n{ANSI_YELLOW}⏹️  Generation interrupted by user.{ANSI_RESET}")
 
-def interactive_repl(session: TenzoSession):
-    # Ensure default model is ready
+def start_persistent_chat(session: TenzoSession):
     default_weights = os.path.join(os.getcwd(), "tenzo-frontend", "export_output", "weights.bin")
     if not os.path.exists(default_weights) and not os.path.exists(os.path.join(session.model_path, "weights.bin")):
         setup_demo_model()
@@ -281,7 +303,130 @@ def interactive_repl(session: TenzoSession):
     try:
         subprocess.run(cmd)
     except KeyboardInterrupt:
-        print(f"\n{ANSI_YELLOW}⏹️  Session ended.{ANSI_RESET}")
+        print(f"\n{ANSI_YELLOW}⏹️  Persistent chat session ended.{ANSI_RESET}")
+
+def interactive_repl(session: TenzoSession):
+    # Ensure default model is ready
+    default_weights = os.path.join(os.getcwd(), "tenzo-frontend", "export_output", "weights.bin")
+    if not os.path.exists(default_weights) and not os.path.exists(os.path.join(session.model_path, "weights.bin")):
+        setup_demo_model()
+
+    print_banner()
+    print(f"\n{ANSI_BOLD}🟢 Console Ready!{ANSI_RESET} Active Model: {ANSI_GREEN}{session.model_name}{ANSI_RESET} | KV-Cache: {ANSI_CYAN}{session.kv_quant}{ANSI_RESET} ({session.get_kv_ram_mb():.1f} MB @ {session.ctx_size} tokens)")
+    print(f"{ANSI_DIM}Type {ANSI_YELLOW}/help{ANSI_RESET}{ANSI_DIM} for available commands or start chatting below:{ANSI_RESET}\n")
+
+    last_interrupt_time = 0
+    while True:
+        try:
+            user_input = input(f"{ANSI_BOLD}{ANSI_GREEN}User > {ANSI_RESET}").strip()
+            last_interrupt_time = 0
+        except KeyboardInterrupt:
+            now = time.time()
+            if now - last_interrupt_time < 2.0:
+                print(f"\n{ANSI_DIM}Exiting Tenzo Console. Goodbye!{ANSI_RESET}")
+                break
+            else:
+                last_interrupt_time = now
+                print(f"\n{ANSI_YELLOW}(Press Ctrl+C again or type /exit to quit){ANSI_RESET}")
+                continue
+        except EOFError:
+            print(f"\n{ANSI_DIM}Exiting Tenzo Console. Goodbye!{ANSI_RESET}")
+            break
+
+        if not user_input:
+            continue
+
+        # Check for commands
+        if user_input.startswith("/"):
+            parts = user_input.split()
+            cmd = parts[0].lower()
+            args = parts[1:]
+
+            if cmd in ("/exit", "/quit", "/bye"):
+                print(f"{ANSI_DIM}Exiting Tenzo Console. Goodbye!{ANSI_RESET}")
+                break
+            elif cmd == "/help":
+                show_help()
+            elif cmd in ("/models", "/list"):
+                models = find_available_models()
+                print(f"\n{ANSI_BOLD}📦 Available Local Models & Registries:{ANSI_RESET}\n")
+                print(f"{'NAME':<24} | {'ALIAS':<10} | {'FORMAT':<22} | {'SIZE (MB)':<10} | {'STATUS':<8}")
+                print("─" * 80)
+                for m in models:
+                    status = "Active" if m['alias'] == session.model_name or m['name'] == session.model_name else "Ready"
+                    color = ANSI_GREEN if status == "Active" else ANSI_RESET
+                    print(f"{color}{m['name']:<24}{ANSI_RESET} | {m['alias']:<10} | {m['format']:<22} | {m['size_mb']:>8.1f} MB | {color}{status:<8}{ANSI_RESET}")
+                print("─" * 80 + "\n")
+            elif cmd == "/pull":
+                if not args:
+                    print(f"{ANSI_RED}Usage: /pull <huggingface_repo_id> (e.g. /pull microsoft/bitnet-b1.58-2B-4T){ANSI_RESET}")
+                else:
+                    pull_model(args[0])
+            elif cmd in ("/load", "/model"):
+                if not args:
+                    print(f"{ANSI_RED}Usage: /load <model_name_or_alias>{ANSI_RESET}")
+                else:
+                    new_path = resolve_model_path(args[0])
+                    session.model_name = args[0]
+                    session.model_path = new_path
+                    print(f"{ANSI_GREEN}✅ Switched active model to: {args[0]} ({new_path}){ANSI_RESET}")
+            elif cmd in ("/delete", "/remove", "/rm"):
+                if not args:
+                    print(f"{ANSI_RED}Usage: /delete <model_name_or_alias>{ANSI_RESET}")
+                else:
+                    delete_model(args[0])
+            elif cmd == "/chat":
+                start_persistent_chat(session)
+            elif cmd == "/kv":
+                if not args or args[0] not in ("popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"):
+                    print(f"{ANSI_RED}Usage: /kv <popcount_fused|tl1_fused|int8_fused|paged_int8|fp32>{ANSI_RESET}")
+                else:
+                    session.kv_quant = args[0]
+                    print(f"{ANSI_GREEN}✅ KV-Cache Quantization switched to: {args[0]} (RAM for {session.ctx_size} ctx: {session.get_kv_ram_mb():.1f} MB){ANSI_RESET}")
+            elif cmd == "/quant":
+                if not args or args[0] not in ("i2_s", "i4_s", "i3_s", "i8_s", "f32"):
+                    print(f"{ANSI_RED}Usage: /quant <i2_s|i4_s|i3_s|i8_s|f32>{ANSI_RESET}")
+                else:
+                    session.model_quant = args[0]
+                    print(f"{ANSI_GREEN}✅ Model Weight Quantization format set to: {args[0]}{ANSI_RESET}")
+            elif cmd == "/set":
+                if len(args) < 2:
+                    print(f"{ANSI_RED}Usage: /set <temp|top_p|top_k|rep_penalty|ctx|max_tokens> <val>{ANSI_RESET}")
+                else:
+                    k, v = args[0].lower(), args[1]
+                    try:
+                        if k in ("temp", "temperature"): session.temp = float(v)
+                        elif k in ("top_p", "topp"): session.top_p = float(v)
+                        elif k in ("top_k", "topk"): session.top_k = int(v)
+                        elif k in ("rep_penalty", "rep", "penalty"): session.rep_penalty = float(v)
+                        elif k in ("ctx", "ctx_size", "context"): session.ctx_size = int(v)
+                        elif k in ("max_tokens", "tokens", "n"): session.max_tokens = int(v)
+                        print(f"{ANSI_GREEN}✅ Set {k} = {v}{ANSI_RESET}")
+                    except ValueError:
+                        print(f"{ANSI_RED}Invalid numeric value: {v}{ANSI_RESET}")
+            elif cmd == "/system":
+                session.system_prompt = " ".join(args)
+                print(f"{ANSI_GREEN}✅ System prompt updated.{ANSI_RESET}")
+            elif cmd == "/stats":
+                show_stats(session)
+            elif cmd == "/bench":
+                bench_type = args[0] if args else "all"
+                bench_script = os.path.join(os.getcwd(), "scripts", "benchmark_suite.py")
+                subprocess.run(["python3", bench_script, "--model", session.model_name, "--bench", bench_type, "--kv-quant", session.kv_quant])
+            elif cmd == "/code":
+                code_prompt = " ".join(args) if args else "Write a complete C++ Red-Black Tree implementation with tests:"
+                print(f"\n{ANSI_CYAN}⚡ Generating Long-Form Code Solution (300+ tokens)...{ANSI_RESET}\n")
+                run_single_turn(session, code_prompt, max_tokens=300, is_code=True)
+            elif cmd in ("/clear", "/reset"):
+                session.history.clear()
+                session.active_tokens = 0
+                print(f"{ANSI_YELLOW}🧹 Conversation history and KV-Cache reset.{ANSI_RESET}")
+            else:
+                print(f"{ANSI_RED}Unknown command: {cmd}. Type /help for command menu.{ANSI_RESET}")
+            continue
+
+        # Standard Chat Message
+        run_single_turn(session, user_input)
 
 def main():
     parser = argparse.ArgumentParser(
