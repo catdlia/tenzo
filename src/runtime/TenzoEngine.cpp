@@ -1504,7 +1504,7 @@ int TenzoEngineImpl::sample_top_k_top_p(
     float* logits = logits_scratch.data();
     float temperature = params ? params->temperature : 0.7f;
     float top_p = params ? params->top_p : 0.9f;
-    int top_k = params ? params->top_k : 40;
+    int top_k = std::clamp(params ? params->top_k : 40, 1, 64);
     float repetition_penalty = params ? params->repetition_penalty : 1.15f;
 
     // Apply repetition penalty directly to past tokens in O(past_tokens_len)
