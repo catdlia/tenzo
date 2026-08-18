@@ -227,6 +227,7 @@ def show_help():
   {ANSI_CYAN}/pull <hf_repo>{ANSI_RESET}                    Download, compile MLIR graph, and pack weights from Hugging Face
   {ANSI_CYAN}/load <model>{ANSI_RESET}, {ANSI_CYAN}/model <name>{ANSI_RESET}        Switch active model dynamically
   {ANSI_CYAN}/delete <model>{ANSI_RESET}, {ANSI_CYAN}/remove <name>{ANSI_RESET}    Delete a local model from storage
+  {ANSI_CYAN}/diag{ANSI_RESET}                              Run comprehensive hardware, SIMD, and math diagnostics
   {ANSI_CYAN}/chat{ANSI_RESET}                              Launch persistent high-speed C++ multi-turn REPL
   {ANSI_CYAN}/kv <tl1_fused|int8_fused|paged_int8|fp32>{ANSI_RESET} Switch KV-Cache quantization mode
   {ANSI_CYAN}/quant <i2_s|i8_s|f32>{ANSI_RESET}              Switch model weights quantization mode
@@ -238,6 +239,30 @@ def show_help():
   {ANSI_CYAN}/clear{ANSI_RESET}, {ANSI_CYAN}/reset{ANSI_RESET}                     Clear conversation memory and reset KV-Cache
   {ANSI_CYAN}/exit{ANSI_RESET}, {ANSI_CYAN}/quit{ANSI_RESET}, {ANSI_CYAN}/bye{ANSI_RESET}             Exit console
 """)
+
+def run_diagnostics(session: TenzoSession):
+    termux_diag = os.path.join(os.getcwd(), "build-termux", "tenzo-diag")
+    cmake_diag = os.path.join(os.getcwd(), "cmake-build-debug", "tenzo-diag")
+
+    if os.path.exists(termux_diag):
+        cmd = [termux_diag, session.model_path]
+    elif is_running_in_docker_host():
+        cmd = [
+            "docker", "compose", "run", "--rm",
+            "-e", "OMP_PLACES=cores", "-e", "OMP_PROC_BIND=spread",
+            "dev",
+            "/app/cmake-build-debug/tenzo-diag",
+            session.model_path
+        ]
+    elif os.path.exists(cmake_diag):
+        cmd = [cmake_diag, session.model_path]
+    else:
+        cmd = ["tenzo-diag", session.model_path]
+
+    try:
+        subprocess.run(cmd)
+    except Exception as e:
+        print(f"{ANSI_RED}❌ Error launching diagnostic suite: {e}{ANSI_RESET}")
 
 def show_stats(session: TenzoSession):
     kv_ram = session.get_kv_ram_mb()
@@ -418,6 +443,8 @@ def interactive_repl(session: TenzoSession):
                 code_prompt = " ".join(args) if args else "Write a complete C++ Red-Black Tree implementation with tests:"
                 print(f"\n{ANSI_CYAN}⚡ Generating Long-Form Code Solution (300+ tokens)...{ANSI_RESET}\n")
                 run_single_turn(session, code_prompt, max_tokens=300, is_code=True)
+            elif cmd in ("/diag", "/diagnostics", "/test"):
+                run_diagnostics(session)
             elif cmd in ("/clear", "/reset"):
                 session.history.clear()
                 session.active_tokens = 0
@@ -435,6 +462,10 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
+
+    # 0. diag
+    sub_diag = subparsers.add_parser("diag", help="Run comprehensive hardware, SIMD, and model diagnostics")
+    sub_diag.add_argument("-m", "--model", type=str, default="default", help="Model name or path to diagnose")
 
     # 1. list
     sub_list = subparsers.add_parser("list", help="List all available local models and formats")
@@ -479,6 +510,11 @@ def main():
         if hasattr(args, "kv_quant") and args.kv_quant:
             session.kv_quant = args.kv_quant
         interactive_repl(session)
+    elif args.command == "diag":
+        if hasattr(args, "model") and args.model:
+            session.model_name = args.model
+            session.model_path = resolve_model_path(args.model)
+        run_diagnostics(session)
     elif args.command == "list":
         models = find_available_models()
         print_banner()

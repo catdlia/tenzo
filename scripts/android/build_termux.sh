@@ -55,11 +55,15 @@ cmake -B "${BUILD_DIR}" -G Ninja \
     -DCMAKE_CXX_FLAGS="${ARCH_FLAGS} -O3 -ffast-math -fopenmp" \
     -DCMAKE_C_FLAGS="${ARCH_FLAGS} -O3 -ffast-math -fopenmp"
 
-# 3. Compile Standalone Inference Engine
-echo -e "${ANSI_YELLOW}🔨 [3/4] Compiling tenzo-inference with Ninja...${ANSI_RESET}"
-ninja -C "${BUILD_DIR}" tenzo_runtime_static tenzo-inference
+# 3. Compile Standalone Inference Engine & Diagnostic Suite
+echo -e "${ANSI_YELLOW}🔨 [3/4] Compiling tenzo-inference & tenzo-diag with Ninja...${ANSI_RESET}"
+ninja -C "${BUILD_DIR}" tenzo_runtime_static tenzo-inference tenzo-diag
 
 echo -e "${ANSI_GREEN}✅ [4/4] Build complete! Binary created at: ${BUILD_DIR}/tenzo-inference${ANSI_RESET}\n"
+
+# 4. Run Self-Diagnostic
+echo -e "${ANSI_YELLOW}🔬 Running Hardware & Math Diagnostics...${ANSI_RESET}"
+./"${BUILD_DIR}"/tenzo-diag tenzo-frontend/export_output || true
 
 echo -e "${ANSI_CYAN}🚀 To start interactive chat:${ANSI_RESET}"
 echo -e "   python3 scripts/tenzo_cli.py chat\n"

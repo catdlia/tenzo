@@ -319,6 +319,23 @@ target_link_libraries(tenzo-inference PRIVATE
     m
 )
 
+# Hardware & System Diagnostic Tool
+add_executable(tenzo-diag
+    src/tests/DeviceDiagnosticTest.cpp
+)
+target_include_directories(tenzo-diag PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_compile_options(tenzo-diag PRIVATE
+    ${TENZO_RUNTIME_FLAGS}
+)
+target_link_libraries(tenzo-diag PRIVATE
+    tenzo_runtime_static
+    OpenMP::OpenMP_CXX
+    m
+)
+
 # ============================================================
 # 🐍 Python Bridge (pybind11 - optional)
 # ============================================================
