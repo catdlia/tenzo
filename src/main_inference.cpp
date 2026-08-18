@@ -129,6 +129,7 @@ struct CliOptions {
     std::string prompt = "";
     std::string system_prompt = "You are Tenzo, a fast and helpful AI assistant powered by 1.58-bit native MLIR execution.";
     std::string kv_mode = "int8_fused";
+    std::string device = "cpu";
     int max_tokens = 128;
     int ctx_size = 8192;
     float temp = 0.7f;
@@ -162,7 +163,8 @@ void print_help(const char* prog_name) {
     std::cout << "  -m, --model <path>          Path to exported model folder (default: /app/tenzo-frontend/export_output)\n";
     std::cout << "  --chat                      Enter interactive multi-turn REPL chat mode\n";
     std::cout << "  --system <str>              Custom system prompt (default: Tenzo Assistant)\n\n";
-    std::cout << ANSI_BOLD << "QUANTIZATION & MEMORY:" << ANSI_RESET << "\n";
+    std::cout << ANSI_BOLD << "QUANTIZATION & COMPUTE:" << ANSI_RESET << "\n";
+    std::cout << "  -d, --device <cpu|gpu>      Compute backend: cpu (AVX2/NEON) or gpu (Vulkan compute)\n";
     std::cout << "  --kv-quant <mode>           KV-Cache Quantization mode (default: int8_fused)\n";
     std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (14.2x comp, 84MB), " 
               << ANSI_GREEN << "int8_fused" << ANSI_RESET << " (4x comp, 309MB), " 
@@ -178,10 +180,10 @@ void print_help(const char* prog_name) {
     std::cout << "  -h, --help                  Show this help message and exit\n";
     std::cout << "  -v, --version               Show version information\n\n";
     std::cout << ANSI_BOLD << "EXAMPLES:" << ANSI_RESET << "\n";
-    std::cout << "  # Interactive chat:\n";
-    std::cout << "  " << prog_name << " --chat --kv-quant tl1_fused\n\n";
-    std::cout << "  # Single prompt generation:\n";
-    std::cout << "  " << prog_name << " -p \"Explain the importance of compilers\" -n 50 -t 0.7\n\n";
+    std::cout << "  # Interactive chat on GPU:\n";
+    std::cout << "  " << prog_name << " --chat --device gpu\n\n";
+    std::cout << "  # Single prompt generation on CPU:\n";
+    std::cout << "  " << prog_name << " -p \"Explain the importance of compilers\" -d cpu -n 50\n\n";
 }
 
 int main(int argc, char** argv) {
@@ -201,6 +203,8 @@ int main(int argc, char** argv) {
             opt.max_tokens = std::atoi(argv[++i]);
         } else if ((arg == "-m" || arg == "--model") && i + 1 < argc) {
             opt.model_dir = argv[++i];
+        } else if ((arg == "-d" || arg == "--device") && i + 1 < argc) {
+            opt.device = argv[++i];
         } else if ((arg == "-t" || arg == "--temp" || arg == "--temperature") && i + 1 < argc) {
             opt.temp = std::atof(argv[++i]);
         } else if (arg == "--top-p" && i + 1 < argc) {
@@ -263,9 +267,11 @@ int main(int argc, char** argv) {
     tenzo_config_t config = tenzo_default_config();
     config.kv_mode = opt.kv_mode.c_str();
     config.max_seq_len = opt.ctx_size;
+    config.device = opt.device.c_str();
 
     std::cout << ANSI_CYAN << "⚙️  Initializing Execution Engine (" 
-              << ANSI_BOLD << "KV-Cache: " << opt.kv_mode << ANSI_RESET << ANSI_CYAN << ", Max Context: " 
+              << ANSI_BOLD << "Backend: " << (opt.device == "gpu" ? "GPU (Vulkan)" : "CPU (SIMD)")
+              << ", KV-Cache: " << opt.kv_mode << ANSI_RESET << ANSI_CYAN << ", Max Context: " 
               << opt.ctx_size << ")..." << ANSI_RESET;
     tenzo::Engine engine(config);
     std::cout << ANSI_GREEN << " [OK]\n" << ANSI_RESET;

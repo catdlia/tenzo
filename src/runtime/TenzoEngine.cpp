@@ -4,6 +4,7 @@
  */
 
 #include "TenzoEngine.h"
+#include "VulkanRuntime.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -1310,7 +1311,63 @@ void TenzoEngineImpl::embedding_lookup(int token_id) {
     }
 }
 
+void TenzoEngineImpl::forward_layer_gpu(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. GPU Pre-RMSNorm
+    runtime::VulkanRuntime::executeRMSNorm(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. GPU BitLinear Projections Q, K, V
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), q_dim, h_dim, lw.q_scale);
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), kv_dim, h_dim, lw.k_scale);
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), kv_dim, h_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. GPU Attn Sub-Norm
+    runtime::VulkanRuntime::executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. GPU Out Projection
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. GPU MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        runtime::VulkanRuntime::executeRMSNorm(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        runtime::VulkanRuntime::executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), ffn_dim, h_dim, lw.gate_scale);
+        runtime::VulkanRuntime::executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), ffn_dim, h_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        runtime::VulkanRuntime::executeRMSNorm(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        runtime::VulkanRuntime::executeBitLinearTL1(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), h_dim, ffn_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
 void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
+    if (config.device && std::string(config.device) == "gpu") {
+        forward_layer_gpu(layer_idx);
+        return;
+    }
+
     const auto& lw = layers[layer_idx];
     const int h_dim = config.hidden_size;
 
@@ -1876,6 +1933,7 @@ tenzo_config_t tenzo_default_config(void) {
     cfg.vocab_size = 128256;
     cfg.max_seq_len = 8192;
     cfg.kv_mode = "int8_fused";
+    cfg.device = "cpu";
     return cfg;
 }
 

@@ -60,6 +60,7 @@ typedef struct {
     int vocab_size;      /* Default: 128256 */
     int max_seq_len;     /* Default: 8192 */
     const char* kv_mode; /* "int8_fused", "tl1_fused", or "fp32" */
+    const char* device;  /* "cpu" (default) or "gpu" (Vulkan compute) */
 } tenzo_config_t;
 
 /* Sampling parameters */

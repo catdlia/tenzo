@@ -1,0 +1,42 @@
+#version 450
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+layout(push_constant) uniform PushConstants {
+    uint N;       // Output dimension (e.g. vocab_size 128256 or hidden_size 2560)
+    uint K;       // Input dimension (e.g. 2560)
+    float alpha;  // Multiplier scale
+} pc;
+
+layout(std430, binding = 0) readonly buffer InputActivation {
+    float x[];
+};
+
+layout(std430, binding = 1) readonly buffer WeightMatrix {
+    float W[]; // Row-major [N, K]
+};
+
+layout(std430, binding = 2) writeonly buffer OutputActivation {
+    float y[];
+};
+
+void main() {
+    uint row = gl_GlobalInvocationID.x;
+    if (row >= pc.N) return;
+
+    float sum = 0.0;
+    uint row_offset = row * pc.K;
+
+    // Unroll by 4 for SIMD register pipeline throughput
+    uint k = 0;
+    for (; k + 3 < pc.K; k += 4) {
+        sum += x[k + 0] * W[row_offset + k + 0];
+        sum += x[k + 1] * W[row_offset + k + 1];
+        sum += x[k + 2] * W[row_offset + k + 2];
+        sum += x[k + 3] * W[row_offset + k + 3];
+    }
+    for (; k < pc.K; ++k) {
+        sum += x[k] * W[row_offset + k];
+    }
+
+    y[row] = sum * pc.alpha;
+}

@@ -250,6 +250,7 @@ public:
 
     void embedding_lookup(int token_id);
     void forward_layer_raw(int layer_idx);
+    void forward_layer_gpu(int layer_idx);
     void compute_logits();
     int sample_top_k_top_p(const tenzo_sampling_params_t* params, const int* past_tokens, int past_tokens_len);
 

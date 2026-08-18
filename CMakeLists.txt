@@ -53,19 +53,28 @@ if(NOT TENZO_STANDALONE_RUNTIME)
     find_package(MLIR QUIET CONFIG)
 endif()
 
-if(LLVM_FOUND AND MLIR_FOUND AND NOT TENZO_STANDALONE_RUNTIME)
-    set(TENZO_HAS_MLIR_COMPILER ON)
-    message(STATUS "🚀 Full MLIR Compiler Pipeline Enabled")
-
-    # Optional Vulkan support
-    find_package(Vulkan QUIET)
-    if(Vulkan_FOUND)
+# Optional Vulkan support
+find_package(Vulkan QUIET)
+if(Vulkan_FOUND)
+    option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" ON)
+    add_definitions(-DTENZO_HAS_VULKAN)
+    message(STATUS "🚀 Vulkan GPU runtime enabled: ${Vulkan_LIBRARY}")
+else()
+    # Check Android /system/lib64/libvulkan.so fallback
+    find_library(ANDROID_VULKAN_LIB vulkan PATHS /system/lib64 /system/lib)
+    if(ANDROID_VULKAN_LIB)
         option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" ON)
         add_definitions(-DTENZO_HAS_VULKAN)
-        message(STATUS "Vulkan support enabled: ${Vulkan_LIBRARY}")
+        set(Vulkan_LIBRARIES ${ANDROID_VULKAN_LIB})
+        message(STATUS "🚀 Android Vulkan GPU runtime enabled: ${ANDROID_VULKAN_LIB}")
     else()
         option(TENZO_HAS_VULKAN "Enable Vulkan GPU runtime" OFF)
     endif()
+endif()
+
+if(LLVM_FOUND AND MLIR_FOUND AND NOT TENZO_STANDALONE_RUNTIME)
+    set(TENZO_HAS_MLIR_COMPILER ON)
+    message(STATUS "🚀 Full MLIR Compiler Pipeline Enabled")
 
     list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
     list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
@@ -256,6 +265,7 @@ endif()
 # Static runtime library
 add_library(tenzo_runtime_static STATIC
     src/runtime/TenzoEngine.cpp
+    src/runtime/VulkanRuntime.cpp
 )
 target_include_directories(tenzo_runtime_static PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -268,11 +278,19 @@ target_link_libraries(tenzo_runtime_static PUBLIC
     OpenMP::OpenMP_CXX
     m
 )
+if(TENZO_HAS_VULKAN)
+    if(Vulkan_FOUND)
+        target_link_libraries(tenzo_runtime_static PUBLIC Vulkan::Vulkan)
+    elseif(Vulkan_LIBRARIES)
+        target_link_libraries(tenzo_runtime_static PUBLIC ${Vulkan_LIBRARIES})
+    endif()
+endif()
 set_target_properties(tenzo_runtime_static PROPERTIES OUTPUT_NAME "tenzo_runtime")
 
 # Shared runtime library
 add_library(tenzo_runtime_shared SHARED
     src/runtime/TenzoEngine.cpp
+    src/runtime/VulkanRuntime.cpp
 )
 target_include_directories(tenzo_runtime_shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -285,6 +303,13 @@ target_link_libraries(tenzo_runtime_shared PUBLIC
     OpenMP::OpenMP_CXX
     m
 )
+if(TENZO_HAS_VULKAN)
+    if(Vulkan_FOUND)
+        target_link_libraries(tenzo_runtime_shared PUBLIC Vulkan::Vulkan)
+    elseif(Vulkan_LIBRARIES)
+        target_link_libraries(tenzo_runtime_shared PUBLIC ${Vulkan_LIBRARIES})
+    endif()
+endif()
 set_target_properties(tenzo_runtime_shared PROPERTIES OUTPUT_NAME "tenzo_runtime")
 
 # Standalone C++ Inference Executable (Example)

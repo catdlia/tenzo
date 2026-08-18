@@ -63,6 +63,7 @@ class TenzoSession:
         default_local = os.path.join(os.getcwd(), "tenzo-frontend", "export_output")
         self.model_name = "default"
         self.model_path = "/app/tenzo-frontend/export_output" if in_docker else default_local
+        self.device = "cpu"
         self.kv_quant = "popcount_fused"
         self.model_quant = "i2_s"
         self.ctx_size = 8192
@@ -101,13 +102,16 @@ def find_available_models():
     in_docker = is_running_in_docker_host()
     # Check default export_output and format-specific export directories
     export_dirs = [
-        ("default", EXPORT_OUTPUT_DIR, "TL1 (1.58b) + INT8 LM"),
+        ("default", EXPORT_OUTPUT_DIR, "BitNet 1.58b + INT8 LM"),
+        ("1.58b", EXPORT_OUTPUT_DIR, "BitNet-b1.58-2B-4T (1.58-bit)"),
+        ("fp32", os.path.join(os.getcwd(), "models", "qwen-fp32"), "FP32 Full Precision"),
+        ("fp16", os.path.join(os.getcwd(), "models", "qwen-fp16"), "FP16 Half Precision"),
+        ("int8", os.path.join(os.getcwd(), "models", "qwen-int8"), "INT8 Quantized Linear"),
+        ("int4", os.path.join(os.getcwd(), "models", "qwen-int4"), "INT4 Symmetric / GPTQ"),
+        ("int3", os.path.join(os.getcwd(), "models", "qwen-int3"), "INT3 Packed Ternary-Scale"),
         ("gguf", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_gguf"), "GGUF (llama.cpp Q4_0)"),
         ("gptq", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_gptq"), "GPTQ (4-bit Groupwise)"),
         ("awq", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_awq"), "AWQ (4-bit Salient)"),
-        ("exl2", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_exl2"), "EXL2 (Variable Bitrate)"),
-        ("int4", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_int4"), "INT4 Symmetric (4-bit)"),
-        ("int3", os.path.join(os.getcwd(), "tenzo-frontend", "export_output_int3"), "INT3 Packed (3-bit)")
     ]
 
     for alias, edir, fmt in export_dirs:
@@ -239,7 +243,8 @@ def show_help():
     print(f"""
 {ANSI_BOLD}📖 Tenzo Interactive Console Commands:{ANSI_RESET}
   {ANSI_CYAN}/help{ANSI_RESET}                              Show this command menu
-  {ANSI_CYAN}/models{ANSI_RESET}, {ANSI_CYAN}/list{ANSI_RESET}                     List all available local models and formats
+  {ANSI_CYAN}/device <cpu|gpu>{ANSI_RESET}                  Switch compute device between CPU (AVX2/NEON) and GPU (Vulkan)
+  {ANSI_CYAN}/models{ANSI_RESET}, {ANSI_CYAN}/list{ANSI_RESET}                     List all available local models and formats (1.58b, fp32, fp16, int8, int4, int3)
   {ANSI_CYAN}/pull <hf_repo>{ANSI_RESET}                    Download, compile MLIR graph, and pack weights from Hugging Face
   {ANSI_CYAN}/load <model>{ANSI_RESET}, {ANSI_CYAN}/model <name>{ANSI_RESET}        Switch active model dynamically
   {ANSI_CYAN}/delete <model>{ANSI_RESET}, {ANSI_CYAN}/remove <name>{ANSI_RESET}    Delete a local model from storage
@@ -284,12 +289,14 @@ def show_stats(session: TenzoSession):
     kv_ram = session.get_kv_ram_mb()
     model_ram = session.get_model_ram_mb()
     total_ram = kv_ram + model_ram
+    dev_str = "CPU (SIMD AVX2/NEON)" if session.device == "cpu" else "GPU (Vulkan Compute Shader)"
 
     print(f"""
 {ANSI_BOLD}╔════════════════════════════════════════════════════════╗
 ║             Tenzo Runtime Telemetry & Stats            ║
 ╠════════════════════════════════════════════════════════╣{ANSI_RESET}
 ║ Active Model:            {session.model_name:<30}║
+║ Compute Backend:         {dev_str:<30}║
 ║ Model Weights RAM:       {model_ram:>8.1f} MB (1.58-bit TL1)       ║
 ║ KV-Cache Architecture:   {session.kv_quant:<30}║
 ║ KV-Cache Capacity:       {session.ctx_size:>8} tokens                   ║
@@ -318,7 +325,8 @@ def run_single_turn(session: TenzoSession, prompt: str, max_tokens: int = None, 
         "--rep-penalty", str(session.rep_penalty),
         "-m", session.model_path,
         "-c", str(session.ctx_size),
-        "--kv-quant", session.kv_quant
+        "--kv-quant", session.kv_quant,
+        "--device", session.device
     ]
     try:
         subprocess.run(cmd)
@@ -340,7 +348,8 @@ def start_persistent_chat(session: TenzoSession):
         "--top-p", str(session.top_p),
         "--top-k", str(session.top_k),
         "--rep-penalty", str(session.rep_penalty),
-        "--system", session.system_prompt
+        "--system", session.system_prompt,
+        "--device", session.device
     ]
     try:
         subprocess.run(cmd)
@@ -412,6 +421,16 @@ def interactive_repl(session: TenzoSession):
                     session.model_name = args[0]
                     session.model_path = new_path
                     print(f"{ANSI_GREEN}✅ Switched active model to: {args[0]} ({new_path}){ANSI_RESET}")
+            elif cmd in ("/device", "/dev"):
+                if not args:
+                    dev_name = "CPU (SIMD AVX2/NEON)" if session.device == "cpu" else "GPU (Vulkan Compute)"
+                    print(f"{ANSI_CYAN}Current compute backend: {ANSI_BOLD}{dev_name}{ANSI_RESET}")
+                elif args[0].lower() in ("cpu", "gpu"):
+                    session.device = args[0].lower()
+                    dev_name = "CPU (SIMD AVX2/NEON)" if session.device == "cpu" else "GPU (Vulkan Compute)"
+                    print(f"{ANSI_GREEN}✅ Compute backend switched to: {ANSI_BOLD}{dev_name}{ANSI_RESET}")
+                else:
+                    print(f"{ANSI_RED}Usage: /device <cpu|gpu>{ANSI_RESET}")
             elif cmd in ("/delete", "/remove", "/rm"):
                 if not args:
                     print(f"{ANSI_RED}Usage: /delete <model_name_or_alias>{ANSI_RESET}")
@@ -454,7 +473,7 @@ def interactive_repl(session: TenzoSession):
             elif cmd == "/bench":
                 bench_type = args[0] if args else "all"
                 bench_script = os.path.join(os.getcwd(), "scripts", "benchmark_suite.py")
-                subprocess.run(["python3", bench_script, "--model", session.model_name, "--bench", bench_type, "--kv-quant", session.kv_quant])
+                subprocess.run(["python3", bench_script, "--model", session.model_name, "--bench", bench_type, "--kv-quant", session.kv_quant, "--device", session.device])
             elif cmd == "/code":
                 code_prompt = " ".join(args) if args else "Write a complete C++ Red-Black Tree implementation with tests:"
                 print(f"\n{ANSI_CYAN}⚡ Generating Long-Form Code Solution (300+ tokens)...{ANSI_RESET}\n")
@@ -477,11 +496,13 @@ def main():
         description="Tenzo Production AI Compiler & LLM Inference CLI (v0.3.0)",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    parser.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu"], help="Compute backend: cpu (AVX2/NEON) or gpu (Vulkan)")
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # 0. diag
     sub_diag = subparsers.add_parser("diag", help="Run comprehensive hardware, SIMD, and model diagnostics")
     sub_diag.add_argument("-m", "--model", type=str, default="default", help="Model name or path to diagnose")
+    sub_diag.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu"], help="Compute backend")
 
     # 1. list
     sub_list = subparsers.add_parser("list", help="List all available local models and formats")
@@ -503,21 +524,24 @@ def main():
     sub_run.add_argument("--rep-penalty", type=float, default=1.15, help="Repetition penalty multiplier")
     sub_run.add_argument("-c", "--ctx-size", type=int, default=8192, help="Context window capacity")
     sub_run.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"], help="KV-Cache quantization mode")
+    sub_run.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu"], help="Compute backend: cpu or gpu")
 
     # 4. chat
     sub_chat = subparsers.add_parser("chat", help="Launch interactive multi-turn REPL chat")
     sub_chat.add_argument("-m", "--model", type=str, default="default", help="Model name or path")
     sub_chat.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"], help="KV-Cache quantization mode")
+    sub_chat.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu"], help="Compute backend: cpu or gpu")
 
     # 5. bench
     sub_bench = subparsers.add_parser("bench", help="Run industry-standard LLM benchmarks")
     sub_bench.add_argument("--model", type=str, default="default", help="Model name to benchmark")
     sub_bench.add_argument("--bench", type=str, default="all", choices=["all", "long", "niah", "ppl", "throughput"], help="Benchmark type")
     sub_bench.add_argument("--kv-quant", type=str, default="popcount_fused", choices=["popcount_fused", "tl1_fused", "int8_fused", "paged_int8", "fp32"], help="KV-Cache quantization mode")
-
     args = parser.parse_args()
 
     session = TenzoSession()
+    if hasattr(args, "device") and args.device:
+        session.device = args.device
 
     if not args.command or args.command == "chat":
         if hasattr(args, "model") and args.model:

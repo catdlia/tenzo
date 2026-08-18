@@ -10,7 +10,7 @@
 namespace tenzo {
 namespace runtime {
 
-/// Simple Vulkan compute runtime for executing SPIR-V shaders
+/// High-Performance Vulkan compute runtime for cross-platform GPU inference
 class VulkanRuntime {
 public:
     /// Initialize Vulkan runtime
@@ -23,34 +23,46 @@ public:
     /// Check if Vulkan is available and initialized
     static bool isAvailable();
 
-    /// Get device name (e.g., "Intel UHD Graphics 770")
+    /// Get device name (e.g., "Qualcomm Adreno 750", "Mali-G720", "Intel UHD Graphics")
     static std::string getDeviceName();
 
-    /// Execute a SPIR-V shader with the given buffers
-    /// @param spirvBinary The compiled SPIR-V shader code
-    /// @param inputBuffers Vector of input buffer pointers and sizes
-    /// @param outputBuffer Output buffer pointer and size
-    /// @param workgroupSize Local workgroup size (x, y, z)
-    /// @param numWorkgroups Number of workgroups to dispatch (x, y, z)
-    /// @return true on success
-    static bool execute(
+    /// Generic SPIR-V dispatch with push constants
+    static bool executeShader(
         const std::vector<uint32_t>& spirvBinary,
         const std::vector<std::pair<void*, size_t>>& inputBuffers,
         std::pair<void*, size_t> outputBuffer,
-        std::array<uint32_t, 3> workgroupSize,
+        const void* pushConstantsData,
+        size_t pushConstantsSize,
         std::array<uint32_t, 3> numWorkgroups
     );
 
-    /// Simplified MatMul execution
-    /// @param spirvBinary The compiled SPIR-V shader
-    /// @param A Input matrix A (row-major)
-    /// @param B Input matrix B (row-major)
-    /// @param C Output matrix C (row-major)
-    /// @param M, N, K Matrix dimensions: C[M,N] = A[M,K] * B[K,N]
-    static bool executeMatMul(
-        const std::vector<uint32_t>& spirvBinary,
-        const float* A, const float* B, float* C,
-        uint32_t M, uint32_t N, uint32_t K
+    /// GPU-Accelerated BitLinear 1.58-bit (TL1) MatVec: y = scale * (W_packed * x)
+    static bool executeBitLinearTL1(
+        const float* x,
+        const uint8_t* W_packed,
+        float* y,
+        uint32_t N,
+        uint32_t K,
+        float scale
+    );
+
+    /// GPU-Accelerated Dense FP32 GEMV: y = alpha * (W * x)
+    static bool executeGemmF32(
+        const float* x,
+        const float* W,
+        float* y,
+        uint32_t N,
+        uint32_t K,
+        float alpha = 1.0f
+    );
+
+    /// GPU-Accelerated RMSNorm
+    static bool executeRMSNorm(
+        const float* x,
+        const float* w,
+        float* y,
+        uint32_t dim,
+        float eps = 1e-5f
     );
 
 private:
@@ -60,4 +72,3 @@ private:
 
 } // namespace runtime
 } // namespace tenzo
-

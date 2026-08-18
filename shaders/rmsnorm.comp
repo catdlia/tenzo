@@ -1,0 +1,56 @@
+#version 450
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(push_constant) uniform PushConstants {
+    uint dim;      // Vector dimension (e.g. 2560 or 6912)
+    float eps;     // 1e-5 or 1e-6
+} pc;
+
+layout(std430, binding = 0) readonly buffer InputVector {
+    float x[];
+};
+
+layout(std430, binding = 1) readonly buffer WeightVector {
+    float w[];
+};
+
+layout(std430, binding = 2) writeonly buffer OutputVector {
+    float y[];
+};
+
+shared float sdata[256];
+
+void main() {
+    uint tid = gl_LocalInvocationID.x;
+    uint i = tid;
+
+    // Step 1: Accumulate sum of squares across elements
+    float local_sum_sq = 0.0;
+    while (i < pc.dim) {
+        float val = x[i];
+        local_sum_sq += val * val;
+        i += 256;
+    }
+    sdata[tid] = local_sum_sq;
+    barrier();
+
+    // Step 2: Shared memory tree reduction
+    for (uint s = 128; s > 0; s >>= 1) {
+        if (tid < s) {
+            sdata[tid] += sdata[tid + s];
+        }
+        barrier();
+    }
+
+    // Step 3: Compute RMS scale factor
+    float mean_sq = sdata[0] / float(pc.dim);
+    float inv_rms = 1.0 / sqrt(mean_sq + pc.eps);
+    barrier();
+
+    // Step 4: Scale and weight output
+    i = tid;
+    while (i < pc.dim) {
+        y[i] = x[i] * inv_rms * w[i];
+        i += 256;
+    }
+}
