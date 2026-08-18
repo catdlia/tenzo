@@ -49,24 +49,20 @@ def download_file_with_progress(url, dest_path):
 def convert_to_f32_bytes(raw, dtype, num_elements):
     if dtype == "F32":
         return raw
+    elif dtype == "BF16":
+        # BF16 is top 16 bits of IEEE float32 (little endian: [0, 0, b0, b1])
+        out = bytearray(num_elements * 4)
+        out[2::4] = raw[0::2]
+        out[3::4] = raw[1::2]
+        return bytes(out)
     elif dtype == "F16":
-        # Unpack IEEE 754 half-precision float16 in chunks
+        # Vectorized chunked struct unpacking
         chunk_size = 65536
         out = bytearray(num_elements * 4)
         for i in range(0, num_elements, chunk_size):
             cnt = min(chunk_size, num_elements - i)
             floats = struct.unpack(f"<{cnt}e", raw[i*2:(i+cnt)*2])
             struct.pack_into(f"<{cnt}f", out, i * 4, *floats)
-        return bytes(out)
-    elif dtype == "BF16":
-        # BF16 is top 16 bits of IEEE float32
-        chunk_size = 65536
-        out = bytearray(num_elements * 4)
-        for i in range(0, num_elements, chunk_size):
-            cnt = min(chunk_size, num_elements - i)
-            u16 = struct.unpack(f"<{cnt}H", raw[i*2:(i+cnt)*2])
-            for j, val in enumerate(u16):
-                struct.pack_into("<HH", out, (i + j) * 4, 0, val)
         return bytes(out)
     else:
         return raw
