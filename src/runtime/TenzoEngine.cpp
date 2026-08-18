@@ -1620,6 +1620,20 @@ std::vector<int8_t> pack_ternary_weights_raw(const uint8_t* raw_bytes, int64_t N
     int64_t K_half = K / 2;
     std::vector<int8_t> packed(n_blocks * K_half * 32);
 
+    // In SafeTensors from Microsoft BitNet-b1.58-2B-4T:
+    // Shape is [N / 4, K] where each byte at (r_packed, c) contains 4 weights for rows:
+    //   4 * r_packed + 0 (shift 0)
+    //   4 * r_packed + 1 (shift 2)
+    //   4 * r_packed + 2 (shift 4)
+    //   4 * r_packed + 3 (shift 6)
+    // with ternary value = ((byte >> shift) & 3) - 1.
+    auto get_tern = [&](int r, int c) -> int {
+        int r_packed = r / 4;
+        int shift = (r % 4) * 2;
+        uint8_t byte_val = raw_bytes[r_packed * K + c];
+        return static_cast<int>((byte_val >> shift) & 0x03) - 1;
+    };
+
     for (int64_t b = 0; b < n_blocks; ++b) {
         for (int64_t k = 0; k < K_half; ++k) {
             int8_t* dst = packed.data() + (b * K_half + k) * 32;
@@ -1629,13 +1643,6 @@ std::vector<int8_t> pack_ternary_weights_raw(const uint8_t* raw_bytes, int64_t N
 
                 int col0 = 2 * k;
                 int col1 = 2 * k + 1;
-
-                // Read 2-bit values from raw_bytes [N, K/4]
-                auto get_tern = [&](int r, int c) -> int {
-                    uint8_t byte_val = raw_bytes[r * (K / 4) + (c / 4)];
-                    int shift = (c % 4) * 2;
-                    return static_cast<int>((byte_val >> shift) & 0x03) - 1;
-                };
 
                 int w0 = get_tern(row0, col0);
                 int w1 = get_tern(row0, col1);

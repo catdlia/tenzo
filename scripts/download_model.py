@@ -79,27 +79,15 @@ def convert_to_tl1_packed(raw, dtype, N, K):
         return raw
         
     out = bytearray(expected_packed_len)
+    n_packed = N // 4
     if dtype == "I8":
-        # Raw int8 with values in {-1, 0, 1}
-        # Pack 4 ternary values per byte: -1 -> 0b00, 0 -> 0b01, 1 -> 0b10
-        for i in range(0, num_elements, 4):
-            b0 = (raw[i] + 1) & 0x3
-            b1 = (raw[i+1] + 1) & 0x3
-            b2 = (raw[i+2] + 1) & 0x3
-            b3 = (raw[i+3] + 1) & 0x3
-            out[i // 4] = b0 | (b1 << 2) | (b2 << 4) | (b3 << 6)
-    elif dtype == "F16":
-        for i in range(0, num_elements, 4):
-            floats = struct.unpack("<4e", raw[i*2:(i+4)*2])
-            def to_ternary(f):
-                if f > 0.3: return 2
-                elif f < -0.3: return 0
-                return 1
-            b0 = to_ternary(floats[0])
-            b1 = to_ternary(floats[1])
-            b2 = to_ternary(floats[2])
-            b3 = to_ternary(floats[3])
-            out[i // 4] = b0 | (b1 << 2) | (b2 << 4) | (b3 << 6)
+        for r_p in range(n_packed):
+            for c in range(K):
+                b0 = (raw[(4 * r_p + 0) * K + c] + 1) & 0x3
+                b1 = (raw[(4 * r_p + 1) * K + c] + 1) & 0x3
+                b2 = (raw[(4 * r_p + 2) * K + c] + 1) & 0x3
+                b3 = (raw[(4 * r_p + 3) * K + c] + 1) & 0x3
+                out[r_p * K + c] = b0 | (b1 << 2) | (b2 << 4) | (b3 << 6)
     else:
         out = bytearray(b"\x55" * expected_packed_len)
         
@@ -139,6 +127,19 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
             st_file.seek(data_base + offsets[0])
             raw = st_file.read(offsets[1] - offsets[0])
             return raw, dtype, shape
+
+        def get_scale_val(tensor_name, default_val=1.0):
+            raw, dt, sh = get_tensor(tensor_name)
+            if not raw:
+                return default_val
+            if dt == "F32":
+                return struct.unpack("<f", raw)[0]
+            elif dt == "F16":
+                return struct.unpack("<e", raw)[0]
+            elif dt == "BF16":
+                u16 = struct.unpack("<H", raw)[0]
+                return struct.unpack("<f", struct.pack("<HH", 0, u16))[0]
+            return default_val
         
         # 1. Embeddings (128256 x 2560 float32)
         vocab_size = 128256
@@ -164,6 +165,7 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
         for i in range(0, ffn_dim * 4, 4):
             struct.pack_into("f", ffn_norm_bytes, i, 1.0)
             
+        all_layer_scales = []
         print(f"  -> Packing {num_layers} BitNet transformer layers...")
         for l in range(num_layers):
             if (l + 1) % 5 == 0 or l == 0 or l == num_layers - 1:
@@ -176,14 +178,17 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
             # 2. q_proj (2560 x 2560)
             raw, dt, sh = get_tensor(f"model.layers.{l}.self_attn.q_proj.weight")
             wf.write(convert_to_tl1_packed(raw, dt, 2560, 2560) if raw else b"\x55" * (2560 * (2560 // 4)))
+            all_layer_scales.append(get_scale_val(f"model.layers.{l}.self_attn.q_proj.weight_scale", 1.21875))
             
             # 3. k_proj (640 x 2560)
             raw, dt, sh = get_tensor(f"model.layers.{l}.self_attn.k_proj.weight")
             wf.write(convert_to_tl1_packed(raw, dt, 640, 2560) if raw else b"\x55" * (640 * (2560 // 4)))
+            all_layer_scales.append(get_scale_val(f"model.layers.{l}.self_attn.k_proj.weight_scale", 1.796875))
             
             # 4. v_proj (640 x 2560)
             raw, dt, sh = get_tensor(f"model.layers.{l}.self_attn.v_proj.weight")
             wf.write(convert_to_tl1_packed(raw, dt, 640, 2560) if raw else b"\x55" * (640 * (2560 // 4)))
+            all_layer_scales.append(get_scale_val(f"model.layers.{l}.self_attn.v_proj.weight_scale", 2.296875))
             
             # 5. attn_sub_norm
             raw, dt, sh = get_tensor(f"model.layers.{l}.self_attn.attn_sub_norm.weight")
@@ -192,6 +197,7 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
             # 6. o_proj (2560 x 2560)
             raw, dt, sh = get_tensor(f"model.layers.{l}.self_attn.o_proj.weight")
             wf.write(convert_to_tl1_packed(raw, dt, 2560, 2560) if raw else b"\x55" * (2560 * (2560 // 4)))
+            all_layer_scales.append(get_scale_val(f"model.layers.{l}.self_attn.o_proj.weight_scale", 0.96484375))
             
             # 7. post_norm
             raw, dt, sh = get_tensor(f"model.layers.{l}.post_attention_layernorm.weight")
@@ -200,10 +206,12 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
             # 8. gate_proj (6912 x 2560)
             raw, dt, sh = get_tensor(f"model.layers.{l}.mlp.gate_proj.weight")
             wf.write(convert_to_tl1_packed(raw, dt, ffn_dim, 2560) if raw else b"\x55" * (ffn_dim * (2560 // 4)))
+            all_layer_scales.append(get_scale_val(f"model.layers.{l}.mlp.gate_proj.weight_scale", 1.5546875))
             
             # 9. up_proj (6912 x 2560)
             raw, dt, sh = get_tensor(f"model.layers.{l}.mlp.up_proj.weight")
             wf.write(convert_to_tl1_packed(raw, dt, ffn_dim, 2560) if raw else b"\x55" * (ffn_dim * (2560 // 4)))
+            all_layer_scales.append(get_scale_val(f"model.layers.{l}.mlp.up_proj.weight_scale", 1.828125))
             
             # 10. ffn_sub_norm
             raw, dt, sh = get_tensor(f"model.layers.{l}.mlp.ffn_sub_norm.weight")
@@ -212,6 +220,7 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
             # 11. down_proj (2560 x 6912)
             raw, dt, sh = get_tensor(f"model.layers.{l}.mlp.down_proj.weight")
             wf.write(convert_to_tl1_packed(raw, dt, 2560, ffn_dim) if raw else b"\x55" * (2560 * (ffn_dim // 4)))
+            all_layer_scales.append(get_scale_val(f"model.layers.{l}.mlp.down_proj.weight_scale", 2.15625))
             
         # final_norm
         raw, dt, sh = get_tensor("model.norm.weight")
@@ -219,6 +228,28 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
         
     sz_mb = os.path.getsize(weights_path) / (1024 * 1024)
     print(f"🎉 Model weights exported successfully ({sz_mb:.1f} MB)!")
+    
+    # Update model.mlir with exact extracted scales
+    mlir_dst = os.path.join(output_dir, "model.mlir")
+    default_mlir = os.path.join(os.getcwd(), "tenzo-frontend", "export_output", "model.mlir")
+    src_mlir = mlir_dst if os.path.exists(mlir_dst) else default_mlir
+    if os.path.exists(src_mlir) and all_layer_scales:
+        import re
+        with open(src_mlir, "r", encoding="utf-8") as f:
+            mlir_content = f.read()
+        
+        scale_pattern = re.compile(r'(%\w+\s*=\s*arith\.constant\s+)([0-9\.e\+\-]+)(\s*:\s*f32\s*\r?\n\s*%\w+\s*=\s*"tenzo\.bitlinear_elut")')
+        idx = [0]
+        def repl(match):
+            if idx[0] < len(all_layer_scales):
+                val = f"{all_layer_scales[idx[0]]:.8e}"
+                idx[0] += 1
+                return f"{match.group(1)}{val}{match.group(3)}"
+            return match.group(0)
+        new_mlir = scale_pattern.sub(repl, mlir_content)
+        with open(mlir_dst, "w", encoding="utf-8") as f:
+            f.write(new_mlir)
+        print(f"  -> Updated {idx[0]} scales in {mlir_dst}")
 
 def download_and_setup(repo_id="microsoft/bitnet-b1.58-2B-4T", output_dir="tenzo-frontend/export_output"):
     import shutil
