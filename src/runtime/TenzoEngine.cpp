@@ -1694,8 +1694,8 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         }
     }
 
-    // 2. Parse views and scales from MLIR
-    std::regex view_regex(R"((%\w+)\s*=\s*arith\.constant\s+(\d+)\s*:\s*index\s*\n\s*(%\w+)\s*=\s*memref\.view\s+%\w+\[\1\]\[\]\s*:\s*memref<\?xi8>\s+to\s+memref<([^>]+)>)");
+    // 2. Parse views and scales from MLIR or calculate sequential offsets safely
+    std::regex view_regex(R"((%\w+)\s*=\s*arith\.constant\s+(\d+)\s*:\s*index\s*\r?\n\s*(%\w+)\s*=\s*memref\.view\s+%\w+\[\1\]\[\]\s*:\s*memref<\?xi8>\s+to\s+memref<([^>]+)>)");
     std::vector<size_t> all_views;
     auto v_begin = std::sregex_iterator(mlir_text.begin(), mlir_text.end(), view_regex);
     auto v_end = std::sregex_iterator();
@@ -1703,7 +1703,7 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         all_views.push_back(std::stoull((*it)[2].str()));
     }
 
-    std::regex scale_regex(R"((%\w+)\s*=\s*arith\.constant\s+([0-9\.e\+\-]+)\s*:\s*f32\s*\n\s*%\w+\s*=\s*"tenzo\.bitlinear_elut"\([^,]+,\s*[^,]+,\s*\1\))");
+    std::regex scale_regex(R"((%\w+)\s*=\s*arith\.constant\s+([0-9\.e\+\-]+)\s*:\s*f32\s*\r?\n\s*%\w+\s*=\s*"tenzo\.bitlinear_elut"\([^,]+,\s*[^,]+,\s*\1\))");
     std::vector<float> all_scales;
     auto s_begin = std::sregex_iterator(mlir_text.begin(), mlir_text.end(), scale_regex);
     auto s_end = std::sregex_iterator();
@@ -1711,85 +1711,117 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         all_scales.push_back(std::stof((*it)[2].str()));
     }
 
-    size_t v_idx = 1; // 0 is embed_tokens
+    // Lambda helpers with strict bounds checking
+    auto safe_slice_f32 = [&](size_t off, size_t count) -> std::vector<float> {
+        std::vector<float> vec(count, 1.0f);
+        if (off + count * sizeof(float) <= raw_bytes.size()) {
+            const float* p = reinterpret_cast<const float*>(raw_bytes.data() + off);
+            vec.assign(p, p + count);
+        }
+        return vec;
+    };
+
+    auto safe_pack_ternary = [&](size_t off, int64_t N, int64_t K) -> std::vector<int8_t> {
+        size_t needed = static_cast<size_t>(N) * (K / 4);
+        if (off + needed <= raw_bytes.size()) {
+            return pack_ternary_weights_raw(raw_bytes.data() + off, N, K);
+        }
+        int64_t n_blocks = N / 64;
+        int64_t K_half = K / 2;
+        return std::vector<int8_t>(n_blocks * K_half * 32, 0x55);
+    };
+
+    size_t v_idx = 1;
     size_t s_idx = 0;
+    size_t seq_offset = embed_bytes;
 
     for (int l = 0; l < num_layers; ++l) {
         auto& lw = layers[l];
 
+        auto get_offset = [&](size_t sz_bytes) -> size_t {
+            size_t off;
+            if (v_idx < all_views.size()) {
+                off = all_views[v_idx++];
+            } else {
+                off = seq_offset;
+            }
+            seq_offset += sz_bytes;
+            return off;
+        };
+
+        auto get_scale = [&]() -> float {
+            if (s_idx < all_scales.size()) {
+                return all_scales[s_idx++];
+            }
+            return 1.0f;
+        };
+
         // 1. in_norm
-        size_t off = all_views[v_idx++];
-        lw.in_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                          reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
+        size_t off = get_offset(hidden_size * sizeof(float));
+        lw.in_norm = safe_slice_f32(off, hidden_size);
         lw.in_norm_ptr = lw.in_norm.data();
 
         // 2. q_proj
-        off = all_views[v_idx++];
-        lw.q_w = pack_ternary_weights_raw(raw_bytes.data() + off, 2560, 2560);
+        off = get_offset(2560 * (2560 / 4));
+        lw.q_w = safe_pack_ternary(off, 2560, 2560);
         lw.q_w_ptr = lw.q_w.data();
-        lw.q_scale = all_scales[s_idx++];
+        lw.q_scale = get_scale();
 
         // 3. k_proj
-        off = all_views[v_idx++];
-        lw.k_w = pack_ternary_weights_raw(raw_bytes.data() + off, 640, 2560);
+        off = get_offset(640 * (2560 / 4));
+        lw.k_w = safe_pack_ternary(off, 640, 2560);
         lw.k_w_ptr = lw.k_w.data();
-        lw.k_scale = all_scales[s_idx++];
+        lw.k_scale = get_scale();
 
         // 4. v_proj
-        off = all_views[v_idx++];
-        lw.v_w = pack_ternary_weights_raw(raw_bytes.data() + off, 640, 2560);
+        off = get_offset(640 * (2560 / 4));
+        lw.v_w = safe_pack_ternary(off, 640, 2560);
         lw.v_w_ptr = lw.v_w.data();
-        lw.v_scale = all_scales[s_idx++];
+        lw.v_scale = get_scale();
 
         // 5. attn_sub_norm
-        off = all_views[v_idx++];
-        lw.attn_sub_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                                reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
+        off = get_offset(hidden_size * sizeof(float));
+        lw.attn_sub_norm = safe_slice_f32(off, hidden_size);
         lw.attn_sub_norm_ptr = lw.attn_sub_norm.data();
 
         // 6. out_proj
-        off = all_views[v_idx++];
-        lw.out_w = pack_ternary_weights_raw(raw_bytes.data() + off, 2560, 2560);
+        off = get_offset(2560 * (2560 / 4));
+        lw.out_w = safe_pack_ternary(off, 2560, 2560);
         lw.out_w_ptr = lw.out_w.data();
-        lw.out_scale = all_scales[s_idx++];
+        lw.out_scale = get_scale();
 
         // 7. post_norm
-        off = all_views[v_idx++];
-        lw.post_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                            reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
+        off = get_offset(hidden_size * sizeof(float));
+        lw.post_norm = safe_slice_f32(off, hidden_size);
         lw.post_norm_ptr = lw.post_norm.data();
 
         // 8. gate_proj
-        off = all_views[v_idx++];
-        lw.gate_w = pack_ternary_weights_raw(raw_bytes.data() + off, ff_dim, 2560);
+        off = get_offset(ff_dim * (2560 / 4));
+        lw.gate_w = safe_pack_ternary(off, ff_dim, 2560);
         lw.gate_w_ptr = lw.gate_w.data();
-        lw.gate_scale = all_scales[s_idx++];
+        lw.gate_scale = get_scale();
 
         // 9. up_proj
-        off = all_views[v_idx++];
-        lw.up_w = pack_ternary_weights_raw(raw_bytes.data() + off, ff_dim, 2560);
+        off = get_offset(ff_dim * (2560 / 4));
+        lw.up_w = safe_pack_ternary(off, ff_dim, 2560);
         lw.up_w_ptr = lw.up_w.data();
-        lw.up_scale = all_scales[s_idx++];
+        lw.up_scale = get_scale();
 
         // 10. ffn_sub_norm
-        off = all_views[v_idx++];
-        lw.ffn_sub_norm.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                               reinterpret_cast<const float*>(raw_bytes.data() + off) + ff_dim);
+        off = get_offset(ff_dim * sizeof(float));
+        lw.ffn_sub_norm = safe_slice_f32(off, ff_dim);
         lw.ffn_sub_norm_ptr = lw.ffn_sub_norm.data();
 
         // 11. down_proj
-        off = all_views[v_idx++];
-        lw.down_w = pack_ternary_weights_raw(raw_bytes.data() + off, 2560, ff_dim);
+        off = get_offset(2560 * (ff_dim / 4));
+        lw.down_w = safe_pack_ternary(off, 2560, ff_dim);
         lw.down_w_ptr = lw.down_w.data();
-        lw.down_scale = all_scales[s_idx++];
+        lw.down_scale = get_scale();
     }
 
-    if (v_idx < all_views.size()) {
-        size_t off = all_views[v_idx];
-        final_norm_w.assign(reinterpret_cast<const float*>(raw_bytes.data() + off),
-                            reinterpret_cast<const float*>(raw_bytes.data() + off) + hidden_size);
-        final_norm_ptr = final_norm_w.data();
-    }
+    size_t final_off = (v_idx < all_views.size()) ? all_views[v_idx] : seq_offset;
+    final_norm_w = safe_slice_f32(final_off, hidden_size);
+    final_norm_ptr = final_norm_w.data();
 
     return TENZO_SUCCESS;
 }

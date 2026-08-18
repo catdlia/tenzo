@@ -60,44 +60,47 @@ def setup_demo_model(output_dir="tenzo-frontend/export_output", num_layers=30):
                 wf.write(embed_row * chunk_len)
 
             # Per-layer weights
-            print(f"  -> Writing {num_layers} BitNet transformer layers...")
             norm_bytes = bytearray(hidden_size * 4)
             for i in range(0, hidden_size * 4, 4):
                 struct.pack_into("f", norm_bytes, i, 1.0)
+
+            ffn_norm_bytes = bytearray(ffn_dim * 4)
+            for i in range(0, ffn_dim * 4, 4):
+                struct.pack_into("f", ffn_norm_bytes, i, 1.0)
 
             for l in range(num_layers):
                 # in_norm (hidden_size floats)
                 wf.write(norm_bytes)
 
                 # q_proj (2560 x 2560 int8 packed)
-                wf.write(b"\x55" * (2560 * 2560 // 4))
+                wf.write(b"\x55" * (2560 * (2560 // 4)))
 
                 # k_proj (640 x 2560 int8 packed)
-                wf.write(b"\x55" * (640 * 2560 // 4))
+                wf.write(b"\x55" * (640 * (2560 // 4)))
 
                 # v_proj (640 x 2560 int8 packed)
-                wf.write(b"\x55" * (640 * 2560 // 4))
+                wf.write(b"\x55" * (640 * (2560 // 4)))
 
                 # attn_sub_norm
                 wf.write(norm_bytes)
 
                 # o_proj (2560 x 2560 int8 packed)
-                wf.write(b"\x55" * (2560 * 2560 // 4))
+                wf.write(b"\x55" * (2560 * (2560 // 4)))
 
                 # post_norm
                 wf.write(norm_bytes)
 
                 # gate_proj (6912 x 2560 int8 packed)
-                wf.write(b"\x55" * (6912 * 2560 // 4))
+                wf.write(b"\x55" * (ffn_dim * (2560 // 4)))
 
                 # up_proj (6912 x 2560 int8 packed)
-                wf.write(b"\x55" * (6912 * 2560 // 4))
+                wf.write(b"\x55" * (ffn_dim * (2560 // 4)))
 
                 # ffn_sub_norm
-                wf.write(norm_bytes)
+                wf.write(ffn_norm_bytes)
 
                 # down_proj (2560 x 6912 int8 packed)
-                wf.write(b"\x55" * (2560 * 6912 // 4))
+                wf.write(b"\x55" * (2560 * (ffn_dim // 4)))
 
             # Final norm
             wf.write(norm_bytes)

@@ -20,7 +20,9 @@ if [ -d "$PREFIX/lib" ]; then
 fi
 
 # 3. Build standalone runtime
-if [ ! -f "build-termux/tenzo-inference" ]; then
+if [ -d "build-termux" ]; then
+    ninja -C build-termux tenzo-inference
+else
     ./scripts/android/build_termux.sh
 fi
 
