@@ -139,8 +139,31 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
     sz_mb = os.path.getsize(weights_path) / (1024 * 1024)
     print(f"🎉 Model weights exported successfully ({sz_mb:.1f} MB)!")
 
+def download_and_setup(repo_id="microsoft/bitnet-b1.58-2B-4T", output_dir="tenzo-frontend/export_output"):
+    os.makedirs(output_dir, exist_ok=True)
+    temp_st = os.path.join(output_dir, "temp_model.safetensors")
+    
+    url = f"https://huggingface.co/{repo_id}/resolve/main/model.safetensors"
+    print(f"\n🌐 Tenzo 1-Click Weights Downloader")
+    print(f"  Target Model: {repo_id}")
+    print(f"  Source URL:   {url}")
+    print(f"  Output Dir:   {output_dir}\n")
+    
+    try:
+        download_file_with_progress(url, temp_st)
+        export_safetensors_to_tenzo(temp_st, output_dir)
+        if os.path.exists(temp_st):
+            os.remove(temp_st)
+        print(f"\n🎉 Model ready in '{output_dir}'. You can now chat in Tenzo!\n")
+    except Exception as e:
+        print(f"\n❌ Error downloading model from Hugging Face: {e}")
+        print(f"   If you already have a model.safetensors file, run:\n   python3 scripts/download_model.py <path_to_safetensors>\n")
+
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1].endswith(".safetensors"):
-        export_safetensors_to_tenzo(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "tenzo-frontend/export_output")
+    if len(sys.argv) > 1:
+        if sys.argv[1].endswith(".safetensors"):
+            export_safetensors_to_tenzo(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "tenzo-frontend/export_output")
+        else:
+            download_and_setup(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "tenzo-frontend/export_output")
     else:
-        print("Usage: python3 download_model.py <path_to_safetensors> [output_dir]")
+        download_and_setup()

@@ -110,11 +110,15 @@ public:
     }
 
     bool is_stop_token(int tid) const {
+        if (tid >= 128000 && tid <= 128256) return true;
         if (tid == eos_token || tid == eot_token) return true;
         auto it = id_to_token.find(tid);
         if (it != id_to_token.end()) {
             const std::string& s = it->second;
-            if (s == "<|endoftext|>" || s == "<|eot_id|>" || s == "</s>" || s == "<eos>") return true;
+            if (s == "<|end_of_text|>" || s == "<|endoftext|>" || s == "<|eot_id|>" || s == "</s>" || s == "<eos>") return true;
+            if (s.find("endoftext") != std::string::npos || s.find("eot_id") != std::string::npos || 
+                s.find("end_of_eot") != std::string::npos || s.find("end_of_text") != std::string::npos ||
+                s.find("end_header_id") != std::string::npos) return true;
         }
         return false;
     }
@@ -289,28 +293,76 @@ int main(int argc, char** argv) {
             if (!std::getline(std::cin, user_input)) break;
             if (user_input.empty()) continue;
 
-            if (user_input == "/exit" || user_input == "/quit") {
-                std::cout << ANSI_DIM << "Exiting Tenzo REPL. Goodbye!\n" << ANSI_RESET;
-                break;
-            } else if (user_input == "/reset" || user_input == "/clear") {
-                engine.reset();
-                conversation_tokens.clear();
-                std::cout << ANSI_YELLOW << "🧹 Conversation context & KV-cache reset.\n" << ANSI_RESET;
-                if (!opt.system_prompt.empty()) {
-                    std::string sys_formatted = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + opt.system_prompt + "<|eot_id|>";
-                    std::vector<int> sys_tokens = tokenizer.encode(sys_formatted, false);
-                    for (int t : sys_tokens) {
-                        engine.prefill_token(t);
-                        conversation_tokens.push_back(t);
+            if (user_input[0] == '/') {
+                std::istringstream iss(user_input);
+                std::string cmd;
+                iss >> cmd;
+
+                if (cmd == "/exit" || cmd == "/quit" || cmd == "/bye") {
+                    std::cout << ANSI_DIM << "Exiting Tenzo REPL. Goodbye!\n" << ANSI_RESET;
+                    break;
+                } else if (cmd == "/help") {
+                    std::cout << ANSI_BOLD << "\n📖 Interactive Chat Commands:\n" << ANSI_RESET;
+                    std::cout << "  /help                       Show this help message\n";
+                    std::cout << "  /stats                      Display active token count & KV-cache RAM\n";
+                    std::cout << "  /reset, /clear              Clear conversation history & reset KV-Cache\n";
+                    std::cout << "  /temp <float>               Set sampling temperature (e.g. /temp 0.7)\n";
+                    std::cout << "  /top_p <float>              Set top-p nucleus sampling (e.g. /top_p 0.9)\n";
+                    std::cout << "  /top_k <int>                Set top-k candidates (e.g. /top_k 40)\n";
+                    std::cout << "  /rep <float>                Set repetition penalty (e.g. /rep 1.15)\n";
+                    std::cout << "  /max_tokens <int>           Set max generation tokens per turn\n";
+                    std::cout << "  /exit, /quit                Exit chat session\n\n";
+                    continue;
+                } else if (cmd == "/reset" || cmd == "/clear") {
+                    engine.reset();
+                    conversation_tokens.clear();
+                    std::cout << ANSI_YELLOW << "🧹 Conversation context & KV-cache reset.\n" << ANSI_RESET;
+                    if (!opt.system_prompt.empty()) {
+                        std::string sys_formatted = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + opt.system_prompt + "<|eot_id|>";
+                        std::vector<int> sys_tokens = tokenizer.encode(sys_formatted, false);
+                        for (int t : sys_tokens) {
+                            engine.prefill_token(t);
+                            conversation_tokens.push_back(t);
+                        }
                     }
+                    continue;
+                } else if (cmd == "/stats") {
+                    int cur_len = engine.get_seq_len();
+                    double kv_mb = (30.0 * cur_len * 5 * 128 * (opt.kv_mode == "tl1_fused" ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : 4.0)) * 2) / (1024.0 * 1024.0);
+                    std::cout << ANSI_CYAN << "📊 Stats: Active Tokens: " << cur_len << " / " << opt.ctx_size 
+                              << " | KV-Cache RAM: " << std::fixed << std::setprecision(2) << kv_mb << " MB"
+                              << " | Temp: " << params.temperature << " | Top-P: " << params.top_p 
+                              << " | Top-K: " << params.top_k << "\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/temp" || cmd == "/temperature") {
+                    float v;
+                    if (iss >> v) { params.temperature = v; std::cout << ANSI_GREEN << "✅ Temperature set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /temp <float>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/top_p" || cmd == "/topp") {
+                    float v;
+                    if (iss >> v) { params.top_p = v; std::cout << ANSI_GREEN << "✅ Top-P set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /top_p <float>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/top_k" || cmd == "/topk") {
+                    int v;
+                    if (iss >> v) { params.top_k = v; std::cout << ANSI_GREEN << "✅ Top-K set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /top_k <int>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/rep" || cmd == "/repetition_penalty") {
+                    float v;
+                    if (iss >> v) { params.repetition_penalty = v; std::cout << ANSI_GREEN << "✅ Repetition penalty set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /rep <float>\n" << ANSI_RESET;
+                    continue;
+                } else if (cmd == "/max_tokens" || cmd == "/tokens") {
+                    int v;
+                    if (iss >> v) { opt.max_tokens = v; std::cout << ANSI_GREEN << "✅ Max tokens set to " << v << "\n" << ANSI_RESET; }
+                    else std::cout << ANSI_RED << "Usage: /max_tokens <int>\n" << ANSI_RESET;
+                    continue;
+                } else {
+                    std::cout << ANSI_RED << "Unknown command: " << cmd << ". Type /help for available commands.\n" << ANSI_RESET;
+                    continue;
                 }
-                continue;
-            } else if (user_input == "/stats") {
-                int cur_len = engine.get_seq_len();
-                double kv_mb = (30.0 * cur_len * 5 * 128 * (opt.kv_mode == "tl1_fused" ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : 4.0)) * 2) / (1024.0 * 1024.0);
-                std::cout << ANSI_CYAN << "📊 Stats: Active Tokens: " << cur_len << " / " << opt.ctx_size 
-                          << " | KV-Cache RAM: " << std::fixed << std::setprecision(2) << kv_mb << " MB\n" << ANSI_RESET;
-                continue;
             }
 
             std::string turn_formatted = "<|start_header_id|>user<|end_header_id|>\n\n" + user_input + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";

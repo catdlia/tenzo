@@ -1671,9 +1671,29 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
     const int num_layers = config.num_layers;
     const int ff_dim = config.ffn_dim;
 
+    // Weight Integrity & Diagnostic Check
+    if (fsize < 100000000) {
+        std::cerr << "\n⚠️  [Tenzo Diagnostic] Warning: Model file (" << (fsize / (1024*1024)) 
+                  << " MB) is smaller than the expected ~1.8 GB for 30-layer BitNet-2B.\n";
+    }
+
     // 1. Embeddings
     size_t embed_bytes = static_cast<size_t>(vocab_size) * hidden_size * 4;
     const float* embed_f32 = reinterpret_cast<const float*>(raw_bytes.data());
+
+    // Check for uniform synthetic placeholder weights
+    bool is_dummy_data = true;
+    for (int i = 1; i < std::min(200, vocab_size); ++i) {
+        if (std::abs(embed_f32[i * hidden_size] - embed_f32[0]) > 1e-6f) {
+            is_dummy_data = false;
+            break;
+        }
+    }
+    if (is_dummy_data && vocab_size > 200) {
+        std::cerr << "\n⚠️  [Tenzo Diagnostic] Notice: Running on synthetic/placeholder model weights.\n"
+                  << "   To download genuine pre-trained weights from Hugging Face, run:\n"
+                  << "   python3 scripts/download_model.py\n\n";
+    }
 
     // INT8 LM Head quantization
     is_lm_i8 = true;
