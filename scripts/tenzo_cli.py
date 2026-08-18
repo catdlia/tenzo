@@ -160,66 +160,62 @@ def resolve_model_path(model_arg):
     return "/app/tenzo-frontend/export_output" if in_docker else default_local
 
 def pull_model(repo_id, quant="i2_s", layers=30):
-    print(f"\n📥 Pulling and compiling model from Hugging Face: {ANSI_BOLD}{repo_id}{ANSI_RESET}...")
+    print(f"\n📥 Pulling and converting model from Hugging Face: {ANSI_BOLD}{repo_id}{ANSI_RESET}...")
     clean_name = repo_id.split("/")[-1].lower().replace("_", "-")
     target_dir = os.path.join(LOCAL_MODELS_DIR, clean_name)
     os.makedirs(target_dir, exist_ok=True)
 
-    if quant == "gguf":
-        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_gguf.py")
-    elif quant == "gptq":
-        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_gptq.py")
-    elif quant == "awq":
-        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_awq.py")
-    elif quant == "exl2":
-        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_exl2.py")
-    else:
-        export_script = os.path.join(os.getcwd(), "tenzo-frontend", "export_bitnet.py")
-
     try:
-        import torch
-        has_torch = True
-    except ImportError:
-        has_torch = False
+        from download_model import download_and_setup
+        success = download_and_setup(repo_id=repo_id, output_dir=target_dir)
+        if success:
+            print(f"\n{ANSI_GREEN}✅ Successfully downloaded and prepared '{clean_name}'! Ready to use.{ANSI_RESET}\n")
+            return True
+    except Exception as e:
+        print(f"{ANSI_YELLOW}⚠️  Direct downloader encountered an issue: {e}{ANSI_RESET}")
 
-    if not has_torch or not os.path.exists(export_script):
-        print(f"{ANSI_YELLOW}⚡ Initializing lightweight 1.58-bit model for '{clean_name}' (Zero-PyTorch Mode)...{ANSI_RESET}")
-        setup_demo_model(target_dir, num_layers=layers)
-        print(f"\n{ANSI_GREEN}✅ Successfully prepared '{clean_name}'! Ready to use.{ANSI_RESET}\n")
-        return True
-
-    cmd = [
-        "python3", export_script,
-        "--output-dir", target_dir,
-        "--num-layers", str(layers)
-    ]
-    res = subprocess.run(cmd)
-    if res.returncode == 0:
-        print(f"\n{ANSI_GREEN}✅ Successfully compiled '{clean_name}'! Ready to use.{ANSI_RESET}\n")
-        return True
-    else:
-        print(f"{ANSI_YELLOW}⚡ Falling back to standalone weights synthesizer...{ANSI_RESET}")
-        setup_demo_model(target_dir, num_layers=layers)
-        return True
+    # Fallback to local synthesizer if offline
+    print(f"{ANSI_YELLOW}⚡ Initializing lightweight 1.58-bit model for '{clean_name}'...{ANSI_RESET}")
+    setup_demo_model(target_dir, num_layers=layers)
+    print(f"\n{ANSI_GREEN}✅ Model directory initialized at '{clean_name}'.{ANSI_RESET}\n")
+    return True
 
 def delete_model(model_name: str):
+    m_clean = model_name.strip().lower()
+    models = find_available_models()
+    matched = None
+    for m in models:
+        if m_clean in (m['name'].lower(), m['alias'].lower(), os.path.basename(m['local_path']).lower()) or m['name'].lower().startswith(m_clean):
+            matched = m
+            break
+            
+    if matched:
+        target_path = matched['local_path']
+        if matched['alias'] == "default" or matched['name'] == "model-default":
+            w_bin = os.path.join(target_path, "weights.bin")
+            if os.path.exists(w_bin):
+                os.remove(w_bin)
+            print(f"{ANSI_GREEN}✅ Successfully reset default model weights at {target_path}.{ANSI_RESET}")
+            return True
+        else:
+            if os.path.exists(target_path):
+                import shutil
+                if os.path.isdir(target_path):
+                    shutil.rmtree(target_path)
+                else:
+                    os.remove(target_path)
+                print(f"{ANSI_GREEN}✅ Successfully deleted model '{matched['name']}' ({target_path}).{ANSI_RESET}")
+                return True
+                
+    # Direct path removal
     clean_name = model_name.split("/")[-1].lower().replace("_", "-")
     target_dir = os.path.join(LOCAL_MODELS_DIR, clean_name)
     if os.path.exists(target_dir):
         import shutil
         shutil.rmtree(target_dir)
-        print(f"{ANSI_GREEN}✅ Successfully deleted model '{clean_name}' from {target_dir}.{ANSI_RESET}")
+        print(f"{ANSI_GREEN}✅ Successfully deleted '{clean_name}' from {target_dir}.{ANSI_RESET}")
         return True
-    
-    if os.path.exists(model_name) and model_name not in ("default", "model-default"):
-        import shutil
-        if os.path.isdir(model_name):
-            shutil.rmtree(model_name)
-        else:
-            os.remove(model_name)
-        print(f"{ANSI_GREEN}✅ Successfully deleted '{model_name}'.{ANSI_RESET}")
-        return True
-        
+
     print(f"{ANSI_RED}Model '{model_name}' not found in local registries. Type /list to see available models.{ANSI_RESET}")
     return False
 

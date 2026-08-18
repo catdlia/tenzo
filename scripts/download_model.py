@@ -112,11 +112,27 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
     print(f"📦 Converting SafeTensors to Tenzo 1.58-bit packed binary: {weights_path}")
     with open(safetensors_path, "rb") as st_file, open(weights_path, "wb") as wf:
         data_base, header = read_safetensors_header(st_file)
-        
+        header_keys_lower = {k.lower(): k for k in header.keys()}
+
+        def find_key(pattern):
+            if pattern in header:
+                return pattern
+            p_no_model = pattern.replace("model.", "")
+            if p_no_model in header:
+                return p_no_model
+            p_lower = pattern.lower()
+            if p_lower in header_keys_lower:
+                return header_keys_lower[p_lower]
+            for k in header:
+                if p_no_model.lower() in k.lower() or k.lower() in p_lower:
+                    return k
+            return None
+
         def get_tensor(tensor_name):
-            if tensor_name not in header:
+            real_key = find_key(tensor_name)
+            if not real_key:
                 return None, None, None
-            meta = header[tensor_name]
+            meta = header[real_key]
             dtype = meta.get("dtype")
             shape = meta.get("shape")
             offsets = meta.get("data_offsets")
@@ -205,9 +221,18 @@ def export_safetensors_to_tenzo(safetensors_path, output_dir, num_layers=30):
     print(f"🎉 Model weights exported successfully ({sz_mb:.1f} MB)!")
 
 def download_and_setup(repo_id="microsoft/bitnet-b1.58-2B-4T", output_dir="tenzo-frontend/export_output"):
+    import shutil
     os.makedirs(output_dir, exist_ok=True)
     temp_st = os.path.join(output_dir, "temp_model.safetensors")
     
+    # Ensure tokenizer.vocab and model.mlir exist in output_dir
+    default_dir = os.path.join(os.getcwd(), "tenzo-frontend", "export_output")
+    for fname in ("tokenizer.vocab", "model.mlir"):
+        src = os.path.join(default_dir, fname)
+        dst = os.path.join(output_dir, fname)
+        if os.path.exists(src) and not os.path.exists(dst) and src != dst:
+            shutil.copy2(src, dst)
+            
     url = f"https://huggingface.co/{repo_id}/resolve/main/model.safetensors"
     print(f"\n🌐 Tenzo 1-Click Weights Downloader")
     print(f"  Target Model: {repo_id}")
@@ -220,9 +245,11 @@ def download_and_setup(repo_id="microsoft/bitnet-b1.58-2B-4T", output_dir="tenzo
         if os.path.exists(temp_st):
             os.remove(temp_st)
         print(f"\n🎉 Model ready in '{output_dir}'. You can now chat in Tenzo!\n")
+        return True
     except Exception as e:
         print(f"\n❌ Error downloading model from Hugging Face: {e}")
         print(f"   If you already have a model.safetensors file, run:\n   python3 scripts/download_model.py <path_to_safetensors>\n")
+        return False
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
