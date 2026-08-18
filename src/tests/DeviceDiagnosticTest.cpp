@@ -8,6 +8,10 @@
 #include "tenzo.hpp"
 #include "runtime/TenzoEngine.h"
 #include "runtime/simd_arm_compat.h"
+#include "runtime/MicroarchProfiler.h"
+#include "runtime/CUDARuntime.h"
+#include "runtime/ROCmRuntime.h"
+#include "runtime/arch/RISCV_RVV.h"
 #include <iostream>
 #include <iomanip>
 #include <chrono>
@@ -293,6 +297,37 @@ bool run_engine_inference_test(const std::string& model_dir) {
     }
 }
 
+// Backend Diagnostics
+bool run_backend_diagnostics() {
+    print_header("4. Heterogeneous Backends & Microarch Diagnostics");
+
+    // 1. Profiler
+    auto& prof = tenzo::MicroarchProfiler::getProfile();
+    report_status("Microarch Profiler", prof.num_threads > 0, 
+                  prof.cpu_arch + ", " + std::to_string(prof.vector_bits) + "-bit SIMD, L1=" + std::to_string(prof.l1d_cache_size/1024) + "KB");
+
+    // 2. RISC-V RVV Kernel Test
+    float act[4] = {1.0f, 2.0f, -1.0f, 0.5f};
+    uint8_t w_packed[1] = { static_cast<uint8_t>(2 | (0 << 2) | (1 << 4) | (2 << 6)) }; // [+1, -1, 0, +1]
+    float out_rvv[1] = {0.0f};
+    tenzo::rvv::gemv_bitlinear_tl1_rvv(act, w_packed, out_rvv, 1, 4, 1, 1.0f);
+    // Expected: 1*1 + 2*(-1) + (-1)*0 + 0.5*1 = 1 - 2 + 0.5 = -0.5f
+    bool rvv_ok = std::abs(out_rvv[0] - (-0.5f)) < 1e-4f;
+    report_status("RISC-V RVV BitLinear Math", rvv_ok, "Calculated: " + std::to_string(out_rvv[0]) + ", Expected: -0.500");
+
+    // 3. CUDA Translation Layer
+    auto& cuda = tenzo::CUDARuntime::getInstance();
+    bool cuda_init = cuda.initialize();
+    report_status("CUDA Backend (Vulkan Translation)", cuda_init, cuda.getDeviceName());
+
+    // 4. ROCm Translation Layer
+    auto& rocm = tenzo::ROCmRuntime::getInstance();
+    bool rocm_init = rocm.initialize();
+    report_status("ROCm Backend (Vulkan Translation)", rocm_init, rocm.getDeviceName());
+
+    return rvv_ok;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -301,18 +336,19 @@ int main(int argc, char** argv) {
 
     std::cout << ANSI_CYAN << ANSI_BOLD
               << "╔══════════════════════════════════════════════════════════════════╗\n"
-              << "║       Tenzo Compiler & Hardware Self-Diagnostic Suite v0.3.0     ║\n"
+              << "║    Tenzo Compiler Diagnostic Suite v1.0.0-beta.1 (Beta-1.0)      ║\n"
               << "╚══════════════════════════════════════════════════════════════════╝\n"
               << ANSI_RESET;
 
     run_system_diagnostics();
     bool simd_ok = run_simd_math_diagnostics();
+    bool backend_ok = run_backend_diagnostics();
     bool weights_ok = run_weight_diagnostics(model_dir);
     bool engine_ok = run_engine_inference_test(model_dir);
 
     print_header("Diagnostic Summary");
-    if (simd_ok && weights_ok && engine_ok) {
-        std::cout << ANSI_GREEN << ANSI_BOLD << "🎉 ALL SYSTEM CHECKS PASSED! Tenzo is fully operational on this device." << ANSI_RESET << "\n\n";
+    if (simd_ok && backend_ok && weights_ok && engine_ok) {
+        std::cout << ANSI_GREEN << ANSI_BOLD << "🎉 ALL SYSTEM CHECKS PASSED! Tenzo Beta-1.0 is fully operational on this device." << ANSI_RESET << "\n\n";
         return 0;
     } else {
         std::cout << ANSI_RED << ANSI_BOLD << "⚠️  DIAGNOSTIC ISSUES DETECTED. Review the logs above for details." << ANSI_RESET << "\n\n";

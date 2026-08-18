@@ -92,8 +92,8 @@ def print_banner():
    | | |  _| |  \\| | / / |  | |
    | | | |___| |\\  |/ /| |__| |
    |_| |_____|_| \\_/____\\____/ {ANSI_RESET}
- {ANSI_BOLD}⚡ Tenzo Compiler & LLM Inference Console {ANSI_GREEN}v0.3.0{ANSI_RESET}
- {ANSI_DIM}High-Performance 1.58-bit BitNet Heterogeneous MLIR/AVX2 Engine{ANSI_RESET}
+ {ANSI_BOLD}⚡ Tenzo Compiler & LLM Inference Console {ANSI_GREEN}v1.0.0-beta.1 (Beta-1.0){ANSI_RESET}
+ {ANSI_DIM}Heterogeneous MLIR Engine: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm){ANSI_RESET}
 ────────────────────────────────────────────────────────────────────────────"""
     print(banner)
 
@@ -496,13 +496,13 @@ def main():
         description="Tenzo Production AI Compiler & LLM Inference CLI (v0.3.0)",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu"], help="Compute backend: cpu (AVX2/NEON) or gpu (Vulkan)")
+    parser.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu", "vulkan", "cuda", "rocm", "riscv"], help="Compute backend: cpu, gpu/vulkan, cuda, rocm, riscv")
     subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # 0. diag
     sub_diag = subparsers.add_parser("diag", help="Run comprehensive hardware, SIMD, and model diagnostics")
     sub_diag.add_argument("-m", "--model", type=str, default="default", help="Model name or path to diagnose")
-    sub_diag.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu"], help="Compute backend")
+    sub_diag.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu", "vulkan", "cuda", "rocm", "riscv"], help="Compute backend")
 
     # 1. list
     sub_list = subparsers.add_parser("list", help="List all available local models and formats")

@@ -15,10 +15,10 @@ import subprocess
 
 TARGETS = {
     "phone": "qPzEE7SMDX3c7h4hn7aeRezKz@nyc1.tmate.io",
-    "tablet": "hhWa46e3Syw4fGqxXJpe3v9c8@nyc1.tmate.io",
+    "tablet": "aZFaa6YLWtCCnFduJCHVBwwaU@nyc1.tmate.io",
 }
 
-def exec_remote(target_name, command, timeout=120):
+def exec_remote_once(target_name, command, timeout=120):
     ssh_target = TARGETS.get(target_name)
     if not ssh_target:
         raise ValueError(f"Unknown target: {target_name}")
@@ -33,10 +33,10 @@ def exec_remote(target_name, command, timeout=120):
         os.environ['TERM'] = 'xterm-256color'
         os.dup2(slave, 0); os.dup2(slave, 1); os.dup2(slave, 2)
         os.close(slave)
-        os.execlp('ssh', 'ssh', '-tt', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=10', ssh_target)
+        os.execlp('ssh', 'ssh', '-tt', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', ssh_target)
 
     os.close(slave)
-    time.sleep(2.0)
+    time.sleep(2.5)
     # Dismiss tmate prompt if any
     os.write(master, b'q\r\n\x03\r\n')
     time.sleep(0.5)
@@ -58,34 +58,38 @@ def exec_remote(target_name, command, timeout=120):
         if not r:
             continue
         try:
-            chunk = os.read(master, 4096)
-            if not chunk:
+            data = os.read(master, 4096)
+            if not data:
                 break
-            buf += chunk
-            text = buf.decode('utf-8', errors='ignore')
-            if delim_end in text:
+            buf += data
+            if delim_end.encode('utf-8') in buf:
                 break
         except OSError:
             break
 
     try:
         os.close(master)
-    except:
+    except OSError:
+        pass
+    try:
+        os.kill(pid, 9)
+    except OSError:
         pass
 
-    text = buf.decode('utf-8', errors='ignore')
-    if delim_start in text:
-        content = text.split(delim_start, 1)[1]
-        if delim_end in content:
-            content = content.split(delim_end, 1)[0]
-        # Clean terminal output
-        lines = []
-        for l in content.split('\n'):
-            cleaned = l.replace('\r', '').strip()
-            if cleaned and not cleaned.startswith('===START_') and not cleaned.startswith('===END_'):
-                lines.append(cleaned)
-        return "\n".join(lines)
-    return text
+    out_str = buf.decode('utf-8', errors='replace')
+    if delim_start in out_str and delim_end in out_str:
+        return out_str.split(delim_start)[1].split(delim_end)[0].strip()
+    return out_str
+
+def exec_remote(target_name, command, timeout=120, retries=3):
+    last_err = ""
+    for attempt in range(retries):
+        res = exec_remote_once(target_name, command, timeout)
+        if "timed out during banner exchange" not in res and "Connection reset" not in res and res.strip():
+            return res
+        last_err = res
+        time.sleep(2.0)
+    return last_err
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

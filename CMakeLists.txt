@@ -273,6 +273,9 @@ endif()
 add_library(tenzo_runtime_static STATIC
     src/runtime/TenzoEngine.cpp
     src/runtime/VulkanRuntime.cpp
+    src/runtime/CUDARuntime.cpp
+    src/runtime/ROCmRuntime.cpp
+    src/runtime/MicroarchProfiler.cpp
 )
 target_include_directories(tenzo_runtime_static PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -284,6 +287,7 @@ target_compile_options(tenzo_runtime_static PRIVATE
 target_link_libraries(tenzo_runtime_static PUBLIC
     OpenMP::OpenMP_CXX
     m
+    ${CMAKE_DL_LIBS}
 )
 if(TENZO_HAS_VULKAN)
     if(Vulkan_FOUND)
@@ -298,6 +302,9 @@ set_target_properties(tenzo_runtime_static PROPERTIES OUTPUT_NAME "tenzo_runtime
 add_library(tenzo_runtime_shared SHARED
     src/runtime/TenzoEngine.cpp
     src/runtime/VulkanRuntime.cpp
+    src/runtime/CUDARuntime.cpp
+    src/runtime/ROCmRuntime.cpp
+    src/runtime/MicroarchProfiler.cpp
 )
 target_include_directories(tenzo_runtime_shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -309,6 +316,7 @@ target_compile_options(tenzo_runtime_shared PRIVATE
 target_link_libraries(tenzo_runtime_shared PUBLIC
     OpenMP::OpenMP_CXX
     m
+    ${CMAKE_DL_LIBS}
 )
 if(TENZO_HAS_VULKAN)
     if(Vulkan_FOUND)

@@ -11,6 +11,7 @@
  */
 
 #include "tenzo.hpp"
+#include "runtime/MicroarchProfiler.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -78,10 +79,9 @@ public:
         }
 
         size_t i = 0;
-        while (i < text.length()) {
+        while (i < text.size()) {
             bool matched = false;
-            size_t max_len = std::min(static_cast<size_t>(64), text.length() - i);
-            for (size_t len = max_len; len > 0; --len) {
+            for (size_t len = std::min((size_t)32, text.size() - i); len >= 1; --len) {
                 std::string sub = text.substr(i, len);
                 auto it = token_to_id.find(sub);
                 if (it != token_to_id.end()) {
@@ -92,10 +92,23 @@ public:
                 }
             }
             if (!matched) {
+                unsigned char c = text[i];
+                std::string byte_str(1, c);
+                if (token_to_id.count(byte_str)) {
+                    tokens.push_back(token_to_id.at(byte_str));
+                }
                 i += 1;
             }
         }
         return tokens;
+    }
+
+    std::string decode_token(int token_id) const {
+        auto it = id_to_token.find(token_id);
+        if (it != id_to_token.end()) {
+            return it->second;
+        }
+        return "";
     }
 
     std::string decode(const std::vector<int>& token_ids) const {
@@ -139,6 +152,7 @@ struct CliOptions {
     bool chat_mode = false;
     bool show_banner = true;
     bool benchmark = false;
+    bool profile = false;
 };
 
 void print_banner() {
@@ -148,8 +162,8 @@ void print_banner() {
     std::cout << "   | | |  _| |  \\| | / / |  | |\n";
     std::cout << "   | | | |___| |\\  |/ /| |__| |\n";
     std::cout << "   |_| |_____|_| \\_/____\\____/ \n" << ANSI_RESET;
-    std::cout << ANSI_BOLD << " ⚡ Tenzo Native LLM Inference Engine " << ANSI_GREEN << "v0.3.0" << ANSI_RESET << "\n";
-    std::cout << ANSI_DIM << " High-performance MLIR/AVX2 runtime for 1.58-bit BitNet architectures\n" << ANSI_RESET;
+    std::cout << ANSI_BOLD << " ⚡ Tenzo Native LLM Inference Engine " << ANSI_GREEN << "v1.0.0-beta.1 (Beta-1.0)" << ANSI_RESET << "\n";
+    std::cout << ANSI_DIM << " Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)\n" << ANSI_RESET;
     std::cout << "────────────────────────────────────────────────────────────────────────────\n" << std::endl;
 }
 
@@ -163,8 +177,12 @@ void print_help(const char* prog_name) {
     std::cout << "  -m, --model <path>          Path to exported model folder (default: /app/tenzo-frontend/export_output)\n";
     std::cout << "  --chat                      Enter interactive multi-turn REPL chat mode\n";
     std::cout << "  --system <str>              Custom system prompt (default: Tenzo Assistant)\n\n";
-    std::cout << ANSI_BOLD << "QUANTIZATION & COMPUTE:" << ANSI_RESET << "\n";
-    std::cout << "  -d, --device <cpu|gpu>      Compute backend: cpu (AVX2/NEON) or gpu (Vulkan compute)\n";
+    std::cout << ANSI_BOLD << "HETEROGENEOUS COMPUTE & BACKENDS:" << ANSI_RESET << "\n";
+    std::cout << "  -d, --device <backend>      Compute backend: " << ANSI_GREEN << "cpu" << ANSI_RESET << " (AVX2/NEON), "
+              << ANSI_GREEN << "gpu / vulkan" << ANSI_RESET << " (Vulkan SPIR-V), "
+              << ANSI_GREEN << "cuda" << ANSI_RESET << " (NVPTX/Vulkan), "
+              << ANSI_GREEN << "rocm" << ANSI_RESET << " (AMDGCN/Vulkan), "
+              << ANSI_GREEN << "riscv" << ANSI_RESET << " (RVV 1.0)\n";
     std::cout << "  --kv-quant <mode>           KV-Cache Quantization mode (default: int8_fused)\n";
     std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (14.2x comp, 84MB), " 
               << ANSI_GREEN << "int8_fused" << ANSI_RESET << " (4x comp, 309MB), " 
@@ -176,14 +194,17 @@ void print_help(const char* prog_name) {
     std::cout << "  --top-k <int>               Top-K candidate filter (default: 40)\n";
     std::cout << "  --rep-penalty <float>       Repetition penalty multiplier (default: 1.15)\n\n";
     std::cout << ANSI_BOLD << "UTILITIES:" << ANSI_RESET << "\n";
+    std::cout << "  --profile                   Print hardware microarchitecture topology & cache analysis\n";
     std::cout << "  -b, --benchmark             Run automated performance benchmark across sequence lengths\n";
     std::cout << "  -h, --help                  Show this help message and exit\n";
     std::cout << "  -v, --version               Show version information\n\n";
     std::cout << ANSI_BOLD << "EXAMPLES:" << ANSI_RESET << "\n";
-    std::cout << "  # Interactive chat on GPU:\n";
-    std::cout << "  " << prog_name << " --chat --device gpu\n\n";
-    std::cout << "  # Single prompt generation on CPU:\n";
-    std::cout << "  " << prog_name << " -p \"Explain the importance of compilers\" -d cpu -n 50\n\n";
+    std::cout << "  # Interactive chat on Vulkan GPU:\n";
+    std::cout << "  " << prog_name << " --chat --device vulkan\n\n";
+    std::cout << "  # CUDA translation mode:\n";
+    std::cout << "  " << prog_name << " -p \"Hello CUDA\" --device cuda\n\n";
+    std::cout << "  # RISC-V RVV vector emulation:\n";
+    std::cout << "  " << prog_name << " -p \"Hello RISC-V\" --device riscv\n\n";
 }
 
 int main(int argc, char** argv) {
@@ -263,6 +284,11 @@ int main(int argc, char** argv) {
     }
     std::cout << ANSI_GREEN << " [OK] " << ANSI_RESET << "(" << tokenizer.id_to_token.size() << " tokens)\n";
 
+    if (opt.profile) {
+        auto& prof = tenzo::MicroarchProfiler::getProfile();
+        tenzo::MicroarchProfiler::printReport(prof);
+    }
+
     // Initialize Tenzo Engine
     tenzo_config_t config = tenzo_default_config();
     config.kv_mode = opt.kv_mode.c_str();
@@ -270,7 +296,7 @@ int main(int argc, char** argv) {
     config.device = opt.device.c_str();
 
     std::cout << ANSI_CYAN << "⚙️  Initializing Execution Engine (" 
-              << ANSI_BOLD << "Backend: " << (opt.device == "gpu" ? "GPU (Vulkan)" : "CPU (SIMD)")
+              << ANSI_BOLD << "Backend: " << opt.device 
               << ", KV-Cache: " << opt.kv_mode << ANSI_RESET << ANSI_CYAN << ", Max Context: " 
               << opt.ctx_size << ")..." << ANSI_RESET;
     tenzo::Engine engine(config);

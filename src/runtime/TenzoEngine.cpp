@@ -5,6 +5,10 @@
 
 #include "TenzoEngine.h"
 #include "VulkanRuntime.h"
+#include "CUDARuntime.h"
+#include "ROCmRuntime.h"
+#include "MicroarchProfiler.h"
+#include "arch/RISCV_RVV.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -1362,9 +1366,172 @@ void TenzoEngineImpl::forward_layer_gpu(int layer_idx) {
     }
 }
 
+void TenzoEngineImpl::forward_layer_cuda(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. CUDA Pre-RMSNorm
+    CUDARuntime::getInstance().executeRMSNorm(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. CUDA BitLinear Projections Q, K, V
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), 1, h_dim, q_dim, lw.q_scale);
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), 1, h_dim, kv_dim, lw.k_scale);
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), 1, h_dim, kv_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. CUDA Attn Sub-Norm
+    CUDARuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. CUDA Out Projection
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. CUDA MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        CUDARuntime::getInstance().executeRMSNorm(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        CUDARuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), 1, h_dim, ffn_dim, lw.gate_scale);
+        CUDARuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), 1, h_dim, ffn_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        CUDARuntime::getInstance().executeRMSNorm(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        CUDARuntime::getInstance().executeBitLinearTL1(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), 1, ffn_dim, h_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
+void TenzoEngineImpl::forward_layer_rocm(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. ROCm Pre-RMSNorm
+    ROCmRuntime::getInstance().executeRMSNorm(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. ROCm BitLinear Projections Q, K, V
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), 1, h_dim, q_dim, lw.q_scale);
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), 1, h_dim, kv_dim, lw.k_scale);
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), 1, h_dim, kv_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. ROCm Attn Sub-Norm
+    ROCmRuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. ROCm Out Projection
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. ROCm MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        ROCmRuntime::getInstance().executeRMSNorm(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        ROCmRuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), 1, h_dim, ffn_dim, lw.gate_scale);
+        ROCmRuntime::getInstance().executeBitLinearTL1(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), 1, h_dim, ffn_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        ROCmRuntime::getInstance().executeRMSNorm(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        ROCmRuntime::getInstance().executeBitLinearTL1(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), 1, ffn_dim, h_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
+void TenzoEngineImpl::forward_layer_riscv(int layer_idx) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+
+    // 1. RISC-V RVV Pre-RMSNorm
+    rvv::rms_norm_rvv(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+
+    // 2. RISC-V RVV BitLinear Projections Q, K, V
+    rvv::gemv_bitlinear_tl1_rvv(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.q_w_ptr), buf_q.data(), 1, h_dim, q_dim, lw.q_scale);
+    rvv::gemv_bitlinear_tl1_rvv(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.k_w_ptr), buf_k.data(), 1, h_dim, kv_dim, lw.k_scale);
+    rvv::gemv_bitlinear_tl1_rvv(buf_norm_x.data(), reinterpret_cast<const uint8_t*>(lw.v_w_ptr), buf_v.data(), 1, h_dim, kv_dim, lw.v_scale);
+
+    // 3. Attention
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+
+    // 4. RISC-V RVV Attn Sub-Norm
+    rvv::rms_norm_rvv(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+
+    // 5. RISC-V RVV Out Projection
+    rvv::gemv_bitlinear_tl1_rvv(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+
+    // 6. Residual 1
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+
+    // 7. RISC-V RVV MLP Block
+    if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
+        rvv::rms_norm_rvv(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        rvv::gemv_bitlinear_tl1_rvv(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.gate_w_ptr), buf_gate.data(), 1, h_dim, ffn_dim, lw.gate_scale);
+        rvv::gemv_bitlinear_tl1_rvv(buf_post_norm.data(), reinterpret_cast<const uint8_t*>(lw.up_w_ptr), buf_up.data(), 1, h_dim, ffn_dim, lw.up_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+
+        rvv::rms_norm_rvv(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        rvv::gemv_bitlinear_tl1_rvv(buf_ffn_norm.data(), reinterpret_cast<const uint8_t*>(lw.down_w_ptr), buf_down.data(), 1, ffn_dim, h_dim, lw.down_scale);
+
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+}
+
 void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
-    if (config.device && std::string(config.device) == "gpu") {
+    std::string dev = config.device ? config.device : "cpu";
+    if (dev == "gpu" || dev == "vulkan") {
         forward_layer_gpu(layer_idx);
+        return;
+    } else if (dev == "cuda") {
+        forward_layer_cuda(layer_idx);
+        return;
+    } else if (dev == "rocm") {
+        forward_layer_rocm(layer_idx);
+        return;
+    } else if (dev == "riscv") {
+        forward_layer_riscv(layer_idx);
         return;
     }
 
