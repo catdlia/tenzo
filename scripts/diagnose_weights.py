@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
 import struct
 import math
-import numpy as np
 
 def check():
     with open("tenzo-frontend/export_output/weights.bin", "rb") as f:
