@@ -231,6 +231,25 @@ int main(int argc, char** argv) {
     std::string mlir_path = opt.model_dir + "/model.mlir";
     std::string weights_path = opt.model_dir + "/weights.bin";
 
+    // Auto-fallback search if model path is not directly accessible
+    if (!std::ifstream(vocab_path).is_open()) {
+        std::vector<std::string> candidates = {
+            "tenzo-frontend/export_output",
+            "./tenzo-frontend/export_output",
+            "/app/tenzo-frontend/export_output"
+        };
+        for (const auto& c : candidates) {
+            std::string test_v = c + "/tokenizer.vocab";
+            if (std::ifstream(test_v).is_open()) {
+                opt.model_dir = c;
+                vocab_path = c + "/tokenizer.vocab";
+                mlir_path = c + "/model.mlir";
+                weights_path = c + "/weights.bin";
+                break;
+            }
+        }
+    }
+
     BpeTokenizer tokenizer;
     std::cout << ANSI_CYAN << "📖 Loading vocabulary..." << ANSI_RESET;
     if (!tokenizer.load_vocab(vocab_path)) {

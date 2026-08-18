@@ -59,9 +59,11 @@ def get_inference_cmd():
 
 class TenzoSession:
     def __init__(self):
+        in_docker = is_running_in_docker_host()
+        default_local = os.path.join(os.getcwd(), "tenzo-frontend", "export_output")
         self.model_name = "default"
-        self.model_path = "/app/tenzo-frontend/export_output"
-        self.kv_quant = "tl1_fused"
+        self.model_path = "/app/tenzo-frontend/export_output" if in_docker else default_local
+        self.kv_quant = "popcount_fused"
         self.model_quant = "i2_s"
         self.ctx_size = 8192
         self.max_tokens = 128
@@ -144,13 +146,16 @@ def find_available_models():
     return models
 
 def resolve_model_path(model_arg):
+    in_docker = is_running_in_docker_host()
     models = find_available_models()
     for m in models:
         if model_arg in (m['name'], m['alias'], m['path'], m['local_path']):
-            return m['path']
+            return m['path'] if in_docker else m['local_path']
     if os.path.exists(model_arg):
-        return model_arg
-    in_docker = is_running_in_docker_host()
+        if in_docker:
+            rel = os.path.relpath(os.path.abspath(model_arg), os.getcwd())
+            return f"/app/{rel}"
+        return os.path.abspath(model_arg)
     default_local = os.path.join(os.getcwd(), "tenzo-frontend", "export_output")
     return "/app/tenzo-frontend/export_output" if in_docker else default_local
 
