@@ -501,5 +501,31 @@ def TernaryPackOp : Tenzo_Op<"ternary_pack", [Pure]> {
   let assemblyFormat = "$input (`,` $scale^)? attr-dict `:` functional-type(operands, results)";
 }
 
+// --- SIMD Bitwise Packed Attention Operation ---
+def PackedAttentionOp : Tenzo_Op<"packed_attention", [Pure, AttrSizedOperandSegments]> {
+  let summary = "SIMD Bitwise Packed Scaled Dot-Product Attention";
+  let description = [{
+    Computes scaled dot-product attention over FP32 Query and packed ternary
+    Key and Value caches (4 ternary values {-1, 0, 1} per byte).
 
+    Operands:
+      - query: FP32 tensor [..., D]
+      - key: packed uint8 tensor [..., D/4] (4 ternary values per byte)
+      - value: packed uint8 tensor [..., D/4] (4 ternary values per byte)
+      - seq_pos: optional sequence position for causal decoding
+      - scale: optional FP32 dequantization/attention scale
+    Result: FP32 tensor [..., D]
+  }];
 
+  let arguments = (ins
+    AnyTensor:$query,
+    AnyTensor:$key,
+    AnyTensor:$value,
+    Optional<AnyTensor>:$seq_pos,
+    Optional<AnyType>:$scale,
+    DefaultValuedAttr<I32Attr, "4">:$values_per_byte
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$query `,` $key `,` $value (`seq_pos` `(` $seq_pos^ `)`)? (`scale` `(` $scale^ `)`)? attr-dict `:` functional-type(operands, results)";
+}

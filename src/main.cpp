@@ -6,6 +6,7 @@
 #include "tests/EndToEndMathTest.h"
 #include "tests/HeteroTests.h"
 #include "tests/TernaryPackTest.h"
+#include "tests/BitwiseAttentionTest.h"
 #include "runtime/TenzoEngine.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
@@ -36,6 +37,7 @@ void printUsage() {
     llvm::outs() << "  gpu       Run GPU pipeline test\n";
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
     llvm::outs() << "  test      Run quick validation tests\n";
+    llvm::outs() << "  attention Run bitwise attention (tenzo.packed_attention) tests\n";
     llvm::outs() << "  all       Run all tests\n";
     llvm::outs() << "  version   Show version info\n";
 }
@@ -134,6 +136,8 @@ int main(int argc, char* argv[]) {
         }
     } else if (strcmp(mode, "ternary") == 0 || strcmp(mode, "ternary-pack") == 0) {
         tenzo::runTernaryPackTest(context);
+    } else if (strcmp(mode, "attention") == 0 || strcmp(mode, "bitwise-attention") == 0) {
+        tenzo::runBitwiseAttentionTest(context);
     } else if (strcmp(mode, "validate") == 0) {
         tenzo::runEndToEndMathTest(context);
     } else if (strcmp(mode, "generate") == 0) {
@@ -169,17 +173,20 @@ int main(int argc, char* argv[]) {
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";
         bool allPassed = true;
 
-        llvm::outs() << "[1/4] CPU MatMul... ";
+        llvm::outs() << "[1/5] CPU MatMul... ";
         tenzo::runFullPipelineTest(context);
 
-        llvm::outs() << "\n[2/4] Conv2D... ";
+        llvm::outs() << "\n[2/5] Conv2D... ";
         tenzo::runConv2DTest(context);
 
-        llvm::outs() << "\n[3/4] GPU Pipeline... ";
+        llvm::outs() << "\n[3/5] GPU Pipeline... ";
         tenzo::gpu::runGPUPipelineTest(context);
 
-        llvm::outs() << "\n[4/4] Ternary Pack (1.58-bit AVX2 Micro-Kernel)... ";
+        llvm::outs() << "\n[4/5] Ternary Pack (1.58-bit AVX2 Micro-Kernel)... ";
         tenzo::runTernaryPackTest(context);
+
+        llvm::outs() << "\n[5/5] Bitwise Attention (SIMD Packed Attention Micro-Kernel)... ";
+        tenzo::runBitwiseAttentionTest(context);
 
         llvm::outs() << "\n--- All Tests Complete ---\n";
         return allPassed ? 0 : 1;
@@ -193,6 +200,8 @@ int main(int argc, char* argv[]) {
         tenzo::gpu::runGPUPipelineTest(context);
         llvm::outs() << "\n=== Ternary Pack Tests ===\n";
         tenzo::runTernaryPackTest(context);
+        llvm::outs() << "\n=== Bitwise Attention Tests ===\n";
+        tenzo::runBitwiseAttentionTest(context);
     } else if (strcmp(mode, "help") == 0 || strcmp(mode, "-h") == 0 || strcmp(mode, "--help") == 0) {
         printUsage();
         return 0;

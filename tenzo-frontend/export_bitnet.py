@@ -1,5 +1,10 @@
 import os
 import sys
+
+libs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".python_libs"))
+if os.path.exists(libs_dir) and libs_dir not in sys.path:
+    sys.path.insert(0, libs_dir)
+
 import argparse
 import struct
 import torch
@@ -8,9 +13,73 @@ from huggingface_hub import hf_hub_download
 from safetensors import safe_open
 from transformers import AutoTokenizer
 
-def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="export_output_bitnet", num_layers=2, quant_mode="i2_s"):
+
+def pack_ternary_list(flat_list) -> bytes:
+    """
+    Packs a python list of ternary values {-1, 0, 1} into 2-bit representation.
+    4 values per byte (uint8).
+    
+    Encoding matches AVX2 microkernel (_mm256_add_epi32 by +1):
+      -1 + 1 = 0 -> 0b00 (0)
+       0 + 1 = 1 -> 0b01 (1)
+      +1 + 1 = 2 -> 0b10 (2)
+    """
+    remainder = len(flat_list) % 4
+    if remainder != 0:
+        flat_list = flat_list + [0] * (4 - remainder)
+
+    packed_bytes = bytearray()
+    for i in range(0, len(flat_list), 4):
+        vals = flat_list[i:i+4]
+        b = 0
+        for shift_idx, v in enumerate(vals):
+            enc = int(v) + 1
+            b |= (enc & 0x03) << (shift_idx * 2)
+        packed_bytes.append(b)
+    return bytes(packed_bytes)
+
+
+def pack_ternary_array(arr) -> bytes:
+    """
+    Packs a numpy array or torch tensor of ternary values {-1, 0, 1} into uint8 bytes.
+    Encoding: -1 -> 00, 0 -> 01, +1 -> 10.
+    """
+    if isinstance(arr, np.ndarray):
+        flat = arr.flatten().astype(np.int8)
+        remainder = len(flat) % 4
+        if remainder != 0:
+            flat = np.pad(flat, (0, 4 - remainder), mode='constant', constant_values=0)
+        codes = (flat + 1).astype(np.uint8)
+        packed = (codes[0::4] & 0x03) | ((codes[1::4] & 0x03) << 2) | ((codes[2::4] & 0x03) << 4) | ((codes[3::4] & 0x03) << 6)
+        return packed.tobytes()
+    elif isinstance(arr, torch.Tensor):
+        return pack_ternary_array(arr.detach().cpu().numpy())
+    else:
+        return pack_ternary_list(list(arr))
+
+
+def unpack_ternary_bytes(packed_bytes: bytes, count: int = None) -> list:
+    """
+    Unpacks 2-bit ternary bytes back into a list of {-1, 0, 1} values.
+    Decoding matches AVX2 microkernel:
+      0b00 (0) - 1 = -1
+      0b01 (1) - 1 =  0
+      0b10 (2) - 1 = +1
+    """
+    unpacked = []
+    for b in packed_bytes:
+        for shift_idx in range(4):
+            enc = (b >> (shift_idx * 2)) & 0x03
+            val = enc - 1
+            unpacked.append(val)
+            if count is not None and len(unpacked) == count:
+                return unpacked
+    return unpacked
+
+
+def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="export_output_bitnet", num_layers=2, quant_mode="i2_s", packed_attention=False):
     os.makedirs(output_dir, exist_ok=True)
-    print(f"Hey! Exporting {model_name} ({num_layers} layers, quant_mode={quant_mode})...")
+    print(f"Hey! Exporting {model_name} ({num_layers} layers, quant_mode={quant_mode}, packed_attention={packed_attention})...")
 
     # 1. Download & Extract Tokenizer Vocabulary
     print("[Export BitNet] Extracting Tokenizer Vocabulary...")
@@ -106,11 +175,13 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
     # Build dynamic function signature for num_layers KV caches
     kv_args_in = []
     kv_types_in = []
+    k_dim = head_dim // 4 if packed_attention else head_dim
+    elem_type = "i8" if packed_attention else "f32"
     for l in range(num_layers):
-        kv_args_in.append(f"%arg{2 + 2*l}: tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
-        kv_args_in.append(f"%arg{3 + 2*l}: tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
-        kv_types_in.append(f"tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
-        kv_types_in.append(f"tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
+        kv_args_in.append(f"%arg{2 + 2*l}: tensor<1x{n_kv_heads}x1024x{k_dim}x{elem_type}>")
+        kv_args_in.append(f"%arg{3 + 2*l}: tensor<1x{n_kv_heads}x1024x{k_dim}x{elem_type}>")
+        kv_types_in.append(f"tensor<1x{n_kv_heads}x1024x{k_dim}x{elem_type}>")
+        kv_types_in.append(f"tensor<1x{n_kv_heads}x1024x{k_dim}x{elem_type}>")
     
     seq_pos_arg_idx = 2 + 2 * num_layers
     seq_pos_var = f"%arg{seq_pos_arg_idx}"
@@ -420,22 +491,42 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
         rope_k = get_var("tensor<1x5x1x128xf32>")
         mlir_lines.append(f'    {rope_k} = "tenzo.rope"({k_4d}, {seq_pos_var}) : (tensor<1x5x1x128xf32>, tensor<1xi32>) -> tensor<1x5x1x128xf32>')
 
-        # KV Cache Update
-        up_k = get_var("tensor<1x5x1024x128xf32>")
-        up_v = get_var("tensor<1x5x1024x128xf32>")
-        mlir_lines.append(
-            f'    {up_k}, {up_v} = "tenzo.kv_cache_update"({curr_k}, {curr_v}, {rope_k}, {v_4d}, {seq_pos_var}) : '
-            f'(tensor<1x5x1024x128xf32>, tensor<1x5x1024x128xf32>, tensor<1x5x1x128xf32>, tensor<1x5x1x128xf32>, tensor<1xi32>) -> (tensor<1x5x1024x128xf32>, tensor<1x5x1024x128xf32>)'
-        )
-        updated_kv_list.append(up_k)
-        updated_kv_list.append(up_v)
+        # KV Cache Update & Attention
+        if packed_attention:
+            pack_k = get_var(f"tensor<1x{n_kv_heads}x1x{head_dim // 4}xi8>")
+            mlir_lines.append(f'    {pack_k} = "tenzo.ternary_pack"({rope_k}) : (tensor<1x{n_kv_heads}x1x{head_dim}xf32>) -> tensor<1x{n_kv_heads}x1x{head_dim // 4}xi8>')
+            pack_v = get_var(f"tensor<1x{n_kv_heads}x1x{head_dim // 4}xi8>")
+            mlir_lines.append(f'    {pack_v} = "tenzo.ternary_pack"({v_4d}) : (tensor<1x{n_kv_heads}x1x{head_dim}xf32>) -> tensor<1x{n_kv_heads}x1x{head_dim // 4}xi8>')
 
-        # Attention
-        attn_4d = get_var("tensor<1x20x1x128xf32>")
-        mlir_lines.append(
-            f'    {attn_4d} = "tenzo.attention"({rope_q}, {up_k}, {up_v}, {seq_pos_var}) : '
-            f'(tensor<1x20x1x128xf32>, tensor<1x5x1024x128xf32>, tensor<1x5x1024x128xf32>, tensor<1xi32>) -> tensor<1x20x1x128xf32>'
-        )
+            up_k = get_var(f"tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>")
+            up_v = get_var(f"tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>")
+            mlir_lines.append(
+                f'    {up_k}, {up_v} = "tenzo.kv_cache_update"({curr_k}, {curr_v}, {pack_k}, {pack_v}, {seq_pos_var}) : '
+                f'(tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>, tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>, tensor<1x{n_kv_heads}x1x{head_dim // 4}xi8>, tensor<1x{n_kv_heads}x1x{head_dim // 4}xi8>, tensor<1xi32>) -> (tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>, tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>)'
+            )
+            updated_kv_list.append(up_k)
+            updated_kv_list.append(up_v)
+
+            attn_4d = get_var(f"tensor<1x{n_q_heads}x1x{head_dim}xf32>")
+            mlir_lines.append(
+                f'    {attn_4d} = "tenzo.packed_attention"({rope_q}, {up_k}, {up_v}, {seq_pos_var}) : '
+                f'(tensor<1x{n_q_heads}x1x{head_dim}xf32>, tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>, tensor<1x{n_kv_heads}x1024x{head_dim // 4}xi8>, tensor<1xi32>) -> tensor<1x{n_q_heads}x1x{head_dim}xf32>'
+            )
+        else:
+            up_k = get_var(f"tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
+            up_v = get_var(f"tensor<1x{n_kv_heads}x1024x{head_dim}xf32>")
+            mlir_lines.append(
+                f'    {up_k}, {up_v} = "tenzo.kv_cache_update"({curr_k}, {curr_v}, {rope_k}, {v_4d}, {seq_pos_var}) : '
+                f'(tensor<1x{n_kv_heads}x1024x{head_dim}xf32>, tensor<1x{n_kv_heads}x1024x{head_dim}xf32>, tensor<1x{n_kv_heads}x1x{head_dim}xf32>, tensor<1x{n_kv_heads}x1x{head_dim}xf32>, tensor<1xi32>) -> (tensor<1x{n_kv_heads}x1024x{head_dim}xf32>, tensor<1x{n_kv_heads}x1024x{head_dim}xf32>)'
+            )
+            updated_kv_list.append(up_k)
+            updated_kv_list.append(up_v)
+
+            attn_4d = get_var(f"tensor<1x{n_q_heads}x1x{head_dim}xf32>")
+            mlir_lines.append(
+                f'    {attn_4d} = "tenzo.attention"({rope_q}, {up_k}, {up_v}, {seq_pos_var}) : '
+                f'(tensor<1x{n_q_heads}x1x{head_dim}xf32>, tensor<1x{n_kv_heads}x1024x{head_dim}xf32>, tensor<1x{n_kv_heads}x1024x{head_dim}xf32>, tensor<1xi32>) -> tensor<1x{n_q_heads}x1x{head_dim}xf32>'
+            )
 
         empty_attn = get_var("tensor<1x1x20x128xf32>")
         mlir_lines.append(f'    {empty_attn} = tensor.empty() : tensor<1x1x20x128xf32>')
@@ -548,6 +639,7 @@ if __name__ == "__main__":
     parser.add_argument("--output-dir", type=str, default="export_output_bitnet", help="Directory to save exported files")
     parser.add_argument("--num-layers", type=int, default=2, help="Number of Transformer layers to export (default: 2)")
     parser.add_argument("--quant-mode", type=str, choices=["i2_s", "i4_s", "i3_s", "tl1", "tl1_pack"], default="i2_s", help="Quantization mode: i2_s (1.58b), i4_s (INT4), i3_s (INT3), tl1, tl1_pack")
+    parser.add_argument("--packed-attention", action="store_true", help="Emit tenzo.packed_attention with packed uint8 KV cache")
     args = parser.parse_args()
 
-    export_bitnet_model(model_name=args.model_name, output_dir=args.output_dir, num_layers=args.num_layers, quant_mode=args.quant_mode)
+    export_bitnet_model(model_name=args.model_name, output_dir=args.output_dir, num_layers=args.num_layers, quant_mode=args.quant_mode, packed_attention=args.packed_attention)

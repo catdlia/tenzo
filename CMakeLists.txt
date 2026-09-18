@@ -180,6 +180,7 @@ if(TENZO_HAS_MLIR_COMPILER)
             src/tests/GenerationTest.cpp
             src/tests/HeteroTests.cpp
             src/tests/TernaryPackTest.cpp
+            src/tests/BitwiseAttentionTest.cpp
     )
 
     add_dependencies(tenzo-cli TenzoOpsIncGen)

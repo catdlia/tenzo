@@ -27,10 +27,13 @@ except ImportError:
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
-    from qat import BitLinear, TernaryQuantizeSTE
+    from qat import BitLinear, TernaryQuantizeSTE, TernaryPack, QATBitSelfAttention, ternary_quantize
 except ImportError:
     BitLinear = None
     TernaryQuantizeSTE = None
+    TernaryPack = None
+    QATBitSelfAttention = None
+    ternary_quantize = None
 
 
 def pack_ternary_list(flat_list) -> bytes:
@@ -38,10 +41,10 @@ def pack_ternary_list(flat_list) -> bytes:
     Packs a python list of ternary values {-1, 0, 1} into 2-bit representation.
     4 values per byte (uint8).
     
-    Encoding:
-      0  -> 0b00 (0)
-      1  -> 0b01 (1)
-     -1  -> 0b10 (2)
+    Encoding matches AVX2 microkernel (_mm256_add_epi32 by +1):
+      -1 + 1 = 0 -> 0b00 (0)
+       0 + 1 = 1 -> 0b01 (1)
+      +1 + 1 = 2 -> 0b10 (2)
     """
     # Pad to multiple of 4
     remainder = len(flat_list) % 4
@@ -53,11 +56,8 @@ def pack_ternary_list(flat_list) -> bytes:
         vals = flat_list[i:i+4]
         b = 0
         for shift_idx, v in enumerate(vals):
-            enc = 0
-            if v == 1:
-                enc = 1
-            elif v == -1:
-                enc = 2
+            # Shift by +1: -1->0, 0->1, 1->2
+            enc = int(v) + 1
             b |= (enc & 0x03) << (shift_idx * 2)
         packed_bytes.append(b)
         
@@ -65,21 +65,53 @@ def pack_ternary_list(flat_list) -> bytes:
 
 
 def pack_ternary_array(arr) -> bytes:
+    """
+    Packs a numpy array or torch tensor of ternary values {-1, 0, 1} into uint8 bytes.
+    Encoding: -1 -> 00, 0 -> 01, +1 -> 10.
+    """
     if HAS_NUMPY and isinstance(arr, np.ndarray):
-        flat_list = arr.flatten().tolist()
+        flat = arr.flatten().astype(np.int8)
+        remainder = len(flat) % 4
+        if remainder != 0:
+            flat = np.pad(flat, (0, 4 - remainder), mode='constant', constant_values=0)
+        codes = (flat + 1).astype(np.uint8)
+        packed = (codes[0::4] & 0x03) | ((codes[1::4] & 0x03) << 2) | ((codes[2::4] & 0x03) << 4) | ((codes[3::4] & 0x03) << 6)
+        return packed.tobytes()
+    elif HAS_TORCH and isinstance(arr, torch.Tensor):
+        return pack_ternary_array(arr.detach().cpu().numpy())
     else:
         flat_list = list(arr)
-    return pack_ternary_list(flat_list)
+        return pack_ternary_list(flat_list)
+
+
+def unpack_ternary_bytes(packed_bytes: bytes, count: int = None) -> list:
+    """
+    Unpacks 2-bit ternary bytes back into a list of {-1, 0, 1} values.
+    Decoding matches AVX2 microkernel:
+      0b00 (0) - 1 = -1
+      0b01 (1) - 1 =  0
+      0b10 (2) - 1 = +1
+    """
+    unpacked = []
+    for b in packed_bytes:
+        for shift_idx in range(4):
+            enc = (b >> (shift_idx * 2)) & 0x03
+            val = enc - 1
+            unpacked.append(val)
+            if count is not None and len(unpacked) == count:
+                return unpacked
+    return unpacked
 
 
 
 class FXToMLIREmitter:
-    def __init__(self, model: "torch.nn.Module", output_dir: str = "."):
+    def __init__(self, model: "torch.nn.Module", output_dir: str = ".", use_packed_attention: bool = True):
         if not HAS_TORCH:
             raise RuntimeError("PyTorch is required for FXToMLIREmitter")
 
         self.model = model
         self.output_dir = output_dir
+        self.use_packed_attention = use_packed_attention
         os.makedirs(self.output_dir, exist_ok=True)
 
         self.weights_bin_path = os.path.join(self.output_dir, "weights.bin")
@@ -164,9 +196,13 @@ class FXToMLIREmitter:
             def is_leaf_module(self, m: "torch.nn.Module", module_qualified_name: str) -> bool:
                 if BitLinear is not None and isinstance(m, BitLinear):
                     return True
+                if TernaryPack is not None and isinstance(m, TernaryPack):
+                    return True
+                if getattr(m, "is_ternary_pack", False):
+                    return True
                 if isinstance(m, (nn.Embedding, nn.LayerNorm)):
                     return True
-                if m.__class__.__name__ in ("RotaryEmbedding", "BitLinear", "LlamaRMSNorm", "RMSNorm", "Embedding"):
+                if m.__class__.__name__ in ("RotaryEmbedding", "BitLinear", "LlamaRMSNorm", "RMSNorm", "Embedding", "TernaryPack", "TernaryQuantizer"):
                     return True
                 return super().is_leaf_module(m, module_qualified_name)
 
@@ -185,8 +221,10 @@ class FXToMLIREmitter:
             parent_module_name = name.rsplit(".", 1)[0] if "." in name else ""
             if parent_module_name:
                 mod = dict(self.model.named_modules()).get(parent_module_name)
-                if isinstance(mod, BitLinear):
+                if isinstance(mod, BitLinear) or getattr(mod, "is_ternary", False) or (mod is not None and mod.__class__.__name__ in ("BitLinear", "QATLinear", "TernaryLinear")):
                     is_bitlinear = True
+            if getattr(param, "is_ternary", False):
+                is_bitlinear = True
 
             self._save_weight(name, param, is_ternary=is_bitlinear)
 
@@ -229,17 +267,27 @@ class FXToMLIREmitter:
         num_heads = None
         head_dim = None
         for m in self.model.modules():
-            if hasattr(m, "num_heads") and hasattr(m, "head_dim"):
+            if hasattr(m, "num_heads") and hasattr(m, "head_dim") and m.num_heads is not None and m.head_dim is not None:
                 num_heads = m.num_heads
                 head_dim = m.head_dim
                 break
 
-        if num_heads is not None and head_dim is not None:
-            cache_k_type = f"tensor<1x{num_heads}x1024x{head_dim}xf32>"
-            cache_v_type = f"tensor<1x{num_heads}x1024x{head_dim}xf32>"
+        if self.use_packed_attention:
+            if num_heads is not None and head_dim is not None:
+                packed_hdim = max(1, head_dim // 4)
+                cache_k_type = f"tensor<1x{num_heads}x1024x{packed_hdim}xi8>"
+                cache_v_type = f"tensor<1x{num_heads}x1024x{packed_hdim}xi8>"
+            else:
+                packed_edim = max(1, embed_dim // 4)
+                cache_k_type = f"tensor<1x1024x{packed_edim}xi8>"
+                cache_v_type = f"tensor<1x1024x{packed_edim}xi8>"
         else:
-            cache_k_type = f"tensor<1x1024x{embed_dim}xf32>"
-            cache_v_type = f"tensor<1x1024x{embed_dim}xf32>"
+            if num_heads is not None and head_dim is not None:
+                cache_k_type = f"tensor<1x{num_heads}x1024x{head_dim}xf32>"
+                cache_v_type = f"tensor<1x{num_heads}x1024x{head_dim}xf32>"
+            else:
+                cache_k_type = f"tensor<1x1024x{embed_dim}xf32>"
+                cache_v_type = f"tensor<1x1024x{embed_dim}xf32>"
 
         seq_pos_type = f"tensor<1xi32>"
         
@@ -419,6 +467,20 @@ class FXToMLIREmitter:
                     self.mlir_lines.append(f'    {res_var} = "tenzo.relu"({inp}) : ({inp_type}) -> {inp_type}')
                     self.ssa_map[node] = res_var
 
+                elif submod.__class__.__name__ in ("TernaryPack", "TernaryQuantizer") or getattr(submod, "is_ternary_pack", False):
+                    inp = self.ssa_map[node.args[0]]
+                    inp_type = self.type_map[inp]
+                    inp_dims = [int(s) for s in inp_type.replace("tensor<", "").replace("xf32>", "").replace("xi8>", "").split("x") if s]
+                    packed_dims = list(inp_dims)
+                    packed_dims[-1] = max(1, packed_dims[-1] // 4)
+                    res_type = f"tensor<{'x'.join(map(str, packed_dims))}xi8>"
+                    res_var = self._get_new_var(res_type)
+                    self.mlir_lines.append(
+                        f'    {res_var} = "tenzo.ternary_pack"({inp}) : ({inp_type}) -> {res_type}'
+                    )
+                    self.ssa_map[node] = res_var
+                    self.type_map[res_var] = res_type
+
             elif node.op == "call_method":
                 method_name = node.target
                 if method_name in ("view", "reshape"):
@@ -535,6 +597,20 @@ class FXToMLIREmitter:
                     self.mlir_lines.append(f'    {res_var} = "tenzo.add"({lhs}, {rhs}) : ({inp_type}, {inp_type}) -> {inp_type}')
                     self.ssa_map[node] = res_var
 
+                elif target in (ternary_quantize, getattr(TernaryQuantizeSTE, "apply", None)) or getattr(target, "__name__", "") in ("ternary_quantize", "ternary_pack"):
+                    inp = self.ssa_map[node.args[0]]
+                    inp_type = self.type_map[inp]
+                    inp_dims = [int(s) for s in inp_type.replace("tensor<", "").replace("xf32>", "").replace("xi8>", "").split("x") if s]
+                    packed_dims = list(inp_dims)
+                    packed_dims[-1] = max(1, packed_dims[-1] // 4)
+                    res_type = f"tensor<{'x'.join(map(str, packed_dims))}xi8>"
+                    res_var = self._get_new_var(res_type)
+                    self.mlir_lines.append(
+                        f'    {res_var} = "tenzo.ternary_pack"({inp}) : ({inp_type}) -> {res_type}'
+                    )
+                    self.ssa_map[node] = res_var
+                    self.type_map[res_var] = res_type
+
                 elif target in (F.scaled_dot_product_attention, getattr(torch._C._nn, "scaled_dot_product_attention", None)):
                     q = self.ssa_map[node.args[0]]
                     k = self.ssa_map[node.args[1]]
@@ -543,29 +619,67 @@ class FXToMLIREmitter:
                     k_type = self.type_map[k]
                     v_type = self.type_map[v]
                     
-                    # 1. Update KV Cache
-                    updated_k = self._get_new_var(cache_k_type)
-                    updated_v = self._get_new_var(cache_v_type)
-                    
-                    self.mlir_lines.append(
-                        f'    {updated_k}, {updated_v} = "tenzo.kv_cache_update"({current_cache_k}, {current_cache_v}, {k}, {v}, {seq_pos_arg}) : '
-                        f'({cache_k_type}, {cache_v_type}, {k_type}, {v_type}, {seq_pos_type}) -> ({cache_k_type}, {cache_v_type})'
-                    )
-                    
-                    current_cache_k = updated_k
-                    current_cache_v = updated_v
+                    if self.use_packed_attention:
+                        # 1. Ensure Key and Value are packed ternary tensors (xi8)
+                        if "xi8" not in k_type:
+                            k_dims = [int(s) for s in k_type.replace("tensor<", "").replace("xf32>", "").split("x") if s]
+                            packed_k_dims = list(k_dims)
+                            packed_k_dims[-1] = max(1, packed_k_dims[-1] // 4)
+                            packed_k_type = f"tensor<{'x'.join(map(str, packed_k_dims))}xi8>"
+                            packed_k = self._get_new_var(packed_k_type)
+                            self.mlir_lines.append(
+                                f'    {packed_k} = "tenzo.ternary_pack"({k}) : ({k_type}) -> {packed_k_type}'
+                            )
+                        else:
+                            packed_k = k
+                            packed_k_type = k_type
 
-                    # 2. Extract valid cache slice to pass to attention
-                    # cache shape: [1, 1024, 128], q shape: [1, seq_len, 128]
-                    # We need to extract [1, seq_pos + current_seq_len, 128]
-                    # But for now, to keep the compiler lowering simple, we will just pass the updated cache and the seq_pos to a new Tenzo Attention op, OR we can extract slice.
-                    # Since we don't have tensor.extract_slice lowering fully wired for dynamic sizes easily in frontend without emitting lots of ops, let's just pass seq_pos to tenzo.attention!
-                    
-                    res_var = self._get_new_var(q_type)
-                    self.mlir_lines.append(
-                        f'    {res_var} = "tenzo.attention"({q}, {updated_k}, {updated_v}, {seq_pos_arg}) : ({q_type}, {cache_k_type}, {cache_v_type}, {seq_pos_type}) -> {q_type}'
-                    )
-                    self.ssa_map[node] = res_var
+                        if "xi8" not in v_type:
+                            v_dims = [int(s) for s in v_type.replace("tensor<", "").replace("xf32>", "").split("x") if s]
+                            packed_v_dims = list(v_dims)
+                            packed_v_dims[-1] = max(1, packed_v_dims[-1] // 4)
+                            packed_v_type = f"tensor<{'x'.join(map(str, packed_v_dims))}xi8>"
+                            packed_v = self._get_new_var(packed_v_type)
+                            self.mlir_lines.append(
+                                f'    {packed_v} = "tenzo.ternary_pack"({v}) : ({v_type}) -> {packed_v_type}'
+                            )
+                        else:
+                            packed_v = v
+                            packed_v_type = v_type
+
+                        # 2. Update KV Cache with packed tensors
+                        updated_k = self._get_new_var(cache_k_type)
+                        updated_v = self._get_new_var(cache_v_type)
+                        self.mlir_lines.append(
+                            f'    {updated_k}, {updated_v} = "tenzo.kv_cache_update"({current_cache_k}, {current_cache_v}, {packed_k}, {packed_v}, {seq_pos_arg}) : '
+                            f'({cache_k_type}, {cache_v_type}, {packed_k_type}, {packed_v_type}, {seq_pos_type}) -> ({cache_k_type}, {cache_v_type})'
+                        )
+                        current_cache_k = updated_k
+                        current_cache_v = updated_v
+
+                        # 3. Emit tenzo.packed_attention
+                        res_var = self._get_new_var(q_type)
+                        self.mlir_lines.append(
+                            f'    {res_var} = "tenzo.packed_attention"({q}, {updated_k}, {updated_v}, {seq_pos_arg}) : '
+                            f'({q_type}, {cache_k_type}, {cache_v_type}, {seq_pos_type}) -> {q_type}'
+                        )
+                        self.ssa_map[node] = res_var
+                    else:
+                        # Standard FP32 attention
+                        updated_k = self._get_new_var(cache_k_type)
+                        updated_v = self._get_new_var(cache_v_type)
+                        self.mlir_lines.append(
+                            f'    {updated_k}, {updated_v} = "tenzo.kv_cache_update"({current_cache_k}, {current_cache_v}, {k}, {v}, {seq_pos_arg}) : '
+                            f'({cache_k_type}, {cache_v_type}, {k_type}, {v_type}, {seq_pos_type}) -> ({cache_k_type}, {cache_v_type})'
+                        )
+                        current_cache_k = updated_k
+                        current_cache_v = updated_v
+
+                        res_var = self._get_new_var(q_type)
+                        self.mlir_lines.append(
+                            f'    {res_var} = "tenzo.attention"({q}, {updated_k}, {updated_v}, {seq_pos_arg}) : ({q_type}, {cache_k_type}, {cache_v_type}, {seq_pos_type}) -> {q_type}'
+                        )
+                        self.ssa_map[node] = res_var
 
 
             elif node.op == "output":
@@ -590,8 +704,8 @@ class FXToMLIREmitter:
         return mlir_content
 
 
-def export_torch_model_to_tenzo(model: "torch.nn.Module", sample_input: "torch.Tensor", output_dir: str = "."):
-    emitter = FXToMLIREmitter(model, output_dir=output_dir)
+def export_torch_model_to_tenzo(model: "torch.nn.Module", sample_input: "torch.Tensor", output_dir: str = ".", use_packed_attention: bool = True):
+    emitter = FXToMLIREmitter(model, output_dir=output_dir, use_packed_attention=use_packed_attention)
     return emitter.convert(sample_input=sample_input)
 
 
