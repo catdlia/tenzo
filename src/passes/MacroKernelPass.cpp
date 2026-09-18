@@ -310,7 +310,6 @@ struct GenerateMacroKernelPass
         OpBuilder builder(&getContext());
         builder.setInsertionPointToStart(module.getBody());
         auto macroFunc = generateMacroKernelFunction(builder, module.getLoc(), &getContext(), params);
-        module.push_back(macroFunc);
     }
 };
 

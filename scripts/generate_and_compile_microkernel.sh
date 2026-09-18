@@ -19,8 +19,15 @@ echo ""
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BUILD_DIR="${PROJECT_ROOT}/build_microkernel"
 SRC_TESTS="${PROJECT_ROOT}/src/tests"
+
+if [ ! -f /.dockerenv ]; then
+    echo "🐳 Running micro-kernel compilation inside Docker container..."
+    docker compose -f "$PROJECT_ROOT/docker-compose.yml" run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/scripts/generate_and_compile_microkernel.sh "$@"
+    exit $?
+fi
+
+BUILD_DIR="/tmp/build_microkernel"
 
 echo "📁 Project root: $PROJECT_ROOT"
 echo "📁 Build dir: $BUILD_DIR"
@@ -80,12 +87,13 @@ fi
 echo "🔄 Lowering Vector Dialect → LLVM..."
 mlir-opt generated_micro_kernel.mlir \
     --convert-vector-to-llvm \
-    --convert-memref-to-llvm \
     --convert-func-to-llvm \
     --convert-scf-to-cf \
     --convert-cf-to-llvm \
     --convert-arith-to-llvm \
     --convert-index-to-llvm \
+    --memref-expand \
+    --finalize-memref-to-llvm \
     --reconcile-unrealized-casts \
     -o micro_kernel_llvm.mlir
 
@@ -187,10 +195,10 @@ echo "║  NEXT STEPS                                            ║"
 echo "╚════════════════════════════════════════════════════════╝"
 echo ""
 echo "1. Rebuild micro_bench with MLIR kernel:"
-echo "   cd build && cmake .. -DUSE_MLIR_KERNEL=ON && make micro_bench"
+echo "   ninja -C cmake-build-debug micro_bench"
 echo ""
 echo "2. Run benchmark:"
-echo "   ./build/micro_bench"
+echo "   docker compose run --rm dev /app/cmake-build-debug/micro_bench"
 echo ""
 echo "3. Compare with intrinsics baseline (124 GFLOPS)"
 echo ""

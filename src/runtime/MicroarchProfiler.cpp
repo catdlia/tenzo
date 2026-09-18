@@ -169,7 +169,7 @@ void MicroarchProfiler::calibrateTiling(MicroarchProfile& prof, size_t hidden_si
 
 void MicroarchProfiler::printReport(const MicroarchProfile& prof) {
     std::cout << "\n╔════════════════════════════════════════════════════════╗\n";
-    std::cout << "║      Tenzo Hardware Microarchitectural Profile v1.0    ║\n";
+    std::cout << "║     Tenzo Hardware Microarchitectural Profile v1.1.0   ║\n";
     std::cout << "╠════════════════════════════════════════════════════════╣\n";
     std::cout << "║ CPU Architecture:       " << prof.cpu_arch << " (" << prof.cpu_vendor << ")\n";
     std::cout << "║ Hardware Threads:       " << prof.num_threads << " threads (Optimal: " << prof.optimal_threads << ")\n";

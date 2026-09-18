@@ -216,6 +216,21 @@ def generate_text(prompt, max_tokens=50, temp=0.7, repetition_penalty=1.15, kv_m
     weights_path = os.path.join(model_dir, "weights.bin")
     vocab_path = os.path.join(model_dir, "tokenizer.vocab")
 
+    if not os.path.exists(vocab_path):
+        print(f"❌ Vocabulary file not found: {vocab_path}")
+        print("Please export the BitNet model first: python3 tenzo-frontend/export_bitnet.py")
+        sys.exit(1)
+
+    if not os.path.exists(weights_path):
+        print(f"❌ Weights file not found: {weights_path}")
+        print("Please export the BitNet model first: python3 tenzo-frontend/export_bitnet.py")
+        sys.exit(1)
+
+    if not os.path.exists(mlir_path):
+        print(f"❌ MLIR model not found: {mlir_path}")
+        print("Please export the BitNet model first: python3 tenzo-frontend/export_bitnet.py")
+        sys.exit(1)
+
     tokenizer = Tokenizer(vocab_path)
     prompt_tokens = tokenizer.encode(prompt)
     if not prompt_tokens:

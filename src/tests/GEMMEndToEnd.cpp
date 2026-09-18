@@ -484,8 +484,10 @@ inline int roundUp(int value, int multiple) {
 void gemmWithPacking(const float *A, const float *B, float *C, int M, int N,
                      int K, int lda, int ldb, int ldc) {
 
-  float *blockA = aligned_alloc_floats(MC * KC);
-  float *blockB = aligned_alloc_floats(KC * NC);
+  int mcAlloc = roundUp(MC, MR);
+  int ncAlloc = roundUp(NC, NR);
+  float *blockA = aligned_alloc_floats(mcAlloc * KC);
+  float *blockB = aligned_alloc_floats(KC * ncAlloc);
 
   for (int jc = 0; jc < N; jc += NC) {
     int ncActual = std::min(NC, N - jc);
@@ -556,8 +558,10 @@ void gemmWithPacking(const float *A, const float *B, float *C, int M, int N,
 void gemmAdaptive(const float *A, const float *B, float *C, int M, int N, int K,
                   int lda, int ldb, int ldc, int aKC, int aMC, int aNC) {
 
-  float *blockA = aligned_alloc_floats(aMC * aKC);
-  float *blockB = aligned_alloc_floats(aKC * aNC);
+  int mcAlloc = roundUp(aMC, MR);
+  int ncAlloc = roundUp(aNC, NR);
+  float *blockA = aligned_alloc_floats(mcAlloc * aKC);
+  float *blockB = aligned_alloc_floats(aKC * ncAlloc);
 
   for (int jc = 0; jc < N; jc += aNC) {
     int ncActual = std::min(aNC, N - jc);
@@ -654,8 +658,10 @@ void gemmPerCoreIndependent(const float *A, const float *B, float *C, int M,
     int localM = mEnd - mStart;
 
     // Each core has its OWN packing buffers — no false sharing
-    float *myBlockA = aligned_alloc_floats(aMC * aKC);
-    float *myBlockB = aligned_alloc_floats(aKC * aNC);
+    int mcAlloc = roundUp(aMC, MR);
+    int ncAlloc = roundUp(aNC, NR);
+    float *myBlockA = aligned_alloc_floats(mcAlloc * aKC);
+    float *myBlockB = aligned_alloc_floats(aKC * ncAlloc);
 
     // Run a COMPLETE, INDEPENDENT 5-loop GEMM on my rows
     for (int jc = 0; jc < N; jc += aNC) {
@@ -801,8 +807,10 @@ void gemmPerCoreIndependentPerType(
         return;
       int localM = mEnd - mStart;
 
-      float *myBlockA = aligned_alloc_floats(myMC * myKC);
-      float *myBlockB = aligned_alloc_floats(myKC * myNC);
+      int mcAlloc = roundUp(myMC, MR);
+      int ncAlloc = roundUp(myNC, NR);
+      float *myBlockA = aligned_alloc_floats(mcAlloc * myKC);
+      float *myBlockB = aligned_alloc_floats(myKC * ncAlloc);
 
       for (int jc = 0; jc < N; jc += myNC) {
         int ncActual = std::min(myNC, N - jc);
@@ -926,8 +934,10 @@ void gemmWithPacking_Parallel(const float *A, const float *B, float *C, int M,
 
     int localM = mEnd - mStart;
 
-    float *blockA = aligned_alloc_floats(MC * KC);
-    float *blockB = aligned_alloc_floats(KC * NC);
+    int mcAlloc = roundUp(MC, MR);
+    int ncAlloc = roundUp(NC, NR);
+    float *blockA = aligned_alloc_floats(mcAlloc * KC);
+    float *blockB = aligned_alloc_floats(KC * ncAlloc);
 
     for (int jc = 0; jc < N; jc += NC) {
       int ncActual = std::min(NC, N - jc);
@@ -1020,8 +1030,10 @@ void gemmWithPacking_Parallel(const float *A, const float *B, float *C, int M,
 void gemmWithPacking_BiasReLU(const float *A, const float *B, float *C, int M,
                               int N, int K, int lda, int ldb, int ldc,
                               const float *bias, bool use_relu) {
-  float *blockA = aligned_alloc_floats(MC * KC);
-  float *blockB = aligned_alloc_floats(KC * NC);
+  int mcAlloc = roundUp(MC, MR);
+  int ncAlloc = roundUp(NC, NR);
+  float *blockA = aligned_alloc_floats(mcAlloc * KC);
+  float *blockB = aligned_alloc_floats(KC * ncAlloc);
 
   for (int jc = 0; jc < N; jc += NC) {
     int ncActual = std::min(NC, N - jc);

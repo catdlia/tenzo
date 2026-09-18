@@ -61,8 +61,9 @@ void runFullGEMMBenchmark(mlir::MLIRContext &context) {
 
     // Step 2: Generate macro-kernel
     llvm::outs() << "[2/3] Generating macro-kernel with 5-loop nest...\n";
+    auto params = hwInfo->getOptimalMicroKernelParams();
     PassManager macroKernelPM(&context);
-    macroKernelPM.addPass(createGenerateMacroKernelPass());
+    macroKernelPM.addPass(createGenerateMacroKernelPass(params));
 
     if (failed(macroKernelPM.run(module))) {
         llvm::errs() << "❌ Failed to generate macro-kernel\n";

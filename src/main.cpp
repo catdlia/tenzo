@@ -36,6 +36,13 @@ void printUsage() {
     llvm::outs() << "  validate  Run single-pass E2E math validation\n";
     llvm::outs() << "  gpu       Run GPU pipeline test\n";
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
+    llvm::outs() << "  packing   Run packing kernels bandwidth benchmark\n";
+    llvm::outs() << "  gemm      Run GotoBLAS 5-loop GEMM benchmark\n";
+    llvm::outs() << "  gemm-e2e  Run GEMM end-to-end native AVX2 benchmark\n";
+    llvm::outs() << "  conv2d    Run Conv2D benchmark\n";
+    llvm::outs() << "  dynamic   Run dynamic inference test\n";
+    llvm::outs() << "  ternary   Run ternary pack (1.58-bit) test\n";
+    llvm::outs() << "  generate-microkernel Generate MLIR micro-kernel\n";
     llvm::outs() << "  test      Run quick validation tests\n";
     llvm::outs() << "  attention Run bitwise attention (tenzo.packed_attention) tests\n";
     llvm::outs() << "  all       Run all tests\n";

@@ -38,7 +38,7 @@ jobs:
 
     - name: Run Unit Tests
       run: |
-        ./build/tenzo-cli test 2>&1 || true
+        ./build/tenzo-cli test
 
     - name: Run CPU Benchmark
       run: |

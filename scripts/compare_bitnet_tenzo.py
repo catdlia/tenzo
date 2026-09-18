@@ -18,6 +18,32 @@ def run_bitnet_cpp(prompt, n_tokens=50, temp=0.7, threads=4):
     print("🚀 [1/2] Running Microsoft BitNet.cpp (Reference C++ Engine)...")
     print("=" * 60)
 
+    if not os.path.exists(BITNET_BIN):
+        print(f"⚠️  BitNet binary not found at {BITNET_BIN}.")
+        return {
+            "engine": "Microsoft BitNet.cpp",
+            "prompt_tokens": 0,
+            "gen_tokens": 0,
+            "ttft_ms": 0.0,
+            "prefill_speed": 0.0,
+            "decode_ms": 0.0,
+            "decode_speed": 0.0,
+            "total_wall_time": 0.0
+        }
+
+    if not os.path.exists(BITNET_MODEL):
+        print(f"⚠️  BitNet model not found at {BITNET_MODEL}.")
+        return {
+            "engine": "Microsoft BitNet.cpp",
+            "prompt_tokens": 0,
+            "gen_tokens": 0,
+            "ttft_ms": 0.0,
+            "prefill_speed": 0.0,
+            "decode_ms": 0.0,
+            "decode_speed": 0.0,
+            "total_wall_time": 0.0
+        }
+
     cmd = [
         BITNET_BIN,
         "-m", BITNET_MODEL,
@@ -65,6 +91,23 @@ def run_tenzo(prompt, n_tokens=50, temp=0.7, repetition_penalty=1.15, kv_quant="
     print("\n" + "=" * 60)
     print("⚡ [2/2] Running Tenzo Native AVX2 Engine...")
     print("=" * 60)
+
+    tenzo_vocab = os.path.join(PROJECT_ROOT, "tenzo-frontend", "export_output", "tokenizer.vocab")
+    tenzo_weights = os.path.join(PROJECT_ROOT, "tenzo-frontend", "export_output", "weights.bin")
+    if not os.path.exists(tenzo_vocab) or not os.path.exists(tenzo_weights):
+        print(f"⚠️  Tenzo BitNet model not found at {os.path.dirname(tenzo_vocab)}.")
+        print("   To export the BitNet model, run:")
+        print("   python3 tenzo-frontend/export_bitnet.py")
+        return {
+            "engine": "Tenzo Native Engine",
+            "prompt_tokens": 0,
+            "gen_tokens": 0,
+            "ttft_ms": 0.0,
+            "prefill_speed": 0.0,
+            "decode_ms": 0.0,
+            "decode_speed": 0.0,
+            "total_wall_time": 0.0
+        }
 
     docker_cmd = [
         "docker", "compose", "run", "--rm",

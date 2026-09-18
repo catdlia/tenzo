@@ -67,9 +67,9 @@ struct HeterogeneousWorkSplit {
 };
 
 struct MicroKernelParams {
-    int MR, NR;
-    int unrollK;
-    int KC, MC, NC;
+    int MR = 6, NR = 16;
+    int unrollK = 4;
+    int KC = 256, MC = 64, NC = 256;
     int VEC_SIZE = 8;
 };
 

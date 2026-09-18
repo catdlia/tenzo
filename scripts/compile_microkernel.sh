@@ -17,6 +17,13 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+if [ ! -f /.dockerenv ]; then
+    echo "🐳 Running micro-kernel compilation inside Docker container..."
+    docker compose -f "$PROJECT_DIR/docker-compose.yml" run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/scripts/compile_microkernel.sh "$@"
+    exit $?
+fi
+
 SRC_DIR="$PROJECT_DIR/src/tests"
 BUILD_DIR="/tmp/build_microkernel"
 
@@ -55,12 +62,13 @@ echo "🔄 Step 1: MLIR → LLVM IR..."
 
 mlir-opt "$SRC_DIR/micro_kernel.mlir" \
     --convert-vector-to-llvm \
-    --convert-memref-to-llvm \
     --convert-func-to-llvm \
     --convert-scf-to-cf \
     --convert-cf-to-llvm \
     --convert-arith-to-llvm \
     --convert-index-to-llvm \
+    --memref-expand \
+    --finalize-memref-to-llvm \
     --reconcile-unrealized-casts \
     -o micro_kernel_llvm.mlir
 

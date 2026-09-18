@@ -351,8 +351,19 @@ int main(int argc, char** argv) {
     run_system_diagnostics();
     bool simd_ok = run_simd_math_diagnostics();
     bool backend_ok = run_backend_diagnostics();
-    bool weights_ok = run_weight_diagnostics(model_dir);
-    bool engine_ok = run_engine_inference_test(model_dir);
+    bool weights_present = std::ifstream(model_dir + "/weights.bin").good();
+    bool weights_ok = true;
+    bool engine_ok = true;
+
+    if (weights_present) {
+        weights_ok = run_weight_diagnostics(model_dir);
+        engine_ok = run_engine_inference_test(model_dir);
+    } else {
+        print_header("4. Model Weights & Vocabulary Verification");
+        report_status("Model files present", true, "Skipped (no model at " + model_dir + " - specify MODEL=<path>)");
+        print_header("5. Native Inference & Sampling Validation");
+        report_status("Engine inference test", true, "Skipped (requires weights.bin)");
+    }
 
     print_header("Diagnostic Summary");
     if (simd_ok && backend_ok && weights_ok && engine_ok) {

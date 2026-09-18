@@ -103,13 +103,20 @@ func::FuncOp generatePackBFunction(OpBuilder &builder, Location loc, MLIRContext
                     Value dstOffset = b.create<arith::AddIOp>(loc, dstBase, kTimesNR);
 
                     // Use transfer_read with padding and optional routing map for Implicit Shuffle
-                    auto map = routingMap ? routingMap : b.getMultiDimIdentityMap(2);
-                    Value srcVec0 = b.create<vector::TransferReadOp>(
-                        loc, vecType, src, ValueRange{k, jStart}, zeroF32, map);
-
+                    Value srcVec0;
+                    Value srcVec1;
                     Value jStartPlus8 = b.create<arith::AddIOp>(loc, jStart, cVecSize);
-                    Value srcVec1 = b.create<vector::TransferReadOp>(
-                        loc, vecType, src, ValueRange{k, jStartPlus8}, zeroF32, map);
+                    if (routingMap) {
+                        srcVec0 = b.create<vector::TransferReadOp>(
+                            loc, vecType, src, ValueRange{k, jStart}, zeroF32, routingMap);
+                        srcVec1 = b.create<vector::TransferReadOp>(
+                            loc, vecType, src, ValueRange{k, jStartPlus8}, zeroF32, routingMap);
+                    } else {
+                        srcVec0 = b.create<vector::TransferReadOp>(
+                            loc, vecType, src, ValueRange{k, jStart}, zeroF32);
+                        srcVec1 = b.create<vector::TransferReadOp>(
+                            loc, vecType, src, ValueRange{k, jStartPlus8}, zeroF32);
+                    }
 
                     // Store to packed buffer
                     b.create<vector::TransferWriteOp>(loc, srcVec0, dst, ValueRange{dstOffset});
@@ -236,14 +243,14 @@ struct GeneratePackingKernelsPass
 
         // Generate pack_matrix_B function
         llvm::outs() << "[PackingKernels] Generating pack_matrix_B...\n";
+        builder.setInsertionPointToEnd(module.getBody());
         auto packBFunc = generatePackBFunction(builder, module.getLoc(), ctx);
-        module.push_back(packBFunc);
         llvm::outs() << "[PackingKernels] ✅ pack_matrix_B created\n";
 
         // Generate pack_matrix_A function
         llvm::outs() << "[PackingKernels] Generating pack_matrix_A...\n";
+        builder.setInsertionPointToEnd(module.getBody());
         auto packAFunc = generatePackAFunction(builder, module.getLoc(), ctx);
-        module.push_back(packAFunc);
         llvm::outs() << "[PackingKernels] ✅ pack_matrix_A created\n";
 
         llvm::outs() << "[PackingKernels] ==========================================\n";

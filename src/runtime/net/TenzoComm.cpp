@@ -17,6 +17,7 @@ typedef int socklen_t;
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #endif
 
 namespace tenzo {
@@ -218,9 +219,28 @@ bool TenzoServer::start() {
     running = true;
     listenThread = std::make_unique<std::thread>([this]() {
         while (running) {
+            int currentFd = serverFd;
+            if (currentFd < 0) break;
+
+#ifdef _WIN32
+            WSAPOLLFD pfd;
+            pfd.fd = currentFd;
+            pfd.events = POLLRDNORM;
+            pfd.revents = 0;
+            int pr = WSAPoll(&pfd, 1, 100);
+#else
+            struct pollfd pfd;
+            pfd.fd = currentFd;
+            pfd.events = POLLIN;
+            pfd.revents = 0;
+            int pr = poll(&pfd, 1, 100);
+#endif
+            if (!running) break;
+            if (pr <= 0) continue;
+
             struct sockaddr_in clientAddr;
             socklen_t addrLen = sizeof(clientAddr);
-            int clientFd = accept(serverFd, (struct sockaddr*)&clientAddr, &addrLen);
+            int clientFd = accept(currentFd, (struct sockaddr*)&clientAddr, &addrLen);
             if (clientFd < 0) {
                 if (!running) break;
                 continue;
@@ -236,12 +256,15 @@ bool TenzoServer::start() {
 void TenzoServer::stop() {
     running = false;
     if (serverFd >= 0) {
-#ifdef _WIN32
-        closesocket(serverFd);
-#else
-        close(serverFd);
-#endif
+        int fd = serverFd;
         serverFd = -1;
+#ifdef _WIN32
+        shutdown(fd, SD_BOTH);
+        closesocket(fd);
+#else
+        shutdown(fd, SHUT_RDWR);
+        close(fd);
+#endif
     }
     if (listenThread && listenThread->joinable()) {
         listenThread->join();

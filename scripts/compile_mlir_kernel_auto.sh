@@ -5,6 +5,15 @@ echo "====== MLIR MICRO-KERNEL COMPILATION ======"
 echo "Starting at: $(date)"
 echo ""
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+if [ ! -f /.dockerenv ]; then
+    echo "🐳 Running MLIR micro-kernel compilation inside Docker container..."
+    docker compose -f "$PROJECT_ROOT/docker-compose.yml" run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/scripts/compile_mlir_kernel_auto.sh "$@"
+    exit $?
+fi
+
 # Create build directory
 mkdir -p /tmp/mlir_build
 cd /tmp/mlir_build
@@ -79,9 +88,9 @@ else
 fi
 
 echo ""
-echo "Step 5: Copy to project"
-cp micro_kernel.o /app/micro_kernel_mlir.o
-echo "✅ Copied to /app/micro_kernel_mlir.o"
+echo "Step 5: Copy to temporary build directory"
+cp micro_kernel.o /tmp/micro_kernel_mlir.o
+echo "✅ Copied to /tmp/micro_kernel_mlir.o"
 
 echo ""
 echo "Step 6: Show first 50 lines of assembly"

@@ -84,8 +84,6 @@ void generateMicroKernelMLIR(mlir::MLIRContext &context) {
 
     builder.create<func::ReturnOp>(loc);
 
-    module.push_back(func);
-
     llvm::outs() << "📝 Generated MLIR function:\n\n";
     module.print(llvm::outs());
     llvm::outs() << "\n\n";
@@ -93,6 +91,7 @@ void generateMicroKernelMLIR(mlir::MLIRContext &context) {
     // Now apply optimization passes
     llvm::outs() << "🔄 Applying optimization passes...\n\n";
 
+    context.disableMultithreading();
     PassManager pm(&context);
     pm.enableIRPrinting();
 

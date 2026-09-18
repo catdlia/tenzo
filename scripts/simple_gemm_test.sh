@@ -8,9 +8,9 @@ echo "Building and running tenzo-cli gemm..."
 docker compose -f "$PROJECT_ROOT/docker-compose.yml" run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash -c "\
     ninja -C /app/cmake-build-debug tenzo-cli && \
     echo '==BUILD DONE==' && \
-    /app/cmake-build-debug/tenzo-cli gemm" 2>&1 | tee "$PROJECT_ROOT/gemm_test_output.log"
+    /app/cmake-build-debug/tenzo-cli gemm" 2>&1 | tee /tmp/gemm_test_output.log
 
 echo ""
-echo "Output saved to gemm_test_output.log"
-tail -50 "$PROJECT_ROOT/gemm_test_output.log"
+echo "Output saved to /tmp/gemm_test_output.log"
+tail -50 /tmp/gemm_test_output.log
 

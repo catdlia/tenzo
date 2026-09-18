@@ -244,11 +244,21 @@ int main(int argc, char** argv) {
             opt.chat_mode = true;
         } else if (arg == "-b" || arg == "--benchmark") {
             opt.benchmark = true;
+        } else if (arg == "--profile") {
+            opt.profile = true;
         }
     }
 
     if (opt.show_banner) {
         print_banner();
+    }
+
+    if (opt.profile) {
+        auto& prof = tenzo::MicroarchProfiler::getProfile();
+        tenzo::MicroarchProfiler::printReport(prof);
+        if (argc == 2) {
+            return 0;
+        }
     }
 
     // Load Tokenizer
@@ -283,11 +293,6 @@ int main(int argc, char** argv) {
         return 1;
     }
     std::cout << ANSI_GREEN << " [OK] " << ANSI_RESET << "(" << tokenizer.id_to_token.size() << " tokens)\n";
-
-    if (opt.profile) {
-        auto& prof = tenzo::MicroarchProfiler::getProfile();
-        tenzo::MicroarchProfiler::printReport(prof);
-    }
 
     // Initialize Tenzo Engine
     tenzo_config_t config = tenzo_default_config();

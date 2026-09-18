@@ -92,15 +92,13 @@ run_all_tests() {
     local failed=0
 
     echo -e "${BLUE}Running all tests...${NC}"
+    if run_cpu_test; then passed=$((passed + 1)); else failed=$((failed + 1)); fi
     echo ""
 
-    if run_cpu_test; then ((passed++)); else ((failed++)); fi
+    if run_conv2d_test; then passed=$((passed + 1)); else failed=$((failed + 1)); fi
     echo ""
 
-    if run_conv2d_test; then ((passed++)); else ((failed++)); fi
-    echo ""
-
-    if run_gpu_test; then ((passed++)); else ((failed++)); fi
+    if run_gpu_test; then passed=$((passed + 1)); else failed=$((failed + 1)); fi
     echo ""
 
     echo -e "${BLUE}═══════════════════════════════════════${NC}"
@@ -117,7 +115,8 @@ generate_report() {
     echo -e "${BLUE}📊 Generating Performance Report...${NC}"
     echo ""
 
-    REPORT_FILE="${PROJECT_DIR}/benchmark_report.md"
+    mkdir -p "${PROJECT_DIR}/benchmark_results"
+    REPORT_FILE="${PROJECT_DIR}/benchmark_results/benchmark_report.md"
 
     cat > "$REPORT_FILE" << EOF
 # Tenzo Compiler Benchmark Report

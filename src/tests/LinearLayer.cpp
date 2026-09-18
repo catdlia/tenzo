@@ -138,8 +138,10 @@ void microKernel6x16_BiasReLU(const float* A_packed, const float* B_packed,
 void gemmBiasReLU(const float* A, const float* B, float* C,
                   int M, int N, int K, int lda, int ldb, int ldc,
                   const float* bias, bool use_relu) {
-    float* blockA = aligned_alloc_floats(MC * KC);
-    float* blockB = aligned_alloc_floats(KC * NC);
+    int mcAlloc = roundUp(MC, MR);
+    int ncAlloc = roundUp(NC, NR);
+    float* blockA = aligned_alloc_floats(mcAlloc * KC);
+    float* blockB = aligned_alloc_floats(KC * ncAlloc);
 
     for (int jc = 0; jc < N; jc += NC) {
         int ncActual = std::min(NC, N - jc);
