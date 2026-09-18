@@ -192,6 +192,33 @@ TENZO_API int tenzo_generate_step(
     int past_tokens_len
 );
 
+/**
+ * @brief Configures heterogeneous layer partitioning across devices (CPU, Vulkan, CUDA, ROCm, Remote).
+ * @param engine Target engine handle.
+ * @param partition_spec Partition string e.g. "gpu:0:0-14,cpu:15-29" or "vulkan:0-14,remote:192.168.1.50:9200:15-29"
+ */
+TENZO_API tenzo_status_t tenzo_set_hetero_pipeline(
+    tenzo_engine_t engine,
+    const char* partition_spec
+);
+
+/**
+ * @brief Automatically partitions layers across discovered devices and optional remote node.
+ */
+TENZO_API tenzo_status_t tenzo_auto_partition(
+    tenzo_engine_t engine,
+    const char* remote_node
+);
+
+/**
+ * @brief Starts a background Tenzo network worker daemon on the specified TCP port.
+ */
+TENZO_API tenzo_status_t tenzo_start_network_worker(
+    int port,
+    const char* weights_path,
+    const char* mlir_path
+);
+
 #ifdef __cplusplus
 }
 #endif

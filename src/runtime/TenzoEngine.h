@@ -17,6 +17,9 @@
 #include <queue>
 #include <unordered_set>
 
+#include "HeteroPipeline.h"
+#include "ThreadPool.h"
+
 namespace tenzo {
 
 // 256-bit SIMD vector wrapper with 32-byte alignment
@@ -256,6 +259,12 @@ public:
     void forward_layer_riscv(int layer_idx);
     void compute_logits();
     int sample_top_k_top_p(const tenzo_sampling_params_t* params, const int* past_tokens, int past_tokens_len);
+
+    HeteroPipeline hetero_pipeline;
+
+    void forward_layer_dispatch(int layer_idx, HeteroDeviceType dev_type);
+    void forward_layers_range(int start_layer, int end_layer, HeteroDeviceType dev_type);
+    void forward_layers_hetero();
 
     void prefill_token(int token_id);
     int generate_step(int cur_token, const tenzo_sampling_params_t* params, const int* past_tokens, int past_tokens_len);

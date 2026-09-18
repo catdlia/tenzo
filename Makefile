@@ -81,6 +81,16 @@ gpu-bench: build
 	@echo "🚀 Running GPU benchmark..."
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli gpu-bench
 
+# Run Heterogeneous Pipeline & Distributed Network Tests
+hetero: build
+	@echo "🌐 Running Heterogeneous Pipeline & Distributed Cluster Tests..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli hetero
+
+# Run Heterogeneous Pipeline Partition Benchmark
+hetero-bench: build
+	@echo "📊 Running Heterogeneous Pipeline Partition Benchmark..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli hetero-bench
+
 # Run text generation (MLIR JIT)
 # Usage: make generate PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7]
 generate:

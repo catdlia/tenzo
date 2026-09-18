@@ -16,6 +16,7 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
+#include "mlir/Conversion/BufferizationToMemRef/BufferizationToMemRef.h"
 
 // Async Dialect for Multithreading
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
@@ -403,6 +404,9 @@ void addTenzoToLLVMPasses(mlir::OpPassManager &pm, bool enableVectorization,
   // -------------------------------------------------------
   // LOWERING TO LLVM (Standard Pipeline)
   // -------------------------------------------------------
+
+  // Bufferization -> MemRef (handles any remaining bufferization.to_tensor/to_memref ops)
+  pm.addPass(mlir::createConvertBufferizationToMemRefPass());
 
   // Lower Affine -> SCF (bufferization leaves affine.apply ops)
   pm.addPass(mlir::createLowerAffinePass());

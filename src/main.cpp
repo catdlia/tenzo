@@ -4,9 +4,14 @@
 #include "tests/DynamicInferenceTest.h"
 #include "tests/ZeroCopyBridgeTest.h"
 #include "tests/EndToEndMathTest.h"
+#include "tests/HeteroTests.h"
+#include "tests/TernaryPackTest.h"
+#include "runtime/TenzoEngine.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 #include <cstdlib>
+#include <thread>
+#include <chrono>
 
 void printUsage() {
     llvm::outs() << "Usage: tenzo-cli [command] [options]\n\n";
@@ -18,6 +23,9 @@ void printUsage() {
     llvm::outs() << "              -t, --temp <float>       Temperature (default: 0.7, 0.0 = Greedy/ArgMax)\n";
     llvm::outs() << "                  --top-p <float>      Nucleus sampling top-p (default: 0.9)\n";
     llvm::outs() << "              -m, --model-dir <path>   Directory with model.mlir, weights.bin, etc.\n";
+    llvm::outs() << "  hetero    Run heterogeneous pipeline & distributed network tests\n";
+    llvm::outs() << "  hetero-bench Run heterogeneous pipeline partition benchmark\n";
+    llvm::outs() << "  worker    Run distributed cluster worker node (e.g. worker [port])\n";
     llvm::outs() << "  cpu       Run CPU MatMul benchmark (512x512, default)\n";
     llvm::outs() << "  explicit  Run Explicit Micro-Kernel benchmark (GotoBLAS-style)\n";
     llvm::outs() << "  large     Run large MatMul benchmark (1024x1024)\n";
@@ -107,7 +115,26 @@ int main(int argc, char* argv[]) {
         tenzo::runDynamicInferenceTest(context);
     } else if (strcmp(mode, "bridge") == 0) {
         tenzo::runZeroCopyBridgeTest(context);
-    } else if (strcmp(mode, "tl1") == 0) { tenzo::runTestTL1(context); } else if (strcmp(mode, "validate") == 0) {
+    } else if (strcmp(mode, "tl1") == 0) {
+        tenzo::runTestTL1(context);
+    } else if (strcmp(mode, "hetero") == 0 || strcmp(mode, "hetero-test") == 0) {
+        tenzo::runHeteroPipelineTests();
+        tenzo::runDistributedNetworkTests();
+    } else if (strcmp(mode, "hetero-bench") == 0) {
+        tenzo::runHeteroBenchmark();
+    } else if (strcmp(mode, "worker") == 0) {
+        int port = 9000;
+        if (argc > 2) port = std::atoi(argv[2]);
+        const char* weights = (argc > 3) ? argv[3] : nullptr;
+        const char* mlir = (argc > 4) ? argv[4] : nullptr;
+        llvm::outs() << "=== Starting Tenzo Distributed Cluster Worker on port " << port << " ===\n";
+        tenzo_start_network_worker(port, weights, mlir);
+        while (true) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    } else if (strcmp(mode, "ternary") == 0 || strcmp(mode, "ternary-pack") == 0) {
+        tenzo::runTernaryPackTest(context);
+    } else if (strcmp(mode, "validate") == 0) {
         tenzo::runEndToEndMathTest(context);
     } else if (strcmp(mode, "generate") == 0) {
         tenzo::GenerationConfig config;
@@ -142,14 +169,17 @@ int main(int argc, char* argv[]) {
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";
         bool allPassed = true;
 
-        llvm::outs() << "[1/3] CPU MatMul... ";
+        llvm::outs() << "[1/4] CPU MatMul... ";
         tenzo::runFullPipelineTest(context);
 
-        llvm::outs() << "\n[2/3] Conv2D... ";
+        llvm::outs() << "\n[2/4] Conv2D... ";
         tenzo::runConv2DTest(context);
 
-        llvm::outs() << "\n[3/3] GPU Pipeline... ";
+        llvm::outs() << "\n[3/4] GPU Pipeline... ";
         tenzo::gpu::runGPUPipelineTest(context);
+
+        llvm::outs() << "\n[4/4] Ternary Pack (1.58-bit AVX2 Micro-Kernel)... ";
+        tenzo::runTernaryPackTest(context);
 
         llvm::outs() << "\n--- All Tests Complete ---\n";
         return allPassed ? 0 : 1;
@@ -161,6 +191,8 @@ int main(int argc, char* argv[]) {
         tenzo::runConv2DTest(context);
         llvm::outs() << "\n=== GPU Tests ===\n";
         tenzo::gpu::runGPUPipelineTest(context);
+        llvm::outs() << "\n=== Ternary Pack Tests ===\n";
+        tenzo::runTernaryPackTest(context);
     } else if (strcmp(mode, "help") == 0 || strcmp(mode, "-h") == 0 || strcmp(mode, "--help") == 0) {
         printUsage();
         return 0;

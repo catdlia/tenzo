@@ -1943,6 +1943,8 @@ struct MulLoweringToLinalg : public OpConversionPattern<tenzo::MulOp> {
             });
         return success();
     }
+};
+
 struct BitLinearINT4LoweringToLinalg : public OpConversionPattern<tenzo::BitLinearINT4Op> {
     using OpConversionPattern<tenzo::BitLinearINT4Op>::OpConversionPattern;
 

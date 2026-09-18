@@ -90,6 +90,7 @@ if(LLVM_FOUND AND MLIR_FOUND AND NOT TENZO_STANDALONE_RUNTIME)
     include_directories(SYSTEM ${MLIR_INCLUDE_DIRS})
     include_directories(${CMAKE_CURRENT_BINARY_DIR})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
     link_directories(${LLVM_BUILD_LIBRARY_DIR})
     add_definitions(${LLVM_DEFINITIONS})
@@ -159,7 +160,13 @@ if(TENZO_HAS_MLIR_COMPILER)
             src/tests/LinearLayer.cpp
             # GPU/SPIR-V
             src/passes/gpu/GPULowering.cpp
+            src/runtime/TenzoEngine.cpp
+            src/runtime/HeteroPipeline.cpp
+            src/runtime/net/TenzoComm.cpp
             src/runtime/VulkanRuntime.cpp
+            src/runtime/CUDARuntime.cpp
+            src/runtime/ROCmRuntime.cpp
+            src/runtime/MicroarchProfiler.cpp
             src/runtime/ThreadPool.cpp
             src/runtime/ExecutionContext.cpp
             src/runtime/KVCacheManager.cpp
@@ -171,6 +178,8 @@ if(TENZO_HAS_MLIR_COMPILER)
             src/tests/ZeroCopyBridgeTest.cpp
             src/tests/EndToEndMathTest.cpp src/tests/TestTL1.cpp
             src/tests/GenerationTest.cpp
+            src/tests/HeteroTests.cpp
+            src/tests/TernaryPackTest.cpp
     )
 
     add_dependencies(tenzo-cli TenzoOpsIncGen)
@@ -253,6 +262,8 @@ if(TENZO_HAS_MLIR_COMPILER)
         target_link_libraries(tenzo-cli PRIVATE OpenMP::OpenMP_CXX)
     endif()
 
+    target_compile_options(tenzo-cli PRIVATE ${TENZO_RUNTIME_FLAGS})
+
     add_executable(micro_bench
         src/tests/IsolatedMicroKernel.cpp
     )
@@ -272,10 +283,17 @@ endif()
 # Static runtime library
 add_library(tenzo_runtime_static STATIC
     src/runtime/TenzoEngine.cpp
+    src/runtime/HeteroPipeline.cpp
+    src/runtime/net/TenzoComm.cpp
     src/runtime/VulkanRuntime.cpp
     src/runtime/CUDARuntime.cpp
     src/runtime/ROCmRuntime.cpp
     src/runtime/MicroarchProfiler.cpp
+    src/runtime/ThreadPool.cpp
+    src/runtime/ExecutionContext.cpp
+    src/runtime/KVCacheManager.cpp
+    src/runtime/Sampler.cpp
+    src/runtime/Tokenizer.cpp
 )
 target_include_directories(tenzo_runtime_static PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -301,10 +319,17 @@ set_target_properties(tenzo_runtime_static PROPERTIES OUTPUT_NAME "tenzo_runtime
 # Shared runtime library
 add_library(tenzo_runtime_shared SHARED
     src/runtime/TenzoEngine.cpp
+    src/runtime/HeteroPipeline.cpp
+    src/runtime/net/TenzoComm.cpp
     src/runtime/VulkanRuntime.cpp
     src/runtime/CUDARuntime.cpp
     src/runtime/ROCmRuntime.cpp
     src/runtime/MicroarchProfiler.cpp
+    src/runtime/ThreadPool.cpp
+    src/runtime/ExecutionContext.cpp
+    src/runtime/KVCacheManager.cpp
+    src/runtime/Sampler.cpp
+    src/runtime/Tokenizer.cpp
 )
 target_include_directories(tenzo_runtime_shared PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

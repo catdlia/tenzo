@@ -36,6 +36,18 @@ public:
         std::array<uint32_t, 3> numWorkgroups
     );
 
+    /// Simplified SPIR-V execute
+    static bool execute(
+        const std::vector<uint32_t>& spirvBinary,
+        const std::vector<std::pair<void*, size_t>>& inputBuffers,
+        std::pair<void*, size_t> outputBuffer,
+        std::array<uint32_t, 3> workgroupSize,
+        std::array<uint32_t, 3> numWorkgroups
+    ) {
+        (void)workgroupSize;
+        return executeShader(spirvBinary, inputBuffers, outputBuffer, nullptr, 0, numWorkgroups);
+    }
+
     /// GPU-Accelerated BitLinear 1.58-bit (TL1) MatVec: y = scale * (W_packed * x)
     static bool executeBitLinearTL1(
         const float* x,

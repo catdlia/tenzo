@@ -1806,11 +1806,59 @@ int TenzoEngineImpl::sample_top_k_top_p(
     return candidates[0].second;
 }
 
+void TenzoEngineImpl::forward_layer_dispatch(int layer_idx, HeteroDeviceType dev_type) {
+    switch (dev_type) {
+        case HeteroDeviceType::GPU_VULKAN:
+            forward_layer_gpu(layer_idx);
+            break;
+        case HeteroDeviceType::GPU_CUDA:
+            forward_layer_cuda(layer_idx);
+            break;
+        case HeteroDeviceType::GPU_ROCM:
+            forward_layer_rocm(layer_idx);
+            break;
+        case HeteroDeviceType::CPU:
+        default:
+            forward_layer_raw(layer_idx);
+            break;
+    }
+}
+
+void TenzoEngineImpl::forward_layers_range(int start_layer, int end_layer, HeteroDeviceType dev_type) {
+    for (int l = start_layer; l < end_layer; ++l) {
+        forward_layer_dispatch(l, dev_type);
+    }
+}
+
+void TenzoEngineImpl::forward_layers_hetero() {
+    const auto& stages = hetero_pipeline.getStages();
+    if (stages.empty()) {
+        for (int l = 0; l < config.num_layers; ++l) {
+            forward_layer_raw(l);
+        }
+        return;
+    }
+
+    for (const auto& stage : stages) {
+        if (stage.type == HeteroDeviceType::REMOTE_NODE && stage.remoteClient) {
+            uint32_t seq_id = static_cast<uint32_t>(get_seq_len());
+            stage.remoteClient->executeRemoteLayers(
+                seq_id,
+                stage.startLayer,
+                stage.endLayer,
+                buf_x.data(),
+                config.hidden_size,
+                buf_x.data()
+            );
+        } else {
+            forward_layers_range(stage.startLayer, stage.endLayer, stage.type);
+        }
+    }
+}
+
 void TenzoEngineImpl::prefill_token(int token_id) {
     embedding_lookup(token_id);
-    for (int l = 0; l < config.num_layers; ++l) {
-        forward_layer_raw(l);
-    }
+    forward_layers_hetero();
     if (use_paged_kv) {
         paged_kv_cache.increment_seq_len(1);
     } else {
@@ -1825,9 +1873,7 @@ int TenzoEngineImpl::generate_step(
     int past_tokens_len
 ) {
     embedding_lookup(cur_token);
-    for (int l = 0; l < config.num_layers; ++l) {
-        forward_layer_raw(l);
-    }
+    forward_layers_hetero();
     if (use_paged_kv) {
         paged_kv_cache.increment_seq_len(1);
     } else {
@@ -2199,6 +2245,52 @@ int tenzo_generate_step(
 ) {
     if (!engine || !engine->impl) return -1;
     return engine->impl->generate_step(cur_token, params, past_tokens, past_tokens_len);
+}
+
+tenzo_status_t tenzo_set_hetero_pipeline(tenzo_engine_t engine, const char* partition_spec) {
+    if (!engine || !engine->impl || !partition_spec) return TENZO_ERROR_INVALID_ARGUMENT;
+    if (!engine->impl->hetero_pipeline.parsePartitionString(partition_spec, engine->impl->config.num_layers)) {
+        return TENZO_ERROR_INVALID_ARGUMENT;
+    }
+    return TENZO_SUCCESS;
+}
+
+tenzo_status_t tenzo_auto_partition(tenzo_engine_t engine, const char* remote_node) {
+    if (!engine || !engine->impl) return TENZO_ERROR_INVALID_ARGUMENT;
+    std::string remote = remote_node ? remote_node : "";
+    bool has_vulkan = (engine->impl->config.device && std::string(engine->impl->config.device) == "gpu");
+    engine->impl->hetero_pipeline.autoPartition(engine->impl->config.num_layers, has_vulkan, false, false, remote);
+    return TENZO_SUCCESS;
+}
+
+tenzo_status_t tenzo_start_network_worker(int port, const char* weights_path, const char* mlir_path) {
+    auto config = tenzo_default_config();
+    tenzo_engine_t engine = tenzo_create_engine(&config);
+    if (!engine) return TENZO_ERROR_OUT_OF_MEMORY;
+
+    if (weights_path && mlir_path) {
+        tenzo_status_t status = tenzo_load_model(engine, weights_path, mlir_path);
+        if (status != TENZO_SUCCESS) {
+            tenzo_destroy_engine(engine);
+            return status;
+        }
+    }
+
+    auto server = std::make_shared<tenzo::net::TenzoServer>(port, [engine](uint16_t startLayer, uint16_t endLayer, const float* inAct, size_t dim, float* outAct) -> bool {
+        if (!engine || !engine->impl) return false;
+        std::memcpy(engine->impl->buf_x.data(), inAct, dim * sizeof(float));
+        engine->impl->forward_layers_range(startLayer, endLayer, tenzo::HeteroDeviceType::CPU);
+        std::memcpy(outAct, engine->impl->buf_x.data(), dim * sizeof(float));
+        return true;
+    });
+
+    if (!server->start()) {
+        tenzo_destroy_engine(engine);
+        return TENZO_ERROR_IO;
+    }
+
+    std::cout << "[TenzoServer] Distributed worker listening on port " << port << "...\n";
+    return TENZO_SUCCESS;
 }
 
 } // extern "C"

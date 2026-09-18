@@ -484,4 +484,22 @@ def BitLinearEXL2Op : Tenzo_Op<"bitlinear_exl2", [Pure]> {
   let assemblyFormat = "$input `,` $qweight `,` $scales `,` $qgroups attr-dict `:` functional-type(operands, results)";
 }
 
+// --- Ternary Pack Operation ---
+def TernaryPackOp : Tenzo_Op<"ternary_pack", [Pure]> {
+  let summary = "Ternary pack operation";
+  let description = [{
+    Packs ternary values (-1, 0, 1) into uint8 bytes (4 values per byte).
+  }];
+
+  let arguments = (ins
+    AnyTensor:$input,
+    Optional<AnyType>:$scale,
+    DefaultValuedAttr<I32Attr, "4">:$values_per_byte
+  );
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "$input (`,` $scale^)? attr-dict `:` functional-type(operands, results)";
+}
+
+
 
