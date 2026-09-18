@@ -1,117 +1,92 @@
+# 🛠️ Tenzo CLI & Testing Guide
+
+This document describes the recommended developer workflows for building, testing, and debugging the Tenzo compiler and runtime.
 
 ---
 
-### ⚡ Як запускати швидше (Правильний Workflow)
+## ⚡ 1. Standard Workflow (Makefile & Docker Compose)
 
-Ти щоразу запускаєш `docker run`, що створює новий контейнер. Це додає 1-2 секунди затримки, але не 10 хвилин.
-Щоб працювати швидко (як на локалці), використовуй **Інтерактивний Режим**.
+In accordance with project rules, all binaries are compiled remotely or via `make build` and run locally inside the Docker container environment.
 
-Ось оновлений файл `CLI_GUIDE.md`, який пропонує **правильний workflow** для розробки.
-
-```markdown
-# 🛠️ Tenzo CLI Guide: Інструкція розробника
-
-Цей документ описує найшвидший спосіб розробки та тестування Tenzo.
-
-## ⚡ 1. Режим Розробника (Найшвидший)
-
-Замість того, щоб запускати `docker run` для кожної команди, зайдіть у контейнер один раз і працюйте всередині. Це економить час на старт контейнера і зберігає історію команд.
-
-**Крок 1: Зайти в контейнер**
+### 1.1 Running Tests
 ```bash
-docker run --rm -it -v $(pwd):/app -w /app tenzo-dev:latest bash
+# Run full compiler regression test suite
+make test
 
+# Run CPU MatMul benchmark
+make cpu
+
+# Run large matrix benchmark (768x768)
+make large
+
+# Run hardware diagnostics
+make diag
 ```
 
-**Крок 2: Всередині контейнера (збираємо і запускаємо)**
-Тепер ви в Linux-терміналі. Всі команди виконуються миттєво.
-
-* **Збірка (один раз налаштувати, потім тільки ninja):**
+### 1.2 Interactive Development Shell
+To avoid spinning up a new container for each command, open an interactive bash shell in the development container:
 ```bash
-mkdir -p build_e2e && cd build_e2e
-cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
-
+make dev
+# or:
+docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev bash
 ```
 
-
-* **Перезбірка + Запуск (ваша основна команда):**
+Inside the container, binaries in `/app/cmake-build-debug` can be run directly:
 ```bash
-ninja tenzo-cli && ./tenzo-cli gemm-e2e
-
+/app/cmake-build-debug/tenzo-cli test
+/app/cmake-build-debug/tenzo-cli cpu
+/app/cmake-build-debug/tenzo-cli version
 ```
-
-
 
 ---
 
-## 🎮 2. Основні Команди (Running Tests)
+## 🎮 2. Main Test Commands (`tenzo-cli`)
 
-Запускати **всередині** папки `build_e2e/`.
+All commands are available via the `tenzo-cli` binary:
 
-### 🏆 `gemm-e2e` (Головний Тест)
-
-Повний пайплайн: Packing + Loops + Micro-kernel.
-
-```bash
-./tenzo-cli gemm-e2e
-
-АБО
-docker run --rm -v $(pwd):/app -w /app tenzo-dev:latest ./build_e2e/tenzo-cli gemm-e2e
-
-```
-
-*Якщо зависає:* Використовуйте `timeout 10s ./tenzo-cli gemm-e2e` щоб не вішати термінал.
-
-### 🔬 `micro_bench` (Чисте Ядро)
-
-Перевірка пікової швидкості AVX2 (без пакування).
-**Треба збирати окремо:** `ninja micro_bench`
+### 🏆 `test` (Core Regression Suite)
+Runs all 5 core validation suites:
+1. CPU MatMul (512x512 with FMA/AVX2)
+2. Conv2D vectorization
+3. GPU / Vulkan SPIR-V pipeline
+4. Ternary Pack (1.58-bit AVX2 micro-kernel verification)
+5. Bitwise Attention (SIMD packed attention micro-kernel)
 
 ```bash
-./micro_bench
-
-АБО
-docker run --rm -v $(pwd):/app -w /app tenzo-dev:latest bash -c "
-    cd build_e2e && 
-    cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release -DUSE_MLIR_KERNEL=ON && 
-    ninja micro_bench && 
-    ./micro_bench"
-    
+docker compose run --rm dev /app/cmake-build-debug/tenzo-cli test
 ```
 
-### 📦 `packing` (Тест Пам'яті)
-
-Тестує лише швидкість перевпорядкування даних.
-
+### 🔬 `cpu` (CPU MatMul Benchmark)
+Evaluates standard matrix multiplication performance with LLVM O3 baseline vs Tenzo vector optimization.
 ```bash
-./tenzo-cli packing
-
-АБО
-docker run --rm -v $(pwd):/app -w /app tenzo-dev:latest ./build_e2e/tenzo-cli packing
-
+docker compose run --rm dev /app/cmake-build-debug/tenzo-cli cpu
 ```
 
-**⚠️ Увага:** Цей тест має проходити за < 1 секунду. Якщо він триває довше — у вас нескінченний цикл у `PackingPass.cpp`.
+### 📦 `packing` (Packing Kernels Benchmark)
+Benchmarks matrix data reordering and packing bandwidth.
+```bash
+docker compose run --rm dev /app/cmake-build-debug/tenzo-cli packing
+```
+
+### 🧠 `attention` (Bitwise Attention Suite)
+Tests SIMD packed attention kernels, zero-copy GQA routing, and numerical parity against FP32 reference.
+```bash
+docker compose run --rm dev /app/cmake-build-debug/tenzo-cli attention
+```
 
 ---
 
-## 🎛️ 3. Як перевірити, чому зависло?
+## 🎛️ 3. Debugging with GDB
 
-Якщо команда "думає" вічність, зробіть так (всередині контейнера):
+If an operation encounters a fault or unexpected latency, debug it inside the Docker container:
 
-1. Встановіть налагоджувач:
 ```bash
-apt-get update && apt-get install -y gdb
+# Start dev container
+make dev
 
+# Run under GDB
+gdb --args /app/cmake-build-debug/tenzo-cli test
+(gdb) run
+# When halted or on error:
+(gdb) bt
 ```
-
-
-2. Запустіть під налагоджувачем:
-```bash
-gdb --args ./tenzo-cli packing
-
-```
-
-
-3. У gdb напишіть `run`. Коли зависне, натисніть `Ctrl+C`, а потім напишіть `bt` (backtrace). Це покаже рядок коду, де зациклилась програма.
-

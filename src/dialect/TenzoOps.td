@@ -1,6 +1,6 @@
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-include "mlir/Interfaces/InferTypeOpInterface.td" // <--- ОСЬ ЦЬОГО НЕ ВИСТАЧАЛО
+include "mlir/Interfaces/InferTypeOpInterface.td"
 
 // --- 1. Опис Діалекту ---
 def Tenzo_Dialect : Dialect {

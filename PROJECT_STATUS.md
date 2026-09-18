@@ -1,6 +1,6 @@
-# 📋 Tenzo Compiler — Project Status (v0.3.0)
+# 📋 Tenzo Compiler — Project Status (v1.1.0-beta)
 
-> **Last updated:** August 2026
+> **Last updated:** September 2026
 
 ---
 
@@ -51,7 +51,7 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 | Engine / Configuration | Model Format | KV-Cache | Decode Speed | Latency / Token | Note |
 |---|---|---|---|---|---|
 | **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms | Official Microsoft C++ Reference Engine |
-| **Tenzo Native Engine (v0.3.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms** | **1.65x FASTER than BitNet.cpp 🚀** |
+| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms** | **1.65x FASTER than BitNet.cpp 🚀** |
 
 ---
 
@@ -66,16 +66,24 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 - [x] Beat Microsoft `BitNet.cpp` reference performance on edge CPUs (**20.32 tok/sec**).
 
 ### Phase 2 (Phase E): C/C++ SDK, Packaging & Ternary KV-Cache (Completed ✅)
-- [x] **Tenzo C/C++ SDK**: ABI-stable pure C header [`include/tenzo.h`](file:///home/illia/CLionProjects/untitled/include/tenzo.h) and modern C++ wrapper [`include/tenzo.hpp`](file:///home/illia/CLionProjects/untitled/include/tenzo.hpp).
+- [x] **Tenzo C/C++ SDK**: ABI-stable pure C header [`include/tenzo.h`](include/tenzo.h) and modern C++ wrapper [`include/tenzo.hpp`](include/tenzo.hpp).
 - [x] **Standalone Runtime Libraries**: Generated `libtenzo_runtime.a` (static) and `libtenzo_runtime.so` (shared).
-- [x] **Standalone C++ Inference**: Fully standalone C++ example [`examples/basic_inference.cpp`](file:///home/illia/CLionProjects/untitled/examples/basic_inference.cpp) with zero Python dependencies (`make run-cpp`).
+- [x] **Standalone C++ Inference**: Fully standalone C++ example [`examples/basic_inference.cpp`](examples/basic_inference.cpp) with zero Python dependencies (`make run-cpp`).
 - [x] **Ternary 1.58b Fused KV-Cache (`tl1_fused`)**: 14.2x KV-Cache memory reduction vs FP32 (88 MB for 8192 context).
 
-### Phase 3: Hardware Expansion & Multi-Target (Next)
-- [ ] **ARM NEON/SVE Backend**: Port AVX2 micro-kernels to ARM for Apple Silicon and Snapdragon.
-- [ ] **Vulkan SPIR-V Compute**: Bring 1.58-bit decompression to iGPUs via Vulkan.
-- [ ] **FlashAttention MLIR Kernel**: Fuse SDPA, RoPE, and causal masking at dialect level.
+### Phase 3: Heterogeneous Multi-Backend & Cross-Device Engine (Completed ✅)
+- [x] **ARM NEON / DotProd Backend**: Ported AVX2 micro-kernels to ARM for Apple Silicon, Dimensity 9400+ (**23.83 tok/sec**), and Snapdragon.
+- [x] **Vulkan 1.3 GPU Compute**: SPIR-V compute shader pipeline for BitLinear TL1, GEMM FP32, and RMSNorm.
+- [x] **CUDA & ROCm Translation Layers**: Transparent fallback to Vulkan compute when native drivers are absent.
+- [x] **MicroarchProfiler**: Runtime CPU microarchitecture detection and GEMV tile calibration.
+- [x] **RISC-V RVV 1.0 Vector Extension Backend**: Scalar-fallback kernels for RISC-V.
+- [x] **Multi-Precision Exporters**: 1.58b, FP32, FP16, INT8, INT4, and INT3 export support.
+
+### Phase 4: Serving & Speculative Acceleration (Next)
 - [ ] **Speculative Decoding**: Multi-token drafting engine.
+- [ ] **FlashDecoding GPU Pipeline**: Parallelized sequence reduction across Vulkan compute workgroups.
+- [ ] **Continuous Batching & OpenAI-Compatible REST Server**: Asynchronous streaming HTTP endpoint in C++.
+- [ ] **ARM SVE2 / I8MM Direct Assembly Micro-Kernels**: Handwritten assembly kernels for Cortex-X925 and Dimensity 9400+.
 
 ---
 

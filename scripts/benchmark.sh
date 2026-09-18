@@ -41,7 +41,7 @@ JSON_FILE="${OUTPUT_DIR}/benchmark_${TIMESTAMP}.json"
 cat > "$JSON_FILE" << EOF
 {
   "timestamp": "$(date -Iseconds)",
-  "version": "0.3.0",
+  "version": "1.1.0",
   "hardware": {
     "cpu": "${HW_CPU:-unknown}",
     "avx2": "${HW_AVX2:-unknown}"

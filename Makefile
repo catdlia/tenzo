@@ -146,7 +146,7 @@ bench-kv:
 # Run side-by-side comparison: Microsoft BitNet.cpp vs Tenzo Native Engine
 # Usage: make compare PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7] [MODEL_QUANT=int8|fp32] [KV_QUANT=int8_fused|tl1_fused|fp32]
 compare:
-	python3 /home/illia/CLionProjects/untitled/scripts/compare_bitnet_tenzo.py -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
+	python3 scripts/compare_bitnet_tenzo.py -p "$(if $(PROMPT),$(PROMPT),In computer science, a compiler translates source code written in a high-level programming language into)" -n $(if $(TOKENS),$(TOKENS),50) -t $(if $(TEMP),$(TEMP),0.7) --model-quant $(if $(MODEL_QUANT),$(MODEL_QUANT),int8) --kv-quant $(if $(KV_QUANT),$(KV_QUANT),int8_fused)
 
 # Run all benchmarks
 bench: build
@@ -237,7 +237,7 @@ watch:
 # Help
 help:
 	@echo "╔════════════════════════════════════════════════════════════════════════╗"
-	@echo "║                   Tenzo Compiler Build System (v0.3.0)                 ║"
+	@echo "║                   Tenzo Compiler Build System (v1.1.0)                 ║"
 	@echo "╠════════════════════════════════════════════════════════════════════════╣"
 	@echo "║  make build-local - Compile compiler & runtime locally inside Docker   ║"
 	@echo "║  make build       - Compile remotely via cloud server                  ║"

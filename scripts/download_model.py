@@ -23,7 +23,7 @@ def download_file_with_progress(url, dest_path):
     print(f"📥 Downloading: {url}")
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     
-    req = urllib.request.Request(url, headers={"User-Agent": "TenzoEngine/0.3.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "TenzoEngine/1.1.0"})
     with urllib.request.urlopen(req) as response, open(dest_path, "wb") as out_file:
         total_size = int(response.info().get("Content-Length", -1))
         downloaded = 0

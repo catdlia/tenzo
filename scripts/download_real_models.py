@@ -40,7 +40,7 @@ def read_safetensors_header(f):
 def download_file(url, dest_path):
     print(f"📥 Downloading: {url}")
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-    req = urllib.request.Request(url, headers={"User-Agent": "TenzoDownloader/0.3.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "TenzoDownloader/1.1.0"})
     with urllib.request.urlopen(req) as resp, open(dest_path, "wb") as out:
         total = int(resp.info().get("Content-Length", -1))
         downloaded = 0

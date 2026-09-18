@@ -64,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DeviceDiagnosticTest**: Moved `#include` directives for backend headers from mid-file (inside anonymous namespace) to file scope for proper linkage.
 - **README.md**: Version badge updated to reflect current release.
 - **tenzo_cli.py**: Updated startup banner, added backend device selection (`/device cpu|gpu|vulkan|cuda|rocm`).
-- **include/tenzo.h**: Version bumped to `1.0.0-beta.1`.
+- **include/tenzo.h**: Version bumped to `1.1.0-beta`.
 
 ---
 

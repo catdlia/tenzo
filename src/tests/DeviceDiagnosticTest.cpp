@@ -336,7 +336,7 @@ int main(int argc, char** argv) {
 
     std::cout << ANSI_CYAN << ANSI_BOLD
               << "╔══════════════════════════════════════════════════════════════════╗\n"
-              << "║    Tenzo Compiler Diagnostic Suite v1.0.0-beta.1 (Beta-1.0)      ║\n"
+              << "║       Tenzo Compiler Diagnostic Suite v1.1.0-beta (Release)      ║\n"
               << "╚══════════════════════════════════════════════════════════════════╝\n"
               << ANSI_RESET;
 
@@ -348,7 +348,7 @@ int main(int argc, char** argv) {
 
     print_header("Diagnostic Summary");
     if (simd_ok && backend_ok && weights_ok && engine_ok) {
-        std::cout << ANSI_GREEN << ANSI_BOLD << "🎉 ALL SYSTEM CHECKS PASSED! Tenzo Beta-1.0 is fully operational on this device." << ANSI_RESET << "\n\n";
+        std::cout << ANSI_GREEN << ANSI_BOLD << "🎉 ALL SYSTEM CHECKS PASSED! Tenzo v1.1.0-beta is fully operational on this device." << ANSI_RESET << "\n\n";
         return 0;
     } else {
         std::cout << ANSI_RED << ANSI_BOLD << "⚠️  DIAGNOSTIC ISSUES DETECTED. Review the logs above for details." << ANSI_RESET << "\n\n";

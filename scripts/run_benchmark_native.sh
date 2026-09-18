@@ -29,11 +29,13 @@ echo "📊 Current CPU frequencies:"
 cat /proc/cpuinfo | grep "cpu MHz" | head -4
 
 # Build if needed
-BUILD_DIR="/home/illia/CLionProjects/untitled/build_e2e"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BUILD_DIR="$PROJECT_ROOT/cmake-build-debug"
 if [ ! -f "$BUILD_DIR/tenzo-cli" ]; then
     echo "🔨 Building..."
-    cd /home/illia/CLionProjects/untitled
-    docker compose run --rm dev sh -c "cd /app/build_e2e && ninja"
+    cd "$PROJECT_ROOT"
+    docker compose run --rm dev sh -c "ninja -C /app/cmake-build-debug tenzo-cli"
 fi
 
 echo ""
@@ -43,12 +45,12 @@ echo ""
 
 # Run inside Docker with taskset
 # Note: taskset inside Docker might not work, but cpuset should
-cd /home/illia/CLionProjects/untitled
-docker compose run --rm dev sh -c "OMP_NUM_THREADS=2 /app/build_e2e/tenzo-cli gemm-e2e"
+cd "$PROJECT_ROOT"
+docker compose run --rm dev sh -c "OMP_NUM_THREADS=2 /app/cmake-build-debug/tenzo-cli gemm-e2e"
 
 echo ""
 echo "✅ Benchmark complete!"
 echo ""
 echo "📊 For even better results, try running natively (outside Docker):"
-echo "   taskset -c 0,2 ./build_e2e/tenzo-cli gemm-e2e"
+echo "   taskset -c 0,2 ./cmake-build-debug/tenzo-cli gemm-e2e"
 

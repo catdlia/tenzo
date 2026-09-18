@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
     }
 
     std::cout << "============================================================" << std::endl;
-    std::cout << "🚀 Tenzo Native C++ SDK Standalone Inference Engine (v0.3.0)" << std::endl;
+    std::cout << "🚀 Tenzo Native C++ SDK Standalone Inference Engine (v1.1.0)" << std::endl;
     std::cout << "============================================================" << std::endl;
 
     std::string vocab_path = model_dir + "/tokenizer.vocab";

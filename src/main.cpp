@@ -44,7 +44,7 @@ void printUsage() {
 
 void printVersion() {
     llvm::outs() << "╔════════════════════════════════════════╗\n";
-    llvm::outs() << "║  Tenzo Compiler v0.3.0                 ║\n";
+    llvm::outs() << "║  Tenzo Compiler v1.1.0                 ║\n";
     llvm::outs() << "║  Heterogeneous AI Compiler             ║\n";
     llvm::outs() << "╠════════════════════════════════════════╣\n";
     llvm::outs() << "║  Targets: CPU (AVX2), GPU (Vulkan)     ║\n";

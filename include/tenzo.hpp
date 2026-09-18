@@ -1,6 +1,6 @@
 /**
  * @file tenzo.hpp
- * @brief Modern C++ RAII wrapper for the Tenzo Inference Engine SDK (v0.3.0)
+ * @brief Modern C++ RAII wrapper for the Tenzo Inference Engine SDK (v1.1.0)
  */
 
 #ifndef TENZO_HPP

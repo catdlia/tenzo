@@ -95,9 +95,6 @@ void runPackingBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "⚠️  Skipping MLIR lowering (needs MLIR 18 API fix)\n";
     llvm::outs() << "   Using memcpy baseline for bandwidth measurement\n\n";
 
-    llvm::outs() << "⚠️  Skipping MLIR lowering (needs MLIR 18 API fix)\n";
-    llvm::outs() << "   Using memcpy baseline for bandwidth measurement\n\n";
-
     // Skip lowering for now
     /*
     if (failed(lowerPM.run(module))) {

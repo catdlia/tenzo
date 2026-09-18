@@ -6,7 +6,8 @@ echo "║  🔧 Testing Packing Kernels Compilation               ║"
 echo "╚════════════════════════════════════════════════════════╝"
 echo ""
 
-cd /home/illia/CLionProjects/untitled
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
 
 echo "Step 1: Build tenzo-cli with packing support..."
 docker run --rm -v $(pwd):/app tenzo-dev:latest bash -c "\

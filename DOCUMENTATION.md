@@ -1,4 +1,4 @@
-# 📖 Tenzo Compiler: Comprehensive Documentation (v0.3.0)
+# 📖 Tenzo Compiler: Comprehensive Documentation (v1.1.0)
 
 Tenzo is a high-performance, MLIR-based compiler and native execution runtime designed for heterogeneous tensor computations on consumer and edge hardware. It bridges the gap between high-level machine learning frameworks and low-level hardware optimizations, with a specialized focus on quantized Large Language Models (LLMs) like BitNet 1.58B.
 
@@ -69,5 +69,5 @@ The high-performance C++ execution engine that powers ultra-fast autoregressive 
 | Engine | Model Format | KV-Cache | Decode Throughput | Per-Token Latency |
 |---|---|---|---|---|
 | **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms |
-| **Tenzo Native Engine (v0.3.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms (1.65x faster 🚀)** |
+| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms (1.65x faster 🚀)** |
 

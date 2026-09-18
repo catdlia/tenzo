@@ -2,9 +2,9 @@ name: Tenzo CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ master, main, experimental, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ master, main ]
 
 env:
   BUILD_TYPE: Release
@@ -60,7 +60,7 @@ jobs:
 
   build-docker:
     runs-on: ubuntu-22.04
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
 
     steps:
     - uses: actions/checkout@v4

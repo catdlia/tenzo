@@ -22,7 +22,7 @@ A clear and concise description of what you expected to happen.
  - OS: [e.g. Linux x86_64, Android Termux, macOS]
  - CPU: [e.g. Intel i3-1215U, Snapdragon 778G, Dimensity 9400+]
  - Compiler Version: [e.g. LLVM 21, Clang 18]
- - Branch / Commit: [e.g. master, v0.3.0]
+ - Branch / Commit: [e.g. master, v1.1.0]
 
 **Additional context**
 Add any other context, terminal logs, or backtraces about the problem here.

@@ -1,6 +1,6 @@
 /**
  * @file main_inference.cpp
- * @brief Tenzo CLI — Full-Featured Native LLM Inference Engine (v0.3.0)
+ * @brief Tenzo CLI — Full-Featured Native LLM Inference Engine (v1.1.0)
  * 
  * Provides production-grade command-line interface for 1.58-bit BitNet LLM inference:
  * - Single-shot generation & Streaming token decode
@@ -162,7 +162,7 @@ void print_banner() {
     std::cout << "   | | |  _| |  \\| | / / |  | |\n";
     std::cout << "   | | | |___| |\\  |/ /| |__| |\n";
     std::cout << "   |_| |_____|_| \\_/____\\____/ \n" << ANSI_RESET;
-    std::cout << ANSI_BOLD << " ⚡ Tenzo Native LLM Inference Engine " << ANSI_GREEN << "v1.0.0-beta.1 (Beta-1.0)" << ANSI_RESET << "\n";
+    std::cout << ANSI_BOLD << " ⚡ Tenzo Native LLM Inference Engine " << ANSI_GREEN << "v1.1.0-beta (Release)" << ANSI_RESET << "\n";
     std::cout << ANSI_DIM << " Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)\n" << ANSI_RESET;
     std::cout << "────────────────────────────────────────────────────────────────────────────\n" << std::endl;
 }

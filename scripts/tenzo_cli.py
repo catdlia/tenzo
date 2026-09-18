@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tenzo_cli.py — Tenzo Production AI Compiler & LLM Inference Console (v0.3.0)
+tenzo_cli.py — Tenzo Production AI Compiler & LLM Inference Console (v1.1.0)
 
 Full-featured interactive TUI / REPL inspired by llama.cpp, vLLM, and Ollama:
 - Dynamic Model Manager: /models, /pull <hf_repo>, /load <name>
@@ -92,7 +92,7 @@ def print_banner():
    | | |  _| |  \\| | / / |  | |
    | | | |___| |\\  |/ /| |__| |
    |_| |_____|_| \\_/____\\____/ {ANSI_RESET}
- {ANSI_BOLD}⚡ Tenzo Compiler & LLM Inference Console {ANSI_GREEN}v1.0.0-beta.1 (Beta-1.0){ANSI_RESET}
+ {ANSI_BOLD}⚡ Tenzo Compiler & LLM Inference Console {ANSI_GREEN}v1.1.0-beta (Release){ANSI_RESET}
  {ANSI_DIM}Heterogeneous MLIR Engine: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm){ANSI_RESET}
 ────────────────────────────────────────────────────────────────────────────"""
     print(banner)
@@ -493,7 +493,7 @@ def interactive_repl(session: TenzoSession):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Tenzo Production AI Compiler & LLM Inference CLI (v0.3.0)",
+        description="Tenzo Production AI Compiler & LLM Inference CLI (v1.1.0)",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu", "vulkan", "cuda", "rocm", "riscv"], help="Compute backend: cpu, gpu/vulkan, cuda, rocm, riscv")

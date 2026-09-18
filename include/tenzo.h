@@ -32,9 +32,9 @@ extern "C" {
 #endif
 
 #define TENZO_VERSION_MAJOR 1
-#define TENZO_VERSION_MINOR 0
+#define TENZO_VERSION_MINOR 1
 #define TENZO_VERSION_PATCH 0
-#define TENZO_VERSION_STRING "1.0.0-beta.1"
+#define TENZO_VERSION_STRING "1.1.0-beta"
 
 /* Opaque handle to the Tenzo Native Execution Engine */
 typedef struct tenzo_engine_opaque* tenzo_engine_t;

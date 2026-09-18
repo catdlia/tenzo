@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(tenzo-compiler)
+project(tenzo-compiler VERSION 1.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -111,9 +111,6 @@ if(OpenMP_CXX_FOUND)
     message(STATUS "🚀 OpenMP found: ${OpenMP_CXX_VERSION}")
 endif()
 
-# ============================================================
-# Full Compiler Targets (Only when MLIR is present)
-# ============================================================
 # ============================================================
 # Full Compiler Targets (Only when MLIR is present)
 # ============================================================

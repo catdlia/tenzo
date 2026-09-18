@@ -99,6 +99,7 @@ For complete architectural details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE
 
 ---
 
+<a id="hybrid-build-environment"></a>
 ## 🚀 Quick Start
 
 ### 1. Build the Project
@@ -156,6 +157,7 @@ See [docs/MOBILE_ARM_VULKAN.md](docs/MOBILE_ARM_VULKAN.md) for detailed mobile s
 
 ---
 
+<a id="hardware-support"></a>
 ## 🔧 Heterogeneous Backend Architecture
 
 Tenzo v1.1.0-beta introduces a multi-backend runtime HAL:
