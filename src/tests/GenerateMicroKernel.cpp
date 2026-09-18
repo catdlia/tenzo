@@ -160,10 +160,9 @@ void generateMicroKernelMLIR(mlir::MLIRContext &context) {
     llvm::outs() << "║  3. Check assembly:                                    ║\n";
     llvm::outs() << "║     objdump -d micro_kernel.o | grep vfmadd            ║\n";
     llvm::outs() << "║                                                        ║\n";
-    llvm::outs() << "║  4. Rebuild benchmark:                                 ║\n";
-    llvm::outs() << "║     cmake -DUSE_MLIR_KERNEL=ON ..                      ║\n";
-    llvm::outs() << "║     make micro_bench                                   ║\n";
-    llvm::outs() << "║     ./micro_bench                                      ║\n";
+    llvm::outs() << "║  4. Rebuild & run benchmark:                           ║\n";
+    llvm::outs() << "║     ninja -C cmake-build-debug micro_bench             ║\n";
+    llvm::outs() << "║     docker compose run --rm dev micro_bench            ║\n";
     llvm::outs() << "╚════════════════════════════════════════════════════════╝\n";
 }
 

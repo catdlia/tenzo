@@ -206,9 +206,9 @@ bool run_simd_math_diagnostics() {
     return all_ok;
 }
 
-// 3. Weight File Diagnostics
+// 4. Weight File Diagnostics
 bool run_weight_diagnostics(const std::string& model_dir) {
-    print_header("3. Model Weights & Vocabulary Verification");
+    print_header("4. Model Weights & Vocabulary Verification");
     std::string vocab_path = model_dir + "/tokenizer.vocab";
     std::string weights_path = model_dir + "/weights.bin";
 
@@ -263,9 +263,17 @@ bool run_weight_diagnostics(const std::string& model_dir) {
     return all_ok;
 }
 
-// 4. Tenzo Engine Single-Step Test
+// 5. Tenzo Engine Single-Step Test
 bool run_engine_inference_test(const std::string& model_dir) {
-    print_header("4. Native Inference & Sampling Validation");
+    print_header("5. Native Inference & Sampling Validation");
+    std::string weights_path = model_dir + "/weights.bin";
+    std::string mlir_path = model_dir + "/model.mlir";
+
+    std::ifstream wf(weights_path);
+    if (!wf.is_open()) {
+        report_status("Engine initialization", false, "Skipped (weights not found at " + weights_path + ")");
+        return false;
+    }
 
     tenzo_config_t config = tenzo_default_config();
     config.kv_mode = "popcount_fused";
@@ -273,7 +281,7 @@ bool run_engine_inference_test(const std::string& model_dir) {
 
     try {
         tenzo::Engine engine(config);
-        engine.load_model(model_dir + "/weights.bin", model_dir + "/model.mlir");
+        engine.load_model(weights_path, mlir_path);
         report_status("Engine model mapping", true);
 
         // Run single decode step with prompt token 128000
@@ -297,9 +305,9 @@ bool run_engine_inference_test(const std::string& model_dir) {
     }
 }
 
-// Backend Diagnostics
+// 3. Backend Diagnostics
 bool run_backend_diagnostics() {
-    print_header("4. Heterogeneous Backends & Microarch Diagnostics");
+    print_header("3. Heterogeneous Backends & Microarch Diagnostics");
 
     // 1. Profiler
     auto& prof = tenzo::MicroarchProfiler::getProfile();

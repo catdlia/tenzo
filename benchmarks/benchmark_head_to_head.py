@@ -44,7 +44,7 @@ def benchmark_multithreaded():
     print("    Single process, all cores used for one GEMM")
     print("="*70)
 
-    output = docker_run("/app/cmake-build-release/tenzo-cli gemm-e2e 2>&1", timeout=300)
+    output = docker_run("/app/cmake-build-debug/tenzo-cli gemm-e2e 2>&1", timeout=300)
 
     # Extract the N-Core comparison table
     gemm_results = {}
@@ -136,7 +136,7 @@ gcc -O3 -march=native -o /tmp/tenzo_bench /tmp/tenzo_bench.c -lopenblas -lm && \
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 /tmp/tenzo_bench
 """
     # For Tenzo: use tenzo-cli with single-threaded per-core independent (1 core only)
-    tenzo_code = "OMP_NUM_THREADS=1 /app/cmake-build-release/tenzo-cli gemm-e2e 2>&1 | grep -E '║.*║.*║.*║.*║' | head -4"
+    tenzo_code = "OMP_NUM_THREADS=1 /app/cmake-build-debug/tenzo-cli gemm-e2e 2>&1 | grep -E '║.*║.*║.*║.*║' | head -4"
 
     processes = []
     start_time = time.time()

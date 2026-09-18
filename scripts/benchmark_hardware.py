@@ -340,14 +340,12 @@ def run_tenzo_benchmark(tenzo_path: str) -> Optional[BenchmarkResult]:
         if local_works:
             cmd = [tenzo_path, 'cpu']
         else:
-            # Use Docker
+            # Use Docker compose
             project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             cmd = [
-                'docker', 'run', '--rm',
-                '-v', f'{project_dir}:/app',
-                '-w', '/app',
-                'tenzo-dev:latest',
-                '/app/cmake-build-debug/tenzo-cli', 'cpu'
+                'docker', 'compose', '-f', os.path.join(project_dir, 'docker-compose.yml'),
+                'run', '--rm', '-e', 'OMP_PLACES=cores', '-e', 'OMP_PROC_BIND=spread',
+                'dev', '/app/cmake-build-debug/tenzo-cli', 'cpu'
             ]
             print("   (Using Docker container)")
 
@@ -512,8 +510,6 @@ def main():
         possible_paths = [
             '/app/cmake-build-debug/tenzo-cli',  # Docker path first
             './cmake-build-debug/tenzo-cli',
-            './cmake-build-release/tenzo-cli',
-            './build/tenzo-cli',
         ]
 
         tenzo_path = None
@@ -535,7 +531,7 @@ def main():
         if tenzo_path:
             benchmark = run_tenzo_benchmark(tenzo_path)
         else:
-            print("\n⚠️  tenzo-cli not found. Build first with: ninja -C build tenzo-cli")
+            print("\n⚠️  tenzo-cli not found. Build first with: make build-local")
 
     print_efficiency_report(rpeak, benchmark)
 

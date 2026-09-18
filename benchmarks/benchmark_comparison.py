@@ -59,7 +59,7 @@ def run_tenzo_benchmark():
         ["docker", "run", "--rm", "--cpuset-cpus=0-3",
          "-v", f"{os.getcwd()}:/app", "-w", "/app",
          "tenzo-dev:latest",
-         "sh", "-c", "OMP_NUM_THREADS=1 /app/build_e2e/tenzo-cli gemm-e2e"],
+         "sh", "-c", "OMP_NUM_THREADS=1 /app/cmake-build-debug/tenzo-cli gemm-e2e"],
         capture_output=True, text=True, timeout=300
     )
 

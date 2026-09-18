@@ -56,7 +56,7 @@ def run_tenzo_benchmark(num_instances, iterations=50):
             "docker", "run", "--rm", "--cpuset-cpus=0-7",
             "-v", f"{WORKDIR}:/app", "-w", "/app",
             "tenzo-dev:latest",
-            "./build_e2e/micro_bench"
+            "./cmake-build-debug/micro_bench"
         ]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         processes.append(p)

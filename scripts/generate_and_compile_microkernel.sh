@@ -38,14 +38,18 @@ echo "║  STEP 1: Generate MLIR Micro-Kernel                   ║"
 echo "╚════════════════════════════════════════════════════════╝"
 echo ""
 
-if [ ! -f "$PROJECT_ROOT/cmake-build-release-docker/tenzo-cli" ]; then
+if [ ! -f "$PROJECT_ROOT/cmake-build-debug/tenzo-cli" ]; then
     echo "❌ tenzo-cli not found. Please build it first:"
     echo "   docker compose run --rm dev ninja -C /app/cmake-build-debug tenzo-cli"
     exit 1
 fi
 
 echo "🔧 Running: tenzo-cli generate-microkernel"
-"$PROJECT_ROOT/cmake-build-release-docker/tenzo-cli" generate-microkernel > micro_kernel_generated.log 2>&1 || true
+if [ -f /.dockerenv ]; then
+    "$PROJECT_ROOT/cmake-build-debug/tenzo-cli" generate-microkernel > micro_kernel_generated.log 2>&1 || true
+else
+    docker compose -f "$PROJECT_ROOT/docker-compose.yml" run --rm dev /app/cmake-build-debug/tenzo-cli generate-microkernel > micro_kernel_generated.log 2>&1 || true
+fi
 
 # Check if file was generated
 if [ -f "generated_micro_kernel.mlir" ]; then

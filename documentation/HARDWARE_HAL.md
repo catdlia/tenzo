@@ -4,8 +4,10 @@
 
 ## 📂 Структура файлів
 *   **`HardwareProfile.h`**: Абстрактний інтерфейс для будь-якої архітектури.
-*   **`X86HardwareProfile.cpp`**: Реалізація для x86 (Intel/AMD).
-*   **`TenzoContext.cpp`**: Контейнер для MLIR контексту та HAL.
+*   **`X86HardwareProfile.cpp/h`**: Реалізація для x86_64 (Intel/AMD, AVX2, VNNI, топологія кешу та ядер).
+*   **`ARMHardwareProfile.cpp/h`**: Реалізація для ARM64 (Apple Silicon, Dimensity, Snapdragon, NEON, SVE2, DotProd).
+*   **`AutoTuner.cpp/h`**: Автоматичний підбір розмірів блоків матриць під L1/L2/L3 кеш.
+*   **`TenzoContext.cpp/h`**: Контейнер для MLIR контексту та активного HardwareProfile.
 
 ## 🛠 Ключові компоненти
 

@@ -1,7 +1,7 @@
 # Tenzo Compiler Makefile
 # Convenience wrapper for common operations
 
-.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench bench version docker-build dev docker-shell compile-commands format watch help
+.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag bench version docker-build dev docker-shell compile-commands format watch help
 
 # Default target
 all: build
@@ -90,6 +90,12 @@ hetero: build
 hetero-bench: build
 	@echo "📊 Running Heterogeneous Pipeline Partition Benchmark..."
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli hetero-bench
+
+# Run hardware and system diagnostics
+# Usage: make diag [MODEL=/path/to/model_dir]
+diag:
+	@echo "🔬 Running hardware & inference diagnostics..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-diag $(if $(MODEL),$(MODEL),/app/tenzo-frontend/export_output)
 
 # Run text generation (MLIR JIT)
 # Usage: make generate PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7]
@@ -247,6 +253,7 @@ help:
 	@echo "║  make cpu         - Run CPU MatMul benchmark                           ║"
 	@echo "║  make large       - Run large matrix (768x768) benchmark               ║"
 	@echo "║  make gpu         - Run GPU pipeline test                              ║"
+	@echo "║  make diag        - Run hardware and system diagnostics                ║"
 	@echo "╚════════════════════════════════════════════════════════════════════════╝"
 
 stop-cloud:

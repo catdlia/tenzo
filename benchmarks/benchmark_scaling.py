@@ -51,7 +51,7 @@ def run_parallel_bench(num_instances, workdir):
             "-v", f"{workdir}:/app",
             "-w", "/app",
             "tenzo-dev:latest",
-            "./build_e2e/micro_bench"
+            "./cmake-build-debug/micro_bench"
         ]
 
         p = subprocess.Popen(
@@ -93,10 +93,10 @@ def main():
     print(f"Working directory: {workdir}")
 
     # Check if micro_bench exists
-    bench_path = os.path.join(workdir, "build_e2e", "micro_bench")
+    bench_path = os.path.join(workdir, "cmake-build-debug", "micro_bench")
     if not os.path.exists(bench_path):
         print(f"❌ Error: {bench_path} not found!")
-        print("   Run: docker compose run --rm dev sh -c 'cd /app/build_e2e && ninja'")
+        print("   Run: docker compose run --rm dev ninja -C /app/cmake-build-debug micro_bench")
         sys.exit(1)
 
     print("\n" + "="*60)

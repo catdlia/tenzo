@@ -177,10 +177,16 @@ The `MicroarchProfiler` automatically detects all available backends and SIMD ca
 
 ## 📚 Documentation & Deep Dives
 
+- [Comprehensive Documentation](DOCUMENTATION.md)
 - [Compiler Architecture](docs/ARCHITECTURE.md)
 - [Quantization Matrix & Bit-Packing](docs/QUANTIZATION.md)
+- [Developer CLI & Testing Guide](src/tests/CLI_GUIDE.md)
 - [Vertical Scaling Research](docs/VERTICAL_SCALING_RESEARCH.md)
 - [Mobile & Vulkan Guide](docs/MOBILE_ARM_VULKAN.md)
+- [CPU Optimization Pipeline](documentation/CPU_PIPELINE.md)
+- [Frontend Exporter Ecosystem](documentation/FRONTEND.md)
+- [Hardware Abstraction Layer (HAL)](documentation/HARDWARE_HAL.md)
+- [Runtime & Execution Engine](documentation/RUNTIME.md)
 - [Project Roadmap](docs/ROADMAP.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing Guide](CONTRIBUTING.md)

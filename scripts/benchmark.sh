@@ -16,9 +16,15 @@ mkdir -p "$OUTPUT_DIR"
 echo "🔬 Running Tenzo Benchmarks..."
 echo ""
 
+if [ -f /.dockerenv ]; then
+    run_cli() { "$BINARY" "$@"; }
+else
+    run_cli() { docker compose -f "$PROJECT_DIR/docker-compose.yml" run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli "$@"; }
+fi
+
 # Run CPU benchmark and extract results
 echo "⚡ CPU MatMul (512x512)..."
-CPU_OUTPUT=$($BINARY cpu 2>&1)
+CPU_OUTPUT=$(run_cli cpu 2>&1)
 
 CPU_SCALAR=$(echo "$CPU_OUTPUT" | grep "Scalar:" | grep -oE '[0-9]+' | head -1)
 CPU_VECTOR=$(echo "$CPU_OUTPUT" | grep "Vector:" | grep -oE '[0-9]+' | head -1)
@@ -26,7 +32,7 @@ CPU_SPEEDUP=$(echo "$CPU_OUTPUT" | grep "Speedup:" | grep -oE '[0-9]+\.[0-9]+' |
 
 # Run Conv2D benchmark
 echo "🎯 Conv2D (32x32x3 → 30x30x64)..."
-CONV_OUTPUT=$($BINARY conv2d 2>&1)
+CONV_OUTPUT=$(run_cli conv2d 2>&1)
 
 CONV_TIME=$(echo "$CONV_OUTPUT" | grep "Per iteration:" | grep -oE '[0-9]+\.[0-9]+' | head -1)
 CONV_GFLOPS=$(echo "$CONV_OUTPUT" | grep "Throughput:" | grep -oE '[0-9]+\.[0-9]+' | head -1)

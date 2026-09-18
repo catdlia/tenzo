@@ -44,9 +44,17 @@ check_binary() {
     fi
 }
 
+run_cli() {
+    if [ -f /.dockerenv ]; then
+        "$BINARY" "$@"
+    else
+        docker compose -f "${PROJECT_DIR}/docker-compose.yml" run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli "$@"
+    fi
+}
+
 run_cpu_test() {
     print_test "CPU MatMul Benchmark (512x512)"
-    if $BINARY cpu 2>&1 | tee /tmp/cpu_test.txt | grep -q "Speedup"; then
+    if run_cli cpu 2>&1 | tee /tmp/cpu_test.txt | grep -q "Speedup"; then
         SPEEDUP=$(grep "Speedup" /tmp/cpu_test.txt | head -1)
         print_pass "CPU Benchmark - $SPEEDUP"
         return 0
@@ -58,7 +66,7 @@ run_cpu_test() {
 
 run_conv2d_test() {
     print_test "Conv2D Test (32x32x3 -> 30x30x64)"
-    if $BINARY conv2d 2>&1 | tee /tmp/conv2d_test.txt | grep -q "Conv2D correct"; then
+    if run_cli conv2d 2>&1 | tee /tmp/conv2d_test.txt | grep -q "Conv2D correct"; then
         THROUGHPUT=$(grep "Throughput" /tmp/conv2d_test.txt)
         print_pass "Conv2D - $THROUGHPUT"
         return 0
@@ -70,7 +78,7 @@ run_conv2d_test() {
 
 run_gpu_test() {
     print_test "GPU Pipeline (SPIR-V Generation)"
-    if $BINARY gpu 2>&1 | tee /tmp/gpu_test.txt | grep -q "SUCCESS"; then
+    if run_cli gpu 2>&1 | tee /tmp/gpu_test.txt | grep -q "SUCCESS"; then
         print_pass "GPU Pipeline"
         return 0
     else

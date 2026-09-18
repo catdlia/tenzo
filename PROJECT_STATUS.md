@@ -32,14 +32,15 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
   - **Fused INT8 In-Register KV-Cache Compression**: 4x smaller memory footprint (314 MB for 8192 context length) with online register-level symmetric quantization.
   - **C++ Top-K / Top-P Min-Heap Sampler**: Min-heap sampler completing in 0.01 ms per token.
 
-### ⚠️ What's Missing (Next Milestones)
+### ⚠️ What's Missing (Phase 4 Milestones)
 
 | Gap | Description | Priority |
 |-----|-------------|----------|
-| **Multi-target Backends** | Micro-kernels are explicitly tuned for x86 AVX2. Need equivalent paths for ARM NEON/SVE and RISC-V RVV. | 🔴 Critical |
-| **GPU/Vulkan Support** | The SPIR-V pipeline is a basic proof-of-concept. It needs to support `tl1_pack` and `q8` tensor layouts. | 🟡 High |
-| **Attention + RoPE Fusion** | RoPE and SDPA in MLIR dialect level can be fused into a single unified FlashAttention MLIR pattern. | 🟡 High |
-| **Autoregressive Speculation** | Speculative decoding / multi-token drafting to achieve 40+ tok/sec. | 🔵 Future |
+| **Speculative Verification Engine** | Draft-target verification using 1-layer ternary draft models to reach 40+ tok/sec. | 🔴 Critical |
+| **FlashDecoding GPU Pipeline** | Parallelized sequence reduction across Vulkan compute workgroups for long contexts. | 🟡 High |
+| **Continuous Batching REST Server** | Asynchronous streaming HTTP endpoint in C++ with OpenAI-compatible API. | 🟡 High |
+| **ARM SVE2 / I8MM Direct Kernels** | Handwritten assembly micro-kernels for Cortex-X925 and Dimensity 9400+. | 🟡 High |
+| **Attention + RoPE Fusion** | Unified FlashAttention MLIR dialect fusion pattern. | 🔵 Medium |
 
 ---
 

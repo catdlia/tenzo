@@ -23,7 +23,7 @@ def run_test(size):
     try:
         result = subprocess.run(
             ["docker", "compose", "run", "--rm", "dev",
-             f"cd /app/cmake-build-debug && ./tenzo-cli cpu"],
+             "bash", "-c", "/app/cmake-build-debug/tenzo-cli cpu"],
             capture_output=True,
             text=True,
             timeout=120
@@ -37,7 +37,7 @@ def run_test(size):
             time_ms = int(match.group(1))
             gflops = float(match.group(2))
             return {"time_ms": time_ms, "gflops": gflops}
-    except:
+    except Exception:
         pass
 
     return None
@@ -65,6 +65,10 @@ def main():
     print("=" * 60)
     print(f"{'Size':>6} | {'GFLOPS':>10} | {'Time (ms)':>10} | {'Note':>20}")
     print("-" * 60)
+
+    if not results:
+        print("❌ No benchmark results collected.")
+        return
 
     best = max(results, key=lambda x: x['gflops'])
 

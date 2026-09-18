@@ -3,10 +3,12 @@
 Це серце компілятора, де високорівневі тензорні операції перетворюються на максимально швидкий машинний код, з фокусом на LLM інференс (BitNet 1.58B).
 
 ## 📂 Структура файлів
-*   **`LinalgLowering.cpp`**: Оптимізація графа на рівні MLIR, опускання до векторних мікро-ядер (BitLinear, RoPE, RMSNorm).
-*   **`BitLinearTL1PackLoweringToLinalg`**: Спеціалізоване AVX2 мікро-ядро для `tenzo.bitlinear_tl1`.
-*   **`PackingPass.cpp`**: Переупорядкування матриць у пам'яті (BLIS-style).
-*   **`ExplicitMicroKernel.cpp`**: Старе FMA мікро-ядро для MatMul.
+*   **`LinalgLowering.cpp`**: Оптимізація графа на рівні MLIR, опускання до векторних мікро-ядер (BitLinear, RoPE, RMSNorm, Bitwise Attention).
+*   **`ExplicitMicroKernelPass.cpp`**: Генерація оптимізованих мікро-ядер (MR=6, NR=16 FMA GEMM та MR=4, NR=16 Fused Ternary Pack).
+*   **`FusedTernaryKernelPass.cpp`**: Фьюжн операцій пакування та обчислення для тернарних моделей.
+*   **`PackingPass.cpp` / `PackingKernels.cpp`**: Переупорядкування матриць у пам'яті (BLIS-style packing).
+*   **`Bufferization.cpp`**: Zero-Allocation OneShotBufferize для усунення динамічних алокацій.
+*   **`OptimalVectorization.cpp` / `MacroKernelPass.cpp`**: Векторизація циклів та макро-блокування.
 
 ## 🛠 Ключові етапи обробки (BitNet LLM)
 
