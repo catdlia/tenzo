@@ -32,6 +32,7 @@ compile_commands.json
 
 # Models, weights, and export directories
 models/
+weights/
 BitNet/
 tenzo-frontend/export_output*/
 tenzo-frontend/export_real_*/
@@ -39,7 +40,11 @@ tenzo-frontend/export_real_*/
 *.gguf
 *.bin
 *.pt
+*.pth
 *.onnx
+
+# Generated compiler output
+optimized.mlir
 
 # Python cache & virtual environments
 __pycache__/
@@ -56,8 +61,15 @@ venv/
 *.swp
 *.swo
 *~
+*.code-workspace
 .aider*
 _llm_context.md
+.agents/
+implementation_plan.md
+prompt_draft.md
+
+# Benchmark results (generated)
+benchmark_results/
 
 # CCache
 .ccache/
