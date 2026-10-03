@@ -1,6 +1,6 @@
 # 📋 Tenzo Compiler — Project Status (v1.1.0-beta)
 
-> **Last updated:** September 2026
+> **Last updated:** October 2026
 
 ---
 
@@ -16,7 +16,22 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 
 ## 📍 Current State (Honest Assessment)
 
+### 🔀 Bifurcated Focus Streams (Розділення статусів розробки)
+
+В рамках актуальної архітектури статус розробки розділено на два ключових напрямки:
+
+| Напрямок / Стрім | Опис та Архітектура | Ключові файли та тести | Статус |
+|---|---|---|---|
+| **Implicit Shuffle у LLM** | **Zero-Copy GQA Virtual Routing via floorDiv**: Віртуальна маршрутизація Grouped-Query Attention без копіювання пам'яті через `AffineExpr::floorDiv` на вимір голів ($H_q \to H_{kv}$). Повністю усуває інструкції `memref.copy`, `linalg.transpose` та векторні gather-операції під час авторегресивного декодування. Чисельна еквівалентність підтверджена тестами. | `src/passes/LinalgLowering.cpp`<br>`src/tests/BitwiseAttentionTest.cpp`<br>`src/dialect/TenzoOps.td` | **Complete / Verified ✅**<br>*(Production Ready)* |
+| **Підготовка до пре-трейну** | **PyTorch QAT STE & FX Export Pipeline**: Шари Quantization-Aware Training для 1.58-бітних тернарних ваг $\{-1, 0, 1\}$ через Straight-Through Estimator (`TernaryQuantizeSTE`), повнозв'язні шари `BitLinear`, та компілятор `fx_to_mlir.py` для експорту натренованих графів у діалект Tenzo (`tenzo.ternary_pack`, `tenzo.packed_attention`). | `tenzo-frontend/qat.py`<br>`tenzo-frontend/fx_to_mlir.py`<br>`tenzo-frontend/test_fx_qat_export.py` | **In Progress / QAT Ready 🔄**<br>*(Ready for Pre-training)* |
+
 ### ✅ What Works
+- **Implicit Shuffle у LLM (Zero-Copy GQA Routing)**:
+  - Пряме відображення індексів через `floorDiv` в `LinalgLowering.cpp`.
+  - Нуль виділень пам'яті та `memref.copy` при GQA з довільним співвідношенням голів ($H_q / H_{kv}$).
+- **Підготовка до пре-трейну (PyTorch 1.58-bit QAT & FX tracing)**:
+  - Модулі `TernaryQuantizeSTE`, `BitLinear`, `QATBitSelfAttention`, `QATTransformerBlock` у `tenzo-frontend/qat.py`.
+  - Графовий трейсинг PyTorch FX у MLIR через `fx_to_mlir.py`.
 - **Custom MLIR Dialect for LLMs**:
   - `tenzo.bitlinear_tl1`: Native support for 1.58-bit ternary weights packed into 2-bit formats.
   - `tenzo.matmul_q8`: Native `i8` quantized linear layers (used for `lm_head`).
