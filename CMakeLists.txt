@@ -261,8 +261,7 @@ if(TENZO_HAS_MLIR_COMPILER)
         target_link_libraries(tenzo-cli PRIVATE OpenMP::OpenMP_CXX)
     endif()
 
-    target_compile_options(tenzo-cli PRIVATE ${TENZO_RUNTIME_FLAGS})
-    target_compile_definitions(tenzo-cli PRIVATE -UNDEBUG)
+    target_compile_options(tenzo-cli PRIVATE ${TENZO_RUNTIME_FLAGS} -UNDEBUG)
 
     add_executable(micro_bench
         src/tests/IsolatedMicroKernel.cpp
