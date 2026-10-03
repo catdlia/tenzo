@@ -131,7 +131,7 @@ jobs:
 
   rpi4-arm64-benchmark:
     name: ARM64 Native Benchmark (Raspberry Pi 4B)
-    runs-on: [self-hosted, rpi4]
+    runs-on: [self-hosted, Linux, ARM64, rpi4]
     continue-on-error: true
     timeout-minutes: 10
     steps:
