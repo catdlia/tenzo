@@ -33,8 +33,8 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64" OR ANDROID)
     set(TENZO_RUNTIME_FLAGS -O3 -funroll-loops -fopenmp)
     message(STATUS "🚀 Target Architecture: ARM64 / AArch64 (NEON / DotProd)")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    set(TENZO_RUNTIME_FLAGS -mavx2 -mavxvnni -mfma -mf16c -O3 -funroll-loops -fopenmp)
-    message(STATUS "🚀 Target Architecture: x86_64 (AVX2 / FMA / VNNI / F16C)")
+    set(TENZO_RUNTIME_FLAGS -mavx2 -mfma -mf16c -O3 -funroll-loops -fopenmp)
+    message(STATUS "🚀 Target Architecture: x86_64 (AVX2 / FMA / F16C)")
 else()
     set(TENZO_RUNTIME_FLAGS -O3 -funroll-loops -fopenmp)
     message(STATUS "🚀 Target Architecture: Generic CPU")
@@ -262,6 +262,7 @@ if(TENZO_HAS_MLIR_COMPILER)
     endif()
 
     target_compile_options(tenzo-cli PRIVATE ${TENZO_RUNTIME_FLAGS})
+    target_compile_definitions(tenzo-cli PRIVATE -UNDEBUG)
 
     add_executable(micro_bench
         src/tests/IsolatedMicroKernel.cpp

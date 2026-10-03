@@ -31,6 +31,17 @@
 #include <vector>
 #include <iostream>
 #include <cstdint>
+#include <cstdlib>
+
+#define TENZO_TEST_ASSERT(cond, msg) \
+    do { \
+        if (!(cond)) { \
+            llvm::errs() << "\n❌ [TEST ASSERTION FAILED] " << (msg) \
+                         << "\n   Expression: " << #cond \
+                         << "\n   Location: " << __FILE__ << ":" << __LINE__ << "\n"; \
+            std::abort(); \
+        } \
+    } while (0)
 
 namespace tenzo {
 
@@ -146,7 +157,8 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
         builder.create<mlir::func::ReturnOp>(loc, packOpNoScale.getResult());
 
         // Verification of MLIR module
-        assert(mlir::succeeded(module.verify()) && "Module verification failed for TernaryPackOp!");
+        auto verStatus = module.verify();
+        TENZO_TEST_ASSERT(mlir::succeeded(verStatus), "Module verification failed for TernaryPackOp!");
 
         // 1c. Textual round-trip parsing test
         const char *mlirText = R"mlir(
@@ -162,8 +174,9 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
             }
         )mlir";
         auto parsedModule = mlir::parseSourceString<mlir::ModuleOp>(mlirText, &context);
-        assert(parsedModule && "Failed to parse textual MLIR containing tenzo.ternary_pack!");
-        assert(mlir::succeeded(parsedModule->verify()) && "Parsed module verification failed!");
+        TENZO_TEST_ASSERT(parsedModule, "Failed to parse textual MLIR containing tenzo.ternary_pack!");
+        auto pVerStatus = parsedModule->verify();
+        TENZO_TEST_ASSERT(mlir::succeeded(pVerStatus), "Parsed module verification failed!");
 
         llvm::outs() << "  ✅ TernaryPackOp verified with scale, without scale, and via textual MLIR parser!\n";
     }
@@ -435,8 +448,10 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
         params.NR = 16;
         params.VEC_SIZE = 8;
         tenzo::addExplicitMicroKernelPass(pm, params);
-        assert(mlir::succeeded(pm.run(module)) && "ExplicitMicroKernelPass failed in JIT test!");
-        assert(mlir::succeeded(module.verify()) && "Module verification failed after microkernel pass!");
+        auto pmStatus = pm.run(module);
+        TENZO_TEST_ASSERT(mlir::succeeded(pmStatus), "ExplicitMicroKernelPass failed in JIT test!");
+        auto verStatus = module.verify();
+        TENZO_TEST_ASSERT(mlir::succeeded(verStatus), "Module verification failed after microkernel pass!");
 
         // Step 2: Lower to LLVM
         mlir::PassManager llvmPM(&context);
@@ -445,7 +460,8 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
         tiles.N = 16;
         tiles.K = 16;
         tenzo::addTenzoToLLVMPasses(llvmPM, /*enableVectorization=*/false, tiles, /*enableParallel=*/false, /*useExplicitKernel=*/false);
-        assert(mlir::succeeded(llvmPM.run(module)) && "LLVM lowering failed in JIT test!");
+        auto llvmStatus = llvmPM.run(module);
+        TENZO_TEST_ASSERT(mlir::succeeded(llvmStatus), "LLVM lowering failed in JIT test!");
 
         // Step 3: JIT Compilation
         llvm::InitializeNativeTarget();
@@ -459,7 +475,11 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
         engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
         auto maybeEngine = mlir::ExecutionEngine::create(module, engineOptions);
-        assert(maybeEngine && "Failed to create ExecutionEngine for fused microkernel!");
+        if (!maybeEngine) {
+            llvm::errs() << "❌ Failed to create ExecutionEngine for fused microkernel: "
+                         << llvm::toString(maybeEngine.takeError()) << "\n";
+            std::abort();
+        }
         auto engine = std::move(maybeEngine.get());
 
         // Step 4: Populate test matrices:
@@ -635,8 +655,10 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
         params.NR = 16;
         params.VEC_SIZE = 8;
         tenzo::addExplicitMicroKernelPass(pm, params);
-        assert(mlir::succeeded(pm.run(module)) && "Standalone pack microkernel lowering failed!");
-        assert(mlir::succeeded(module.verify()) && "Module verification failed after standalone pack!");
+        auto pmStatus = pm.run(module);
+        TENZO_TEST_ASSERT(mlir::succeeded(pmStatus), "Standalone pack microkernel lowering failed!");
+        auto verStatus = module.verify();
+        TENZO_TEST_ASSERT(mlir::succeeded(verStatus), "Module verification failed after standalone pack!");
 
         // Lower to LLVM
         mlir::PassManager llvmPM(&context);
@@ -645,7 +667,8 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
         llvmPM.addPass(mlir::createReconcileUnrealizedCastsPass());
         tenzo::TileSizes tiles{4, 16, 16};
         tenzo::addTenzoToLLVMPasses(llvmPM, false, tiles, false, false);
-        assert(mlir::succeeded(llvmPM.run(module)) && "LLVM lowering failed for standalone pack!");
+        auto llvmStatus = llvmPM.run(module);
+        TENZO_TEST_ASSERT(mlir::succeeded(llvmStatus), "LLVM lowering failed for standalone pack!");
 
         // JIT Compile
         mlir::ExecutionEngineOptions engineOptions;
@@ -653,7 +676,11 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
         engineOptions.jitCodeGenOptLevel = llvm::CodeGenOptLevel::Aggressive;
 
         auto maybeEngine = mlir::ExecutionEngine::create(module, engineOptions);
-        assert(maybeEngine && "Failed to create ExecutionEngine for standalone pack!");
+        if (!maybeEngine) {
+            llvm::errs() << "❌ Failed to create ExecutionEngine for standalone pack: "
+                         << llvm::toString(maybeEngine.takeError()) << "\n";
+            std::abort();
+        }
         auto engine = std::move(maybeEngine.get());
 
         alignas(32) float in_data[4 * 16];
@@ -806,8 +833,10 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
             tenzo::MicroKernelParams params;
             params.MR = 6; params.NR = 16; params.VEC_SIZE = 8;
             tenzo::addExplicitMicroKernelPass(pm, params);
-            assert(mlir::succeeded(pm.run(module)) && "0D tensor scale lowering failed!");
-            assert(mlir::succeeded(module.verify()) && "0D tensor scale module verification failed!");
+            auto pmStatus = pm.run(module);
+            TENZO_TEST_ASSERT(mlir::succeeded(pmStatus), "0D tensor scale lowering failed!");
+            auto verStatus = module.verify();
+            TENZO_TEST_ASSERT(mlir::succeeded(verStatus), "0D tensor scale module verification failed!");
         }
 
         llvm::outs() << "  ✅ All negative paths and edge cases passed verification!\n";
