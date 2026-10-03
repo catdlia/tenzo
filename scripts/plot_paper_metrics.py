@@ -25,7 +25,9 @@ plt.rcParams.update({
     'ps.fonttype': 42
 })
 
-OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'benchmark_results')
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def plot_memory_footprint():
     """Chart 1: Memory Footprint across Context Lengths (1K to 32K)"""
