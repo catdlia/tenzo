@@ -131,7 +131,7 @@ jobs:
 
   rpi4-arm64-benchmark:
     name: ARM64 Native Benchmark (Raspberry Pi 4B)
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, rpi4]
     continue-on-error: true
     timeout-minutes: 10
     steps:
@@ -154,7 +154,7 @@ jobs:
 
   benchmark-report:
     name: Generate Benchmark Summary
-    needs: [build-and-test]
+    needs: [build-and-test, rpi4-arm64-benchmark]
     runs-on: ubuntu-24.04
     if: always() && needs.build-and-test.result == 'success'
     steps:
