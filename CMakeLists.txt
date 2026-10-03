@@ -400,6 +400,26 @@ target_link_libraries(tenzo-diag PRIVATE
 )
 
 # ============================================================
+# 📄 Paper Evaluation Micro-Benchmark (Standalone)
+# ============================================================
+add_executable(paper_benchmark
+    src/tests/PaperMicroBenchmark.cpp
+)
+target_include_directories(paper_benchmark PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_compile_options(paper_benchmark PRIVATE
+    ${TENZO_RUNTIME_FLAGS}
+)
+if(TARGET OpenMP::OpenMP_CXX)
+    target_link_libraries(paper_benchmark PRIVATE OpenMP::OpenMP_CXX)
+endif()
+target_link_libraries(paper_benchmark PRIVATE
+    m
+)
+
+# ============================================================
 # 🐍 Python Bridge (pybind11 - optional)
 # ============================================================
 find_package(Python COMPONENTS Interpreter Development QUIET)

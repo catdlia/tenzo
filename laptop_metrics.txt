@@ -1,0 +1,132 @@
+==========================================================================
+  🔬 LAPTOP MICRO-BENCHMARK & PERF HARDWARE METRICS (Intel Core i3 AVX2) 
+==========================================================================
+
+--- 1. FULL RUN SUMMARY (Contexts 1024, 4096, 8192, 32768) ---
+╔══════════════════════════════════════════════════════════════════════╗
+║  🚀 TENZO COMPILER: PAPER MICRO-BENCHMARK (GQA ATTENTION)            ║
+║  Architecture: x86_64 AVX2 + FMA SIMD Micro-Kernel                   ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════
+  📊 Benchmarking Context Length T = 1024 tokens (H_q=32, H_kv=8, D=128)
+══════════════════════════════════════════════════════════════════════
+  [Memory Footprint]
+    • Baseline Allocated (KV + Copy Buffer): 40.00 MB
+    • Tenzo Allocated (Packed KV, Zero Copy): 0.50 MB (80.0x reduction)
+  [Performance & Throughput]
+    • Baseline FP32 Attention Latency : 2.115 ms  (472.8 tok/sec, 19.83 GB/s)
+    • Tenzo Packed Attention Latency  : 2.129 ms  (469.6 tok/sec, 0.25 GB/s)
+    ⚡ Speedup: 0.99x faster
+
+══════════════════════════════════════════════════════════════════════
+  📊 Benchmarking Context Length T = 4096 tokens (H_q=32, H_kv=8, D=128)
+══════════════════════════════════════════════════════════════════════
+  [Memory Footprint]
+    • Baseline Allocated (KV + Copy Buffer): 160.00 MB
+    • Tenzo Allocated (Packed KV, Zero Copy): 2.00 MB (80.0x reduction)
+  [Performance & Throughput]
+    • Baseline FP32 Attention Latency : 10.517 ms  (95.1 tok/sec, 15.95 GB/s)
+    • Tenzo Packed Attention Latency  : 9.656 ms  (103.6 tok/sec, 0.22 GB/s)
+    ⚡ Speedup: 1.09x faster
+
+══════════════════════════════════════════════════════════════════════
+  📊 Benchmarking Context Length T = 8192 tokens (H_q=32, H_kv=8, D=128)
+══════════════════════════════════════════════════════════════════════
+  [Memory Footprint]
+    • Baseline Allocated (KV + Copy Buffer): 320.00 MB
+    • Tenzo Allocated (Packed KV, Zero Copy): 4.00 MB (80.0x reduction)
+  [Performance & Throughput]
+    • Baseline FP32 Attention Latency : 75.287 ms  (13.3 tok/sec, 4.46 GB/s)
+    • Tenzo Packed Attention Latency  : 18.273 ms  (54.7 tok/sec, 0.23 GB/s)
+    ⚡ Speedup: 4.12x faster
+
+══════════════════════════════════════════════════════════════════════
+  📊 Benchmarking Context Length T = 32768 tokens (H_q=32, H_kv=8, D=128)
+══════════════════════════════════════════════════════════════════════
+  [Memory Footprint]
+    • Baseline Allocated (KV + Copy Buffer): 1280.00 MB
+    • Tenzo Allocated (Packed KV, Zero Copy): 16.00 MB (80.0x reduction)
+  [Performance & Throughput]
+    • Baseline FP32 Attention Latency : 177.321 ms  (5.6 tok/sec, 7.57 GB/s)
+    • Tenzo Packed Attention Latency  : 81.922 ms  (12.2 tok/sec, 0.20 GB/s)
+    ⚡ Speedup: 2.16x faster
+
+
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
+║                     🔬 TENZO VS. BASELINE PAPER EVALUATION SUMMARY TABLE                          ║
+╠═════════════╦═══════════════════════╦═══════════════════════╦══════════╦══════════════════════════╣
+║ Context (T) ║ Baseline (FP32+Copy)  ║ Tenzo (Packed+Zero-Cp)║ Speedup  ║ Memory Reduction         ║
+║             ║ Latency  | Memory     ║ Latency  | Memory     ║          ║ Working Set Ratio        ║
+╠═════════════╬══════════╪════════════╬══════════╪════════════╬══════════╬══════════════════════════╣
+║        1024 ║   2.12ms |    40.0MB ║   2.13ms |     0.5MB ║    0.99x ║            80.0x smaller     ║
+║        4096 ║  10.52ms |   160.0MB ║   9.66ms |     2.0MB ║    1.09x ║            80.0x smaller     ║
+║        8192 ║  75.29ms |   320.0MB ║  18.27ms |     4.0MB ║    4.12x ║            80.0x smaller     ║
+║       32768 ║ 177.32ms |  1280.0MB ║  81.92ms |    16.0MB ║    2.16x ║            80.0x smaller     ║
+╚═════════════╩═══════════════════════╩═══════════════════════╩══════════╩══════════════════════════╝
+
+--- 2. PERF HARDWARE COUNTERS: BASELINE (T=8192, 10 iters) ---
+╔══════════════════════════════════════════════════════════════════════╗
+║  🚀 TENZO COMPILER: PAPER MICRO-BENCHMARK (GQA ATTENTION)            ║
+║  Architecture: x86_64 AVX2 + FMA SIMD Micro-Kernel                   ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════
+  📊 Benchmarking Context Length T = 8192 tokens (H_q=32, H_kv=8, D=128)
+══════════════════════════════════════════════════════════════════════
+  [Memory Footprint]
+    • Baseline Allocated (KV + Copy Buffer): 320.00 MB
+    • Tenzo Allocated (Packed KV, Zero Copy): 4.00 MB (80.0x reduction)
+  [Performance & Throughput]
+    • Baseline FP32 Attention Latency : 96.573 ms  (10.4 tok/sec, 3.47 GB/s)
+
+ Performance counter stats for './cmake-build-debug/paper_benchmark --baseline --context 8192 --iters 10':
+
+       428,767,635      cpu_atom/L1-dcache-loads/u                                              (47.64%)
+       395,630,026      cpu_core/L1-dcache-loads/u                                              (52.36%)
+   <not supported>      cpu_atom/L1-dcache-load-misses/u                                      
+        79,319,815      cpu_core/L1-dcache-load-misses/u                                        (52.36%)
+        28,053,047      cpu_atom/LLC-loads/u                                                    (47.64%)
+        71,228,125      cpu_core/LLC-loads/u                                                    (52.36%)
+        26,638,011      cpu_atom/LLC-load-misses/u                                              (47.64%)
+        65,759,784      cpu_core/LLC-load-misses/u                                              (52.36%)
+
+       1.313128367 seconds time elapsed
+
+       1.194310000 seconds user
+       0.087487000 seconds sys
+
+
+
+--- 3. PERF HARDWARE COUNTERS: TENZO PACKED ATTENTION (T=8192, 10 iters) ---
+╔══════════════════════════════════════════════════════════════════════╗
+║  🚀 TENZO COMPILER: PAPER MICRO-BENCHMARK (GQA ATTENTION)            ║
+║  Architecture: x86_64 AVX2 + FMA SIMD Micro-Kernel                   ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+══════════════════════════════════════════════════════════════════════
+  📊 Benchmarking Context Length T = 8192 tokens (H_q=32, H_kv=8, D=128)
+══════════════════════════════════════════════════════════════════════
+  [Memory Footprint]
+    • Baseline Allocated (KV + Copy Buffer): 320.00 MB
+    • Tenzo Allocated (Packed KV, Zero Copy): 4.00 MB (80.0x reduction)
+  [Performance & Throughput]
+    • Tenzo Packed Attention Latency  : 20.453 ms  (48.9 tok/sec, 0.21 GB/s)
+
+ Performance counter stats for './cmake-build-debug/paper_benchmark --tenzo --context 8192 --iters 10':
+
+       492,627,728      cpu_atom/L1-dcache-loads/u                                              (11.53%)
+     1,104,167,362      cpu_core/L1-dcache-loads/u                                              (88.47%)
+   <not supported>      cpu_atom/L1-dcache-load-misses/u                                      
+         2,145,789      cpu_core/L1-dcache-load-misses/u                                        (88.47%)
+            41,077      cpu_atom/LLC-loads/u                                                    (11.53%)
+            19,041      cpu_core/LLC-loads/u                                                    (88.47%)
+            19,117      cpu_atom/LLC-load-misses/u                                              (11.53%)
+            11,454      cpu_core/LLC-load-misses/u                                              (88.47%)
+
+       0.335487446 seconds time elapsed
+
+       0.306100000 seconds user
+       0.027754000 seconds sys
+
+

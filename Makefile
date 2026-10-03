@@ -1,7 +1,7 @@
 # Tenzo Compiler Makefile
 # Convenience wrapper for common operations
 
-.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag bench version docker-build dev docker-shell compile-commands format watch help
+.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help
 
 # Default target
 all: build
@@ -18,7 +18,7 @@ build:
 # Локальний білд компілятора та SDK
 build-local:
 	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo-diag tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo-diag paper_benchmark tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
 
 # Збірка лише автономного C/C++ SDK та прикладів (швидко)
 build-sdk:
@@ -96,6 +96,12 @@ hetero-bench: build
 diag:
 	@echo "🔬 Running hardware & inference diagnostics..."
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-diag $(if $(MODEL),$(MODEL),/app/tenzo-frontend/export_output)
+
+# Run Paper Micro-Benchmark (Baseline vs Tenzo Packed Attention)
+# Usage: make paper-bench [ARGS="--context 4096"]
+paper-bench:
+	@echo "📄 Running Paper Micro-Benchmark (Baseline vs. Tenzo)..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/paper_benchmark $(ARGS)
 
 # Run text generation (MLIR JIT)
 # Usage: make generate PROMPT="Your prompt" [TOKENS=50] [TEMP=0.7]

@@ -15,7 +15,7 @@ import subprocess
 
 TARGETS = {
     "phone": "qPzEE7SMDX3c7h4hn7aeRezKz@nyc1.tmate.io",
-    "tablet": "aZFaa6YLWtCCnFduJCHVBwwaU@nyc1.tmate.io",
+    "tablet": "-p 8022 u0_a427@192.168.0.103",
 }
 
 def exec_remote_once(target_name, command, timeout=120):
@@ -33,7 +33,8 @@ def exec_remote_once(target_name, command, timeout=120):
         os.environ['TERM'] = 'xterm-256color'
         os.dup2(slave, 0); os.dup2(slave, 1); os.dup2(slave, 2)
         os.close(slave)
-        os.execlp('ssh', 'ssh', '-tt', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', ssh_target)
+        ssh_args = ['ssh', '-tt', '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15'] + ssh_target.split()
+        os.execlp('ssh', *ssh_args)
 
     os.close(slave)
     time.sleep(2.5)
