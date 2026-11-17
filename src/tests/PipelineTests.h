@@ -3,16 +3,16 @@
 
 namespace tenzo {
     // Основна точка входу для тестів
-    void runFullPipelineTest(mlir::MLIRContext &context);
+    bool runFullPipelineTest(mlir::MLIRContext &context);
 
     // Нова функція для бенчмаркінгу
-    void runBenchmark(mlir::MLIRContext &context);
+    bool runBenchmark(mlir::MLIRContext &context);
 
     // Large matrix benchmark (1024x1024)
     void runLargeMatrixBenchmark(mlir::MLIRContext &context);
 
     // Conv2D test
-    void runConv2DTest(mlir::MLIRContext &context);
+    bool runConv2DTest(mlir::MLIRContext &context);
 
     // Small matrix test (64x64) for explicit vectorization
     void runSmallMatMulTest(mlir::MLIRContext &context);
@@ -22,7 +22,7 @@ namespace tenzo {
 
     // Parallel (multithreaded) benchmark test
     void runParallelBenchmark(mlir::MLIRContext &context);
-    void runExplicitKernelBenchmark(mlir::MLIRContext &context);
+    bool runExplicitKernelBenchmark(mlir::MLIRContext &context);
 
     // Micro-kernel benchmark (6x16) - pure computational performance
     void runMicroKernelBenchmark(mlir::MLIRContext &context);

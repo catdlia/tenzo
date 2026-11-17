@@ -9,11 +9,20 @@ SERVER_NAME="tenzo-build-node"
 # UserKnownHostsFile=/dev/null — щоб нові сервери з тою ж IP не блокували known_hosts
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o LogLevel=ERROR"
 
-# дістаємо hetzner api токен з локального конфігу
-HCLOUD_TOKEN=$(grep '^\s*token\s*=' ~/.config/hcloud/cli.toml | head -1 | sed "s/.*= *'//;s/'.*//")
+# Obtain Hetzner Cloud API token from environment or config file
+if [ -z "${HCLOUD_TOKEN:-}" ]; then
+    HCLOUD_TOKEN=$(grep '^\s*token\s*=' ~/.config/hcloud/cli.toml 2>/dev/null | head -1 | sed "s/.*= *'//;s/'.*//")
+fi
 
 if [ -z "$HCLOUD_TOKEN" ]; then
-    echo "-> ❌ HCLOUD_TOKEN порожній! Перевір ~/.config/hcloud/cli.toml"
+    echo "ERROR: Remote compilation required. Local compilation fallback is prohibited."
+    echo "HCLOUD_TOKEN is empty or missing in environment and ~/.config/hcloud/cli.toml." >&2
+    exit 1
+fi
+
+if ! command -v hcloud >/dev/null 2>&1; then
+    echo "ERROR: Remote compilation required. Local compilation fallback is prohibited."
+    echo "'hcloud' CLI tool not found in PATH." >&2
     exit 1
 fi
 
@@ -123,10 +132,12 @@ else
 fi
 
 echo "-> 🔥 запускаємо віддалену компіляцію через docker..."
+TARGETS="${@:-tenzo-cli}"
+echo "-> 🎯 Цілі збірки: $TARGETS"
 docker compose run --rm --remove-orphans \
   -e DISTCC_HOSTS="$SERVER_IP/32,lzo" \
   -e CCACHE_PREFIX="distcc" \
-  dev ninja -C /app/cmake-build-debug tenzo-cli -j8
+  dev ninja -C /app/cmake-build-debug $TARGETS -j8
 
 echo "-> 🎯 компіляцію завершено!"
 echo "-> 💰 сервер залишається працювати. watchdog на сервері видалить його автоматично."

@@ -10,9 +10,17 @@
 #include "llvm/Support/FileSystem.h"
 #include <chrono>
 #include <cmath>
+#include <cstring>
+#include <limits>
 
 namespace tenzo {
 namespace gpu {
+
+static inline bool isNonFiniteFloat(float val) {
+    uint32_t bits = 0;
+    std::memcpy(&bits, &val, sizeof(float));
+    return ((bits & 0x7F800000) == 0x7F800000);
+}
 
 using namespace tenzo::gpu;
 
@@ -122,30 +130,43 @@ bool runGPUPipelineTest(mlir::MLIRContext &context) {
             };
             std::pair<void*, size_t> output = {C.data(), C.size() * sizeof(float)};
 
-            if (runtime::VulkanRuntime::execute(
+            if (!runtime::VulkanRuntime::execute(
                     spirvBinary, inputs, output,
                     {1, 1, 1},   // workgroup size
                     {256, 1, 1}  // num workgroups
                 )) {
-                // Verify result
-                bool correct = true;
-                for (size_t i = 0; i < 256 && correct; i++) {
-                    if (std::abs(C[i] - 5.0f) > 0.001f) {
-                        correct = false;
-                        llvm::outs() << "❌ Mismatch at " << i << ": " << C[i] << " != 5.0\n";
-                    }
-                }
-                if (correct) {
-                    llvm::outs() << "\n🎉🎉🎉 GPU EXECUTION SUCCESS! 🎉🎉🎉\n";
-                    llvm::outs() << "✅ Result verified: 2.0 + 3.0 = 5.0 for all 256 elements\n";
-                }
-            } else {
-                llvm::outs() << "⚠️  GPU execution failed (shader may need adjustment)\n";
+                llvm::errs() << "❌ [GPU-FAIL] Vulkan execution failed!\n";
+                runtime::VulkanRuntime::cleanup();
+                return false;
             }
 
+            // Verify result with strict IEEE 754 NaN and Inf rejection
+            bool correct = true;
+            for (size_t i = 0; i < 256; i++) {
+                float val = C[i];
+                if (isNonFiniteFloat(val) || std::isnan(val) || !std::isfinite(val)) {
+                    correct = false;
+                    llvm::errs() << "❌ [GPU-FAIL] Non-finite value (NaN/Inf) detected at index " << i << ": " << val << "\n";
+                    break;
+                }
+                if (std::abs(val - 5.0f) > 0.001f) {
+                    correct = false;
+                    llvm::errs() << "❌ [GPU-FAIL] Mismatch at index " << i << ": " << val << " != 5.0 (expected 5.0)\n";
+                    break;
+                }
+            }
+            if (!correct) {
+                runtime::VulkanRuntime::cleanup();
+                return false;
+            }
+
+            llvm::outs() << "\n🎉🎉🎉 GPU EXECUTION SUCCESS! 🎉🎉🎉\n";
+            llvm::outs() << "✅ Result verified: 2.0 + 3.0 = 5.0 for all 256 elements\n";
             runtime::VulkanRuntime::cleanup();
+            return true;
         } else {
-            llvm::outs() << "⚠️  Vulkan not available - skipping GPU execution\n";
+            llvm::outs() << "⚠️  [GPU-SKIP] Vulkan hardware/runtime not available (e.g. headless environment or driver error -9) - skipping GPU execution\n";
+            return true;
         }
 
         llvm::outs() << "\n📋 Next steps:\n";
@@ -314,10 +335,14 @@ void runGPUBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "CPU: " << cpuGBps << " GB/s\n";
     llvm::outs() << "GPU: " << gpuGBps << " GB/s\n";
 
-    // Verify correctness
+    // Verify correctness with strict NaN/Inf checks
     bool correct = true;
     for (size_t i = 0; i < SIZE && correct; i++) {
-        if (std::abs(C_gpu[i] - 5.0f) > 0.001f) {
+        float val = C_gpu[i];
+        if (isNonFiniteFloat(val) || std::isnan(val) || !std::isfinite(val)) {
+            correct = false;
+            llvm::outs() << "❌ GPU result non-finite (NaN/Inf) at " << i << ": " << val << "\n";
+        } else if (std::abs(val - 5.0f) > 0.001f) {
             correct = false;
             llvm::outs() << "❌ GPU result mismatch at " << i << "\n";
         }
@@ -327,6 +352,45 @@ void runGPUBenchmark(mlir::MLIRContext &context) {
     }
 
     runtime::VulkanRuntime::cleanup();
+}
+
+bool runGPUNaNRegressionTest() {
+    llvm::outs() << "▶ Running GPU NaN Detection Regression Test...\n";
+    // Synthetic output buffer containing intentional NaNs and Infs
+    std::vector<float> testBuffer(256, 5.0f);
+    testBuffer[42] = std::numeric_limits<float>::quiet_NaN();
+    testBuffer[100] = std::numeric_limits<float>::infinity();
+
+    bool detectedNaN = false;
+    bool detectedInf = false;
+
+    // Check index 42 (NaN)
+    float val42 = testBuffer[42];
+    if (isNonFiniteFloat(val42) || std::isnan(val42) || !std::isfinite(val42)) {
+        detectedNaN = true;
+    }
+
+    // Check index 100 (Inf)
+    float val100 = testBuffer[100];
+    if (isNonFiniteFloat(val100) || std::isnan(val100) || !std::isfinite(val100)) {
+        detectedInf = true;
+    }
+
+    // Full buffer scan simulation using same logic as runGPUPipelineTest
+    size_t nonFiniteCount = 0;
+    for (size_t i = 0; i < testBuffer.size(); ++i) {
+        float val = testBuffer[i];
+        if (isNonFiniteFloat(val) || std::isnan(val) || !std::isfinite(val)) {
+            nonFiniteCount++;
+        }
+    }
+
+    if (!detectedNaN || !detectedInf || nonFiniteCount != 2) {
+        llvm::errs() << "❌ [REGRESSION FAILURE] GPU verification loop failed to detect NaN/Inf in output buffer!\n";
+        return false;
+    }
+    llvm::outs() << "✅ [PASS] GPU NaN/Inf detection successfully rejected invalid floating-point values.\n";
+    return true;
 }
 
 } // namespace gpu

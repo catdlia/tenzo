@@ -122,9 +122,11 @@ Value getOrCreateVScale(PatternRewriter &rewriter, Location loc, VectorType vecT
 void emitTernaryPackingAST(PatternRewriter &rewriter, Location loc,
                            ValueRange accResults, Value vScale,
                            Value targetUint8Memref) {
+    auto f32Type = rewriter.getF32Type();
     auto i8Type = rewriter.getI8Type();
     auto i16Type = rewriter.getI16Type();
     auto i32Type = rewriter.getI32Type();
+    auto vecF32Type = VectorType::get({8}, f32Type);
     auto vecI32Type = VectorType::get({8}, i32Type);
     auto vecI16Type = VectorType::get({8}, i16Type);
     auto vecI8Type = VectorType::get({8}, i8Type);
@@ -137,6 +139,12 @@ void emitTernaryPackingAST(PatternRewriter &rewriter, Location loc,
     // Constant 3: multipliers / shift weights (YMM13)
     Value vMultipliers = rewriter.create<arith::ConstantOp>(
         loc, vec4I8Type, DenseElementsAttr::get(vec4I8Type, static_cast<int8_t>(2)));
+
+    // Clamping limits for QAT parity: [-1.0f, 1.0f]
+    Value vNegOne = rewriter.create<arith::ConstantOp>(
+        loc, vecF32Type, DenseElementsAttr::get(vecF32Type, -1.0f));
+    Value vPosOne = rewriter.create<arith::ConstantOp>(
+        loc, vecF32Type, DenseElementsAttr::get(vecF32Type, 1.0f));
 
     // Process each of the 4 rows (MR=4)
     for (int64_t i = 0; i < 4; i++) {
@@ -151,15 +159,26 @@ void emitTernaryPackingAST(PatternRewriter &rewriter, Location loc,
         accLo = rewriter.create<arith::MulFOp>(loc, accLo, vScale);
         accHi = rewriter.create<arith::MulFOp>(loc, accHi, vScale);
 
-        // 2. Convert to 32-bit ints (_mm256_cvtps_epi32)
-        Value i32Lo = rewriter.create<arith::FPToSIOp>(loc, vecI32Type, accLo);
-        Value i32Hi = rewriter.create<arith::FPToSIOp>(loc, vecI32Type, accHi);
+        // 2. Round to nearest integer (round-half-to-even) for QAT parity with torch.round / std::nearbyint
+        Value rndLo = rewriter.create<math::RoundEvenOp>(loc, accLo);
+        Value rndHi = rewriter.create<math::RoundEvenOp>(loc, accHi);
 
-        // 3. Shift values by +1 (domain {-1, 0, 1} -> {0, 1, 2})
+        // 3. Clamp to [-1.0f, 1.0f]
+        Value clampedLo = rewriter.create<arith::MaximumFOp>(loc, rndLo, vNegOne);
+        clampedLo = rewriter.create<arith::MinimumFOp>(loc, clampedLo, vPosOne);
+
+        Value clampedHi = rewriter.create<arith::MaximumFOp>(loc, rndHi, vNegOne);
+        clampedHi = rewriter.create<arith::MinimumFOp>(loc, clampedHi, vPosOne);
+
+        // 4. Convert to 32-bit ints (_mm256_cvtps_epi32)
+        Value i32Lo = rewriter.create<arith::FPToSIOp>(loc, vecI32Type, clampedLo);
+        Value i32Hi = rewriter.create<arith::FPToSIOp>(loc, vecI32Type, clampedHi);
+
+        // 5. Shift values by +1 (domain {-1, 0, 1} -> {0, 1, 2})
         Value shiftedLo = rewriter.create<arith::AddIOp>(loc, i32Lo, vOne);
         Value shiftedHi = rewriter.create<arith::AddIOp>(loc, i32Hi, vOne);
 
-        // 4. Narrowing to 16-bit and 8-bit (_mm256_packs_epi32, _mm256_packs_epi16)
+        // 6. Narrowing to 16-bit and 8-bit (_mm256_packs_epi32, _mm256_packs_epi16)
         Value i16Lo = rewriter.create<arith::TruncIOp>(loc, vecI16Type, shiftedLo);
         Value i16Hi = rewriter.create<arith::TruncIOp>(loc, vecI16Type, shiftedHi);
         Value i8Lo = rewriter.create<arith::TruncIOp>(loc, vecI8Type, i16Lo);
@@ -237,7 +256,10 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
         if (!aType || !bType || !cType || !aType.hasStaticShape() || !bType.hasStaticShape() || !cType.hasStaticShape())
             return failure();
 
-        if (aType.getRank() != 2 || bType.getRank() != 2)
+        if (aType.getRank() != 2 || bType.getRank() != 2 || cType.getRank() != 2)
+            return failure();
+
+        if (!aType.getLayout().isIdentity() || !bType.getLayout().isIdentity() || !cType.getLayout().isIdentity())
             return failure();
 
         if (!aType.getElementType().isF32() || !bType.getElementType().isF32())
@@ -271,6 +293,7 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
         }
         Operation *ternaryPackConsumer = nullptr;
         Operation *toTensorWrapper = nullptr;
+        Operation *castWrapper = nullptr;
 
         for (auto user : C.getUsers()) {
             if (user->getName().getStringRef() == "tenzo.ternary_pack" ||
@@ -297,10 +320,78 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
                         isa<tenzo::TernaryPackOp>(cUser)) {
                         isTernaryPack = true;
                         ternaryPackConsumer = cUser;
+                        castWrapper = castOp;
                         break;
                     }
                 }
                 if (isTernaryPack) break;
+            }
+        }
+
+        // Secondary consumer and non-zero initial C detection for F11:
+        bool hasSecondaryConsumer = false;
+        bool hasNonzeroInitialC = false;
+        if (isTernaryPack && cType.getElementType().isF32()) {
+            bool isZeroFilled = false;
+            bool hasExplicitNonZeroFill = false;
+            if (isa<BlockArgument>(C)) {
+                hasSecondaryConsumer = true;
+            }
+            for (auto user : C.getUsers()) {
+                if (user == op) continue;
+                if (user == ternaryPackConsumer) continue;
+                if (user == toTensorWrapper) continue;
+                if (user == castWrapper) continue;
+                if (isa<memref::DeallocOp>(user)) continue;
+                if (auto fillOp = dyn_cast<linalg::FillOp>(user)) {
+                    if (fillOp.getInputs().size() == 1) {
+                        Value fillVal = fillOp.getInputs()[0];
+                        if (auto constOp = fillVal.getDefiningOp<arith::ConstantFloatOp>()) {
+                            if (constOp.value().isZero()) {
+                                isZeroFilled = true;
+                            } else {
+                                hasExplicitNonZeroFill = true;
+                            }
+                        } else if (auto constOp = fillVal.getDefiningOp<arith::ConstantOp>()) {
+                            if (auto floatAttr = dyn_cast<FloatAttr>(constOp.getValue())) {
+                                if (floatAttr.getValue().isZero()) {
+                                    isZeroFilled = true;
+                                } else {
+                                    hasExplicitNonZeroFill = true;
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                }
+                hasSecondaryConsumer = true;
+                break;
+            }
+            if (toTensorWrapper) {
+                for (auto tUser : toTensorWrapper->getUsers()) {
+                    if (tUser != ternaryPackConsumer) {
+                        hasSecondaryConsumer = true;
+                        break;
+                    }
+                }
+            }
+            if (castWrapper) {
+                for (auto cUser : castWrapper->getUsers()) {
+                    if (cUser != ternaryPackConsumer) {
+                        hasSecondaryConsumer = true;
+                        break;
+                    }
+                }
+            }
+
+            hasNonzeroInitialC = hasExplicitNonZeroFill || (isa<BlockArgument>(C) && !isZeroFilled);
+            // If secondary consumers or nonzero initial C exist, verify that C can receive FP32 output
+            bool canPreserveFP32 = cType.getRank() == 2 &&
+                                   cType.getShape()[0] >= 4 &&
+                                   cType.getShape()[1] >= 16;
+            if ((hasSecondaryConsumer || hasNonzeroInitialC) && !canPreserveFP32) {
+                // Cannot accommodate secondary consumers, abort fusion to allow standard lowering
+                return failure();
             }
         }
 
@@ -349,9 +440,11 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
             for (int64_t j = 0; j < numVecsPerNR; j++) {
                 auto jOffset = rewriter.create<arith::ConstantIndexOp>(loc, j * params.VEC_SIZE);
                 Value cVec;
-                if (!isTernaryPack && cType.getElementType().isF32() && 
-                    cType.getShape().size() >= 2 && cType.getShape()[0] >= targetMR && 
-                    cType.getShape()[1] >= targetNR) {
+                bool shouldLoadC = (!isTernaryPack || hasSecondaryConsumer || hasNonzeroInitialC) &&
+                                   cType.getElementType().isF32() && 
+                                   cType.getShape().size() >= 2 && cType.getShape()[0] >= targetMR && 
+                                   cType.getShape()[1] >= targetNR;
+                if (shouldLoadC) {
                     cVec = rewriter.create<vector::TransferReadOp>(
                         loc, vecType, C, ValueRange{iIdx, jOffset}, zeroF32);
                 } else {
@@ -537,6 +630,19 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
             targetUint8Memref = rewriter.create<memref::AllocOp>(loc, packedMemRefType);
         }
 
+        // STEP 3.1: Dual-write FP32 accumulator results to C if secondary consumers or nonzero initial C exist
+        if (hasSecondaryConsumer || hasNonzeroInitialC) {
+            for (int64_t i = 0; i < targetMR; i++) {
+                auto iIdx = rewriter.create<arith::ConstantIndexOp>(loc, i);
+                for (int64_t j = 0; j < numVecsPerNR; j++) {
+                    auto jOffset = rewriter.create<arith::ConstantIndexOp>(loc, j * params.VEC_SIZE);
+                    Value res = results[i * numVecsPerNR + j];
+                    rewriter.create<vector::TransferWriteOp>(
+                        loc, res, C, ValueRange{iIdx, jOffset});
+                }
+            }
+        }
+
         // Emit fused AVX2 ternary packing logic
         emitTernaryPackingAST(rewriter, loc, results, vScale, targetUint8Memref);
 
@@ -566,13 +672,24 @@ struct ExplicitMicroKernelPattern : public OpRewritePattern<linalg::MatmulOp> {
             if (toTensorWrapper && toTensorWrapper->use_empty()) {
                 rewriter.eraseOp(toTensorWrapper);
             }
+            if (castWrapper && castWrapper->use_empty()) {
+                rewriter.eraseOp(castWrapper);
+            }
+        }
+        rewriter.eraseOp(op);
+
+        if (ternaryPackConsumer && !hasSecondaryConsumer && !hasNonzeroInitialC) {
             if (auto allocOp = C.getDefiningOp<memref::AllocOp>()) {
+                for (OpOperand &use : llvm::make_early_inc_range(allocOp->getUses())) {
+                    if (auto deallocOp = dyn_cast<memref::DeallocOp>(use.getOwner())) {
+                        rewriter.eraseOp(deallocOp);
+                    }
+                }
                 if (allocOp->use_empty()) {
                     rewriter.eraseOp(allocOp);
                 }
             }
         }
-        rewriter.eraseOp(op);
         return success();
     }
 };
@@ -748,7 +865,7 @@ void bitwise_attention_microkernel(
     float eff_scale = s_q * scale;
 
     // 2. Compute Q * K^T scores using AVX2 integer dot-products
-    std::vector<float> scores(T, -10000.0f);
+    std::vector<float> scores(T, -1e30f);
     int64_t valid_T = (seq_pos >= 0 && seq_pos < T) ? (seq_pos + 1) : T;
 
     const __m128i mask_0f = _mm_set1_epi8(0x0F);
@@ -966,9 +1083,21 @@ struct PackedAttentionMicroKernelPattern : public OpRewritePattern<tenzo::Packed
         if (!qType.getElementType().isF32() || !resType.getElementType().isF32())
             return failure();
 
+        if (!kType.getElementType().isInteger(8) || !vType.getElementType().isInteger(8))
+            return failure();
+
         int qRank = qType.getRank();
         int kRank = kType.getRank();
         int vRank = vType.getRank();
+
+        if (kRank != vRank)
+            return failure();
+
+        if (kType.getShape() != vType.getShape())
+            return failure();
+
+        if ((qRank == 4 && kRank != 4) || (qRank != 4 && kRank == 4))
+            return failure();
 
         if (qRank < 1 || kRank < 2 || vRank < 2)
             return failure();
@@ -978,12 +1107,23 @@ struct PackedAttentionMicroKernelPattern : public OpRewritePattern<tenzo::Packed
         if (D > 0 && kDim > 0 && kDim != D / 4)
             return failure();
 
-        if (D <= 0 || (D % 16 != 0))
+        if (D <= 0 || (D % 32 != 0))
             return failure();
 
         int64_t T = kType.getDimSize(kRank - 2);
         if (T <= 0)
             return failure();
+
+        int64_t B = (qRank == 4) ? qType.getDimSize(0) : 1;
+        bool qIsB1HDh = (qRank == 4 && qType.getDimSize(1) == 1 && qType.getDimSize(2) > 1);
+        int64_t Hq = (qRank == 4) ? (qIsB1HDh ? qType.getDimSize(2) : qType.getDimSize(1)) : 1;
+        int64_t Hkv = (kRank == 4) ? kType.getDimSize(1) : 1;
+
+        if (B <= 0 || Hq <= 0 || Hkv <= 0)
+            return failure();
+        if (Hq % Hkv != 0)
+            return failure();
+        int64_t gqaRatio = Hq / Hkv;
 
         llvm::outs() << "[MicroKernel] 🚀 Generating SIMD BITWISE PACKED ATTENTION Micro-Kernel (D="
                      << D << ", T=" << T << ")\n";
@@ -995,14 +1135,12 @@ struct PackedAttentionMicroKernelPattern : public OpRewritePattern<tenzo::Packed
         auto indexType = rewriter.getIndexType();
 
         auto vec8F32 = VectorType::get({8}, f32Type);
-        auto vec8I32 = VectorType::get({8}, i32Type);
         auto vec16I16 = VectorType::get({16}, i16Type);
         auto vec8I8 = VectorType::get({8}, i8Type);
         auto vec8I16 = VectorType::get({8}, i16Type);
 
         auto zeroF32 = rewriter.create<arith::ConstantOp>(loc, f32Type, rewriter.getF32FloatAttr(0.0f));
         auto zeroI8 = rewriter.create<arith::ConstantIntOp>(loc, 0, 8);
-        auto zeroVecI32 = rewriter.create<arith::ConstantOp>(loc, vec8I32, rewriter.getZeroAttr(vec8I32));
 
         // Scale factor: optional scale or default 1.0 / sqrt(D)
         Value vScale;
@@ -1032,6 +1170,11 @@ struct PackedAttentionMicroKernelPattern : public OpRewritePattern<tenzo::Packed
             } else {
                 seqPosVal = rewriter.create<arith::IndexCastOp>(loc, indexType, sp);
             }
+            // Clamp seqPos to valid index bounds [0, T-1]
+            Value c0Idx = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+            Value maxTIdx = rewriter.create<arith::ConstantIndexOp>(loc, T - 1);
+            Value clampedPos = rewriter.create<arith::MaxSIOp>(loc, seqPosVal, c0Idx);
+            seqPosVal = rewriter.create<arith::MinSIOp>(loc, clampedPos, maxTIdx);
         } else {
             seqPosVal = rewriter.create<arith::ConstantIndexOp>(loc, T);
         }
@@ -1048,11 +1191,11 @@ struct PackedAttentionMicroKernelPattern : public OpRewritePattern<tenzo::Packed
         auto shift4_vec = rewriter.create<arith::ConstantOp>(loc, vec8I16, DenseElementsAttr::get(vec8I16, static_cast<int16_t>(4)));
         auto shift6_vec = rewriter.create<arith::ConstantOp>(loc, vec8I16, DenseElementsAttr::get(vec8I16, static_cast<int16_t>(6)));
 
-        SmallVector<int64_t, 8> evenMask = {0, 2, 4, 6, 8, 10, 12, 14};
-        SmallVector<int64_t, 8> oddMask  = {1, 3, 5, 7, 9, 11, 13, 15};
         SmallVector<int64_t, 16> packLo16 = {0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7, 15};
         SmallVector<int64_t, 16> kSlice0Mask = {0, 1, 16, 17, 2, 3, 18, 19, 4, 5, 20, 21, 6, 7, 22, 23};
         SmallVector<int64_t, 16> kSlice1Mask = {8, 9, 24, 25, 10, 11, 26, 27, 12, 13, 28, 29, 14, 15, 30, 31};
+        SmallVector<int64_t, 8> lo8 = {0, 1, 2, 3, 4, 5, 6, 7};
+        SmallVector<int64_t, 8> hi8 = {8, 9, 10, 11, 12, 13, 14, 15};
 
         // Temporary scores memref [T]
         auto scoresMemType = MemRefType::get({T}, f32Type);
@@ -1060,267 +1203,228 @@ struct PackedAttentionMicroKernelPattern : public OpRewritePattern<tenzo::Packed
 
         auto c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
         auto c1_idx = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-        auto c4 = rewriter.create<arith::ConstantIndexOp>(loc, 4);
         auto c8 = rewriter.create<arith::ConstantIndexOp>(loc, 8);
         auto c32 = rewriter.create<arith::ConstantIndexOp>(loc, 32);
         auto cT = rewriter.create<arith::ConstantIndexOp>(loc, T);
         auto cD = rewriter.create<arith::ConstantIndexOp>(loc, D);
+        auto cB = rewriter.create<arith::ConstantIndexOp>(loc, B);
+        auto cHq = rewriter.create<arith::ConstantIndexOp>(loc, Hq);
+        Value cGqaRatio = (gqaRatio > 1) ? rewriter.create<arith::ConstantIndexOp>(loc, gqaRatio) : Value();
 
-        // Step 1: Compute Q * K^T scores
+        auto unpack8BytesTo4Vec8F32 = [&](OpBuilder &builder, Location l, Value rawI8) -> std::array<Value, 4> {
+            Value extI16 = builder.create<arith::ExtUIOp>(l, vec8I16, rawI8);
+            Value u0 = builder.create<arith::AndIOp>(l, extI16, c3_vec);
+            Value v0 = builder.create<arith::SubIOp>(l, u0, c1_vec);
+
+            Value s2 = builder.create<arith::ShRUIOp>(l, extI16, shift2_vec);
+            Value u1 = builder.create<arith::AndIOp>(l, s2, c3_vec);
+            Value v1 = builder.create<arith::SubIOp>(l, u1, c1_vec);
+
+            Value s4 = builder.create<arith::ShRUIOp>(l, extI16, shift4_vec);
+            Value u2 = builder.create<arith::AndIOp>(l, s4, c3_vec);
+            Value v2 = builder.create<arith::SubIOp>(l, u2, c1_vec);
+
+            Value s6 = builder.create<arith::ShRUIOp>(l, extI16, shift6_vec);
+            Value u3 = builder.create<arith::AndIOp>(l, s6, c3_vec);
+            Value v3 = builder.create<arith::SubIOp>(l, u3, c1_vec);
+
+            Value v01 = builder.create<vector::ShuffleOp>(l, v0, v1, packLo16);
+            Value v23 = builder.create<vector::ShuffleOp>(l, v2, v3, packLo16);
+            Value slice0 = builder.create<vector::ShuffleOp>(l, v01, v23, kSlice0Mask);
+            Value slice1 = builder.create<vector::ShuffleOp>(l, v01, v23, kSlice1Mask);
+
+            Value vi0 = builder.create<vector::ShuffleOp>(l, slice0, slice0, lo8);
+            Value vi1 = builder.create<vector::ShuffleOp>(l, slice0, slice0, hi8);
+            Value vi2 = builder.create<vector::ShuffleOp>(l, slice1, slice1, lo8);
+            Value vi3 = builder.create<vector::ShuffleOp>(l, slice1, slice1, hi8);
+
+            Value vf0 = builder.create<arith::SIToFPOp>(l, vec8F32, vi0);
+            Value vf1 = builder.create<arith::SIToFPOp>(l, vec8F32, vi1);
+            Value vf2 = builder.create<arith::SIToFPOp>(l, vec8F32, vi2);
+            Value vf3 = builder.create<arith::SIToFPOp>(l, vec8F32, vi3);
+
+            return {vf0, vf1, vf2, vf3};
+        };
+
+        auto zeroVec8F = rewriter.create<arith::ConstantOp>(loc, vec8F32, rewriter.getZeroAttr(vec8F32));
+        auto negInfScore = rewriter.create<arith::ConstantOp>(loc, f32Type, rewriter.getF32FloatAttr(-1e30f));
+
         rewriter.create<scf::ForOp>(
-            loc, c0, cT, c4, ValueRange{},
-            [&](OpBuilder &b, Location l, Value t, ValueRange) {
-                // Accumulators for 4 keys: YMM0-YMM3
-                auto dLoop = b.create<scf::ForOp>(
-                    l, c0, cD, c32, ValueRange{zeroVecI32, zeroVecI32, zeroVecI32, zeroVecI32},
-                    [&](OpBuilder &db, Location dl, Value d, ValueRange iterAccs) {
-                        SmallVector<Value> qIndices;
-                        if (qRank == 2) {
-                            qIndices = {c0, d};
-                        } else if (qRank == 4) {
-                            qIndices = {c0, c0, c0, d};
-                        } else {
-                            qIndices = {d};
-                        }
+            loc, c0, cB, c1_idx, ValueRange{},
+            [&](OpBuilder &bBuilder, Location bLoc, Value bVal, ValueRange) {
+                bBuilder.create<scf::ForOp>(
+                    bLoc, c0, cHq, c1_idx, ValueRange{},
+                    [&](OpBuilder &hqB, Location hqLoc, Value hqVal, ValueRange) {
+                        Value khVal = (gqaRatio > 1)
+                            ? hqB.create<arith::DivUIOp>(hqLoc, hqVal, cGqaRatio)
+                            : hqVal;
 
-                        Value qRaw0 = db.create<vector::TransferReadOp>(
-                            dl, vec8F32, query, qIndices, zeroF32);
-                        auto d8 = db.create<arith::AddIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 8));
-                        SmallVector<Value> qIndices1 = qIndices;
-                        qIndices1.back() = d8;
-                        Value qRaw1 = db.create<vector::TransferReadOp>(
-                            dl, vec8F32, query, qIndices1, zeroF32);
-
-                        auto d16 = db.create<arith::AddIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 16));
-                        SmallVector<Value> qIndices2 = qIndices;
-                        qIndices2.back() = d16;
-                        Value qRaw2 = db.create<vector::TransferReadOp>(
-                            dl, vec8F32, query, qIndices2, zeroF32);
-
-                        auto d24 = db.create<arith::AddIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 24));
-                        SmallVector<Value> qIndices3 = qIndices;
-                        qIndices3.back() = d24;
-                        Value qRaw3 = db.create<vector::TransferReadOp>(
-                            dl, vec8F32, query, qIndices3, zeroF32);
-
-                        // Convert to i16: YMM4 (q_slice0: 16xi16), YMM5 (q_slice1: 16xi16)
-                        Value qi16_0 = db.create<arith::FPToSIOp>(dl, vec8I16, qRaw0);
-                        Value qi16_1 = db.create<arith::FPToSIOp>(dl, vec8I16, qRaw1);
-                        Value qi16_2 = db.create<arith::FPToSIOp>(dl, vec8I16, qRaw2);
-                        Value qi16_3 = db.create<arith::FPToSIOp>(dl, vec8I16, qRaw3);
-
-                        Value q_slice0 = db.create<vector::ShuffleOp>(dl, qi16_0, qi16_1, packLo16);
-                        Value q_slice1 = db.create<vector::ShuffleOp>(dl, qi16_2, qi16_3, packLo16);
-
-                        Value qe0 = db.create<vector::ShuffleOp>(dl, q_slice0, q_slice0, evenMask);
-                        Value qo0 = db.create<vector::ShuffleOp>(dl, q_slice0, q_slice0, oddMask);
-                        Value qe1 = db.create<vector::ShuffleOp>(dl, q_slice1, q_slice1, evenMask);
-                        Value qo1 = db.create<vector::ShuffleOp>(dl, q_slice1, q_slice1, oddMask);
-
-                        Value qe32_0 = db.create<arith::ExtSIOp>(dl, vec8I32, qe0);
-                        Value qo32_0 = db.create<arith::ExtSIOp>(dl, vec8I32, qo0);
-                        Value qe32_1 = db.create<arith::ExtSIOp>(dl, vec8I32, qe1);
-                        Value qo32_1 = db.create<arith::ExtSIOp>(dl, vec8I32, qo1);
-
-                        SmallVector<Value, 4> nextAccs;
-                        Value d_byte = db.create<arith::DivUIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 4));
-
-                        for (int k = 0; k < 4; ++k) {
-                            auto kIdx = db.create<arith::ConstantIndexOp>(dl, k);
-                            auto t_curr = db.create<arith::AddIOp>(dl, t, kIdx);
-
-                            SmallVector<Value> kIndices;
-                            if (kRank == 2) {
-                                kIndices = {t_curr, d_byte};
-                            } else if (kRank == 4) {
-                                kIndices = {c0, c0, t_curr, d_byte};
-                            } else {
-                                kIndices = {t_curr, d_byte};
+                        auto getQIdx = [&](OpBuilder &, Value dVal) -> SmallVector<Value> {
+                            if (qRank == 2) return {c0, dVal};
+                            if (qRank == 4) {
+                                if (qIsB1HDh) return {bVal, c0, hqVal, dVal};
+                                return {bVal, hqVal, c0, dVal};
                             }
+                            return {dVal};
+                        };
 
-                            Value kRaw = db.create<vector::TransferReadOp>(
-                                dl, vec8I8, key, kIndices, zeroI8);
+                        auto getKIdx = [&](OpBuilder &, Value tVal, Value dByteVal) -> SmallVector<Value> {
+                            if (kRank == 2) return {tVal, dByteVal};
+                            if (kRank == 4) return {bVal, khVal, tVal, dByteVal};
+                            return {tVal, dByteVal};
+                        };
 
-                            Value kExt = db.create<arith::ExtUIOp>(dl, vec8I16, kRaw);
-                            Value u0 = db.create<arith::AndIOp>(dl, kExt, c3_vec);
-                            Value v0 = db.create<arith::SubIOp>(dl, u0, c1_vec);
+                        auto getVIdx = [&](OpBuilder &, Value tVal, Value dByteVal) -> SmallVector<Value> {
+                            if (vRank == 2) return {tVal, dByteVal};
+                            if (vRank == 4) return {bVal, khVal, tVal, dByteVal};
+                            return {tVal, dByteVal};
+                        };
 
-                            Value s2 = db.create<arith::ShRUIOp>(dl, kExt, shift2_vec);
-                            Value u1 = db.create<arith::AndIOp>(dl, s2, c3_vec);
-                            Value v1 = db.create<arith::SubIOp>(dl, u1, c1_vec);
+                        auto getOIdx = [&](OpBuilder &, Value dVal) -> SmallVector<Value> {
+                            if (qRank == 2) return {c0, dVal};
+                            if (qRank == 4) {
+                                if (qIsB1HDh) return {bVal, c0, hqVal, dVal};
+                                return {bVal, hqVal, c0, dVal};
+                            }
+                            return {dVal};
+                        };
 
-                            Value s4 = db.create<arith::ShRUIOp>(dl, kExt, shift4_vec);
-                            Value u2 = db.create<arith::AndIOp>(dl, s4, c3_vec);
-                            Value v2 = db.create<arith::SubIOp>(dl, u2, c1_vec);
+                        // Step 1: Compute Q * K^T scores into scoresMemref
+                        hqB.create<scf::ForOp>(
+                            hqLoc, c0, cT, c1_idx, ValueRange{},
+                            [&](OpBuilder &tb, Location tl, Value t, ValueRange) {
+                                auto dLoop = tb.create<scf::ForOp>(
+                                    tl, c0, cD, c32, ValueRange{zeroVec8F},
+                                    [&](OpBuilder &db, Location dl, Value d, ValueRange iterAccs) {
+                                        SmallVector<Value> qIdx0 = getQIdx(db, d);
+                                        Value qRaw0 = db.create<vector::TransferReadOp>(
+                                            dl, vec8F32, query, qIdx0, zeroF32);
 
-                            Value s6 = db.create<arith::ShRUIOp>(dl, kExt, shift6_vec);
-                            Value u3 = db.create<arith::AndIOp>(dl, s6, c3_vec);
-                            Value v3 = db.create<arith::SubIOp>(dl, u3, c1_vec);
+                                        auto d8 = db.create<arith::AddIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 8));
+                                        SmallVector<Value> qIdx1 = getQIdx(db, d8);
+                                        Value qRaw1 = db.create<vector::TransferReadOp>(
+                                            dl, vec8F32, query, qIdx1, zeroF32);
 
-                            Value v01 = db.create<vector::ShuffleOp>(dl, v0, v1, packLo16);
-                            Value v23 = db.create<vector::ShuffleOp>(dl, v2, v3, packLo16);
-                            Value k_slice0 = db.create<vector::ShuffleOp>(dl, v01, v23, kSlice0Mask);
-                            Value k_slice1 = db.create<vector::ShuffleOp>(dl, v01, v23, kSlice1Mask);
+                                        auto d16 = db.create<arith::AddIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 16));
+                                        SmallVector<Value> qIdx2 = getQIdx(db, d16);
+                                        Value qRaw2 = db.create<vector::TransferReadOp>(
+                                            dl, vec8F32, query, qIdx2, zeroF32);
 
-                            Value ke0 = db.create<vector::ShuffleOp>(dl, k_slice0, k_slice0, evenMask);
-                            Value ko0 = db.create<vector::ShuffleOp>(dl, k_slice0, k_slice0, oddMask);
-                            Value ke1 = db.create<vector::ShuffleOp>(dl, k_slice1, k_slice1, evenMask);
-                            Value ko1 = db.create<vector::ShuffleOp>(dl, k_slice1, k_slice1, oddMask);
+                                        auto d24 = db.create<arith::AddIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 24));
+                                        SmallVector<Value> qIdx3 = getQIdx(db, d24);
+                                        Value qRaw3 = db.create<vector::TransferReadOp>(
+                                            dl, vec8F32, query, qIdx3, zeroF32);
 
-                            Value ke32_0 = db.create<arith::ExtSIOp>(dl, vec8I32, ke0);
-                            Value ko32_0 = db.create<arith::ExtSIOp>(dl, vec8I32, ko0);
-                            Value ke32_1 = db.create<arith::ExtSIOp>(dl, vec8I32, ke1);
-                            Value ko32_1 = db.create<arith::ExtSIOp>(dl, vec8I32, ko1);
+                                        Value d_byte = db.create<arith::DivUIOp>(dl, d, db.create<arith::ConstantIndexOp>(dl, 4));
+                                        SmallVector<Value> kIndices = getKIdx(db, t, d_byte);
+                                        Value kRaw = db.create<vector::TransferReadOp>(
+                                            dl, vec8I8, key, kIndices, zeroI8);
 
-                            Value pe0 = db.create<arith::MulIOp>(dl, qe32_0, ke32_0);
-                            Value po0 = db.create<arith::MulIOp>(dl, qo32_0, ko32_0);
-                            Value madd0 = db.create<arith::AddIOp>(dl, pe0, po0);
+                                        std::array<Value, 4> kflt = unpack8BytesTo4Vec8F32(db, dl, kRaw);
 
-                            Value pe1 = db.create<arith::MulIOp>(dl, qe32_1, ke32_1);
-                            Value po1 = db.create<arith::MulIOp>(dl, qo32_1, ko32_1);
-                            Value madd1 = db.create<arith::AddIOp>(dl, pe1, po1);
+                                        Value p0 = db.create<vector::FMAOp>(dl, qRaw0, kflt[0], iterAccs[0]);
+                                        Value p1 = db.create<vector::FMAOp>(dl, qRaw1, kflt[1], p0);
+                                        Value p2 = db.create<vector::FMAOp>(dl, qRaw2, kflt[2], p1);
+                                        Value p3 = db.create<vector::FMAOp>(dl, qRaw3, kflt[3], p2);
 
-                            Value dsum = db.create<arith::AddIOp>(dl, madd0, madd1);
-                            Value updatedAcc = db.create<arith::AddIOp>(dl, iterAccs[k], dsum);
-                            nextAccs.push_back(updatedAcc);
-                        }
-                        db.create<scf::YieldOp>(dl, nextAccs);
+                                        db.create<scf::YieldOp>(dl, ValueRange{p3});
+                                    });
+
+                                Value isum = tb.create<vector::ReductionOp>(
+                                    tl, vector::CombiningKind::ADD, dLoop.getResult(0));
+                                Value score = tb.create<arith::MulFOp>(tl, isum, vScale);
+
+                                Value isCausal = tb.create<arith::CmpIOp>(
+                                    tl, arith::CmpIPredicate::sgt, t, seqPosVal);
+                                Value finalScore = tb.create<arith::SelectOp>(
+                                    tl, isCausal, negInfScore, score);
+
+                                tb.create<memref::StoreOp>(tl, finalScore, scoresMemref, ValueRange{t});
+                                tb.create<scf::YieldOp>(tl);
+                            });
+
+                        // Step 2: Softmax over scoresMemref
+                        auto negInfInit = hqB.create<arith::ConstantOp>(hqLoc, f32Type, hqB.getF32FloatAttr(-1e30f));
+                        auto maxLoop = hqB.create<scf::ForOp>(
+                            hqLoc, c0, cT, c1_idx, ValueRange{negInfInit},
+                            [&](OpBuilder &b, Location l, Value i, ValueRange iterMax) {
+                                Value sc = b.create<memref::LoadOp>(l, scoresMemref, ValueRange{i});
+                                Value newMax = b.create<arith::MaximumFOp>(l, iterMax[0], sc);
+                                b.create<scf::YieldOp>(l, ValueRange{newMax});
+                            });
+                        Value maxScore = maxLoop.getResult(0);
+
+                        auto sumInit = hqB.create<arith::ConstantOp>(hqLoc, f32Type, hqB.getF32FloatAttr(0.0f));
+                        auto expSumLoop = hqB.create<scf::ForOp>(
+                            hqLoc, c0, cT, c1_idx, ValueRange{sumInit},
+                            [&](OpBuilder &b, Location l, Value i, ValueRange iterSum) {
+                                Value sc = b.create<memref::LoadOp>(l, scoresMemref, ValueRange{i});
+                                Value diff = b.create<arith::SubFOp>(l, sc, maxScore);
+                                Value expVal = b.create<math::ExpOp>(l, diff);
+                                b.create<memref::StoreOp>(l, expVal, scoresMemref, ValueRange{i});
+                                Value newSum = b.create<arith::AddFOp>(l, iterSum[0], expVal);
+                                b.create<scf::YieldOp>(l, ValueRange{newSum});
+                            });
+                        Value sumExp = expSumLoop.getResult(0);
+                        Value invSumExp = hqB.create<arith::DivFOp>(
+                            hqLoc,
+                            hqB.create<arith::ConstantOp>(hqLoc, f32Type, hqB.getF32FloatAttr(1.0f)),
+                            sumExp);
+
+                        hqB.create<scf::ForOp>(
+                            hqLoc, c0, cT, c1_idx, ValueRange{},
+                            [&](OpBuilder &b, Location l, Value i, ValueRange) {
+                                Value ev = b.create<memref::LoadOp>(l, scoresMemref, ValueRange{i});
+                                Value w = b.create<arith::MulFOp>(l, ev, invSumExp);
+                                b.create<memref::StoreOp>(l, w, scoresMemref, ValueRange{i});
+                                b.create<scf::YieldOp>(l);
+                            });
+
+                        // Step 3: Initialize output slice for this (b, hq) to 0.0f
+                        hqB.create<scf::ForOp>(
+                            hqLoc, c0, cD, c8, ValueRange{},
+                            [&](OpBuilder &zb, Location zl, Value d, ValueRange) {
+                                SmallVector<Value> oIdx = getOIdx(zb, d);
+                                zb.create<vector::TransferWriteOp>(zl, zeroVec8F, outMemref, oIdx);
+                                zb.create<scf::YieldOp>(zl);
+                            });
+
+                        // Step 4: Value accumulation: outMemref += w_t * V[b, kh, t, :]
+                        hqB.create<scf::ForOp>(
+                            hqLoc, c0, cT, c1_idx, ValueRange{},
+                            [&](OpBuilder &tb, Location tl, Value t, ValueRange) {
+                                Value wt = tb.create<memref::LoadOp>(tl, scoresMemref, ValueRange{t});
+                                Value wtVec = tb.create<vector::BroadcastOp>(tl, vec8F32, wt);
+
+                                tb.create<scf::ForOp>(
+                                    tl, c0, cD, c32, ValueRange{},
+                                    [&](OpBuilder &vb, Location vl, Value d, ValueRange) {
+                                        Value d_byte = vb.create<arith::DivUIOp>(vl, d, vb.create<arith::ConstantIndexOp>(vl, 4));
+                                        SmallVector<Value> vIdx = getVIdx(vb, t, d_byte);
+                                        Value vRaw = vb.create<vector::TransferReadOp>(vl, vec8I8, value, vIdx, zeroI8);
+
+                                        std::array<Value, 4> vflt = unpack8BytesTo4Vec8F32(vb, vl, vRaw);
+
+                                        for (int chunk = 0; chunk < 4; ++chunk) {
+                                            auto cOffset = vb.create<arith::ConstantIndexOp>(vl, chunk * 8);
+                                            auto currD = vb.create<arith::AddIOp>(vl, d, cOffset);
+                                            SmallVector<Value> oIdx = getOIdx(vb, currD);
+
+                                            Value currOut = vb.create<vector::TransferReadOp>(vl, vec8F32, outMemref, oIdx, zeroF32);
+                                            Value prod = vb.create<arith::MulFOp>(vl, wtVec, vflt[chunk]);
+                                            Value updated = vb.create<arith::AddFOp>(vl, currOut, prod);
+                                            vb.create<vector::TransferWriteOp>(vl, updated, outMemref, oIdx);
+                                        }
+
+                                        vb.create<scf::YieldOp>(vl);
+                                    });
+
+                                tb.create<scf::YieldOp>(tl);
+                            });
+
+                        hqB.create<scf::YieldOp>(hqLoc);
                     });
-
-                for (int k = 0; k < 4; ++k) {
-                    auto kIdx = b.create<arith::ConstantIndexOp>(l, k);
-                    auto t_curr = b.create<arith::AddIOp>(l, t, kIdx);
-
-                    Value isum = b.create<vector::ReductionOp>(
-                        l, vector::CombiningKind::ADD, dLoop.getResult(k));
-                    Value fsum = b.create<arith::SIToFPOp>(l, f32Type, isum);
-                    Value score = b.create<arith::MulFOp>(l, fsum, vScale);
-
-                    Value isCausal = b.create<arith::CmpIOp>(l, arith::CmpIPredicate::sgt, t_curr, seqPosVal);
-                    Value negInf = b.create<arith::ConstantOp>(l, f32Type, b.getF32FloatAttr(-10000.0f));
-                    Value finalScore = b.create<arith::SelectOp>(l, isCausal, negInf, score);
-
-                    b.create<memref::StoreOp>(l, finalScore, scoresMemref, ValueRange{t_curr});
-                }
-                b.create<scf::YieldOp>(l);
-            });
-
-        // Step 2: Softmax over scoresMemref
-        auto negInfInit = rewriter.create<arith::ConstantOp>(loc, f32Type, rewriter.getF32FloatAttr(-1e30f));
-        auto maxLoop = rewriter.create<scf::ForOp>(
-            loc, c0, cT, c1_idx, ValueRange{negInfInit},
-            [&](OpBuilder &b, Location l, Value i, ValueRange iterMax) {
-                Value sc = b.create<memref::LoadOp>(l, scoresMemref, ValueRange{i});
-                Value newMax = b.create<arith::MaximumFOp>(l, iterMax[0], sc);
-                b.create<scf::YieldOp>(l, ValueRange{newMax});
-            });
-        Value maxScore = maxLoop.getResult(0);
-
-        auto sumInit = rewriter.create<arith::ConstantOp>(loc, f32Type, rewriter.getF32FloatAttr(0.0f));
-        auto expSumLoop = rewriter.create<scf::ForOp>(
-            loc, c0, cT, c1_idx, ValueRange{sumInit},
-            [&](OpBuilder &b, Location l, Value i, ValueRange iterSum) {
-                Value sc = b.create<memref::LoadOp>(l, scoresMemref, ValueRange{i});
-                Value diff = b.create<arith::SubFOp>(l, sc, maxScore);
-                Value expVal = b.create<math::ExpOp>(l, diff);
-                b.create<memref::StoreOp>(l, expVal, scoresMemref, ValueRange{i});
-                Value newSum = b.create<arith::AddFOp>(l, iterSum[0], expVal);
-                b.create<scf::YieldOp>(l, ValueRange{newSum});
-            });
-        Value sumExp = expSumLoop.getResult(0);
-        Value invSumExp = rewriter.create<arith::DivFOp>(loc, 
-            rewriter.create<arith::ConstantOp>(loc, f32Type, rewriter.getF32FloatAttr(1.0f)), sumExp);
-
-        rewriter.create<scf::ForOp>(
-            loc, c0, cT, c1_idx, ValueRange{},
-            [&](OpBuilder &b, Location l, Value i, ValueRange) {
-                Value ev = b.create<memref::LoadOp>(l, scoresMemref, ValueRange{i});
-                Value w = b.create<arith::MulFOp>(l, ev, invSumExp);
-                b.create<memref::StoreOp>(l, w, scoresMemref, ValueRange{i});
-                b.create<scf::YieldOp>(l);
-            });
-
-        // Initialize output memref to 0.0f
-        rewriter.create<scf::ForOp>(
-            loc, c0, cD, c8, ValueRange{},
-            [&](OpBuilder &b, Location l, Value d, ValueRange) {
-                SmallVector<Value> oIdx;
-                if (qRank == 2) oIdx = {c0, d};
-                else if (qRank == 4) oIdx = {c0, c0, c0, d};
-                else oIdx = {d};
-                Value zeroVec8F = b.create<arith::ConstantOp>(l, vec8F32, b.getZeroAttr(vec8F32));
-                b.create<vector::TransferWriteOp>(l, zeroVec8F, outMemref, oIdx);
-                b.create<scf::YieldOp>(l);
-            });
-
-        // Step 3: Value accumulation: output += w_t * V[t]
-        rewriter.create<scf::ForOp>(
-            loc, c0, cT, c1_idx, ValueRange{},
-            [&](OpBuilder &b, Location l, Value t, ValueRange) {
-                Value wt = b.create<memref::LoadOp>(l, scoresMemref, ValueRange{t});
-                Value wtVec = b.create<vector::BroadcastOp>(l, vec8F32, wt);
-
-                b.create<scf::ForOp>(
-                    l, c0, cD, c32, ValueRange{},
-                    [&](OpBuilder &vb, Location vl, Value d, ValueRange) {
-                        Value d_byte = vb.create<arith::DivUIOp>(vl, d, vb.create<arith::ConstantIndexOp>(vl, 4));
-                        SmallVector<Value> vIdx;
-                        if (vRank == 2) vIdx = {t, d_byte};
-                        else if (vRank == 4) vIdx = {c0, c0, t, d_byte};
-                        else vIdx = {t, d_byte};
-
-                        Value vRaw = vb.create<vector::TransferReadOp>(vl, vec8I8, value, vIdx, zeroI8);
-
-                        Value vExt = vb.create<arith::ExtUIOp>(vl, vec8I16, vRaw);
-                        Value u0 = vb.create<arith::AndIOp>(vl, vExt, c3_vec);
-                        Value val0 = vb.create<arith::SubIOp>(vl, u0, c1_vec);
-
-                        Value s2 = vb.create<arith::ShRUIOp>(vl, vExt, shift2_vec);
-                        Value u1 = vb.create<arith::AndIOp>(vl, s2, c3_vec);
-                        Value val1 = vb.create<arith::SubIOp>(vl, u1, c1_vec);
-
-                        Value s4 = vb.create<arith::ShRUIOp>(vl, vExt, shift4_vec);
-                        Value u2 = vb.create<arith::AndIOp>(vl, s4, c3_vec);
-                        Value val2 = vb.create<arith::SubIOp>(vl, u2, c1_vec);
-
-                        Value s6 = vb.create<arith::ShRUIOp>(vl, vExt, shift6_vec);
-                        Value u3 = vb.create<arith::AndIOp>(vl, s6, c3_vec);
-                        Value val3 = vb.create<arith::SubIOp>(vl, u3, c1_vec);
-
-                        Value v01 = vb.create<vector::ShuffleOp>(vl, val0, val1, packLo16);
-                        Value v23 = vb.create<vector::ShuffleOp>(vl, val2, val3, packLo16);
-                        Value v_slice0 = vb.create<vector::ShuffleOp>(vl, v01, v23, kSlice0Mask);
-                        Value v_slice1 = vb.create<vector::ShuffleOp>(vl, v01, v23, kSlice1Mask);
-
-                        Value vf0 = vb.create<vector::ShuffleOp>(vl, v_slice0, v_slice0, SmallVector<int64_t, 8>{0,1,2,3,4,5,6,7});
-                        Value vf1 = vb.create<vector::ShuffleOp>(vl, v_slice0, v_slice0, SmallVector<int64_t, 8>{8,9,10,11,12,13,14,15});
-                        Value vf2 = vb.create<vector::ShuffleOp>(vl, v_slice1, v_slice1, SmallVector<int64_t, 8>{0,1,2,3,4,5,6,7});
-                        Value vf3 = vb.create<vector::ShuffleOp>(vl, v_slice1, v_slice1, SmallVector<int64_t, 8>{8,9,10,11,12,13,14,15});
-
-                        Value vflt0 = vb.create<arith::SIToFPOp>(vl, vec8F32, vf0);
-                        Value vflt1 = vb.create<arith::SIToFPOp>(vl, vec8F32, vf1);
-                        Value vflt2 = vb.create<arith::SIToFPOp>(vl, vec8F32, vf2);
-                        Value vflt3 = vb.create<arith::SIToFPOp>(vl, vec8F32, vf3);
-
-                        for (int chunk = 0; chunk < 4; ++chunk) {
-                            auto cOffset = vb.create<arith::ConstantIndexOp>(vl, chunk * 8);
-                            auto currD = vb.create<arith::AddIOp>(vl, d, cOffset);
-                            SmallVector<Value> oIdx;
-                            if (qRank == 2) oIdx = {c0, currD};
-                            else if (qRank == 4) oIdx = {c0, c0, c0, currD};
-                            else oIdx = {currD};
-
-                            Value currOut = vb.create<vector::TransferReadOp>(vl, vec8F32, outMemref, oIdx, zeroF32);
-                            Value vVal = (chunk == 0) ? vflt0 : (chunk == 1) ? vflt1 : (chunk == 2) ? vflt2 : vflt3;
-                            Value prod = vb.create<arith::MulFOp>(vl, wtVec, vVal);
-                            Value updated = vb.create<arith::AddFOp>(vl, currOut, prod);
-                            vb.create<vector::TransferWriteOp>(vl, updated, outMemref, oIdx);
-                        }
-
-                        vb.create<scf::YieldOp>(vl);
-                    });
-
-                b.create<scf::YieldOp>(l);
+                bBuilder.create<scf::YieldOp>(bLoc);
             });
 
         rewriter.create<memref::DeallocOp>(loc, scoresMemref);
@@ -1346,6 +1450,12 @@ struct ExplicitMicroKernelPass
 
     tenzo::MicroKernelParams params;
     ExplicitMicroKernelPass(const tenzo::MicroKernelParams &p) : params(p) {}
+
+    void getDependentDialects(DialectRegistry &registry) const override {
+        registry.insert<arith::ArithDialect, math::MathDialect, vector::VectorDialect,
+                        memref::MemRefDialect, tensor::TensorDialect,
+                        bufferization::BufferizationDialect, tenzo::TenzoDialect>();
+    }
 
     void runOnOperation() override {
         auto func = getOperation();

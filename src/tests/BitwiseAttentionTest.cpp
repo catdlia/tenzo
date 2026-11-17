@@ -150,7 +150,7 @@ static void naiveFP32Attention(const float *query,       // [D]
 // ============================================================================
 // Test runner
 // ============================================================================
-void runBitwiseAttentionTest(mlir::MLIRContext &context) {
+bool runBitwiseAttentionTest(mlir::MLIRContext &context) {
   llvm::outs()
       << "\n╔════════════════════════════════════════════════════════╗\n";
   llvm::outs()
@@ -1014,6 +1014,7 @@ void runBitwiseAttentionTest(mlir::MLIRContext &context) {
 
   llvm::outs()
       << "\n🎉 ALL BITWISE ATTENTION & SIMD MICRO-KERNEL TESTS PASSED! 🎉\n\n";
+  return true;
 }
 
 } // namespace tenzo

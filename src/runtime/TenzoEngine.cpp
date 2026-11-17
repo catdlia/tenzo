@@ -1931,31 +1931,77 @@ std::vector<int8_t> pack_ternary_weights_raw(const uint8_t* raw_bytes, int64_t N
 } // namespace
 
 tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, const char* mlir_path) {
+    if (!weights_path || !mlir_path) {
+        std::cerr << "❌ [Tenzo Error] Invalid arguments: weights_path and mlir_path must not be null." << std::endl;
+        return TENZO_ERROR_INVALID_ARGUMENT;
+    }
+
     std::ifstream mf(mlir_path);
-    if (!mf.is_open()) return TENZO_ERROR_IO;
+    if (!mf.is_open()) {
+        std::cerr << "❌ [Tenzo Error] Failed to open MLIR graph topology file: " << mlir_path << std::endl;
+        return TENZO_ERROR_IO;
+    }
     std::stringstream ss; ss << mf.rdbuf();
     std::string mlir_text = ss.str();
+    if (mlir_text.empty()) {
+        std::cerr << "❌ [Tenzo Error] MLIR graph topology file is empty: " << mlir_path << std::endl;
+        return TENZO_ERROR_MODEL_PARSE;
+    }
 
     std::ifstream wf(weights_path, std::ios::binary | std::ios::ate);
-    if (!wf.is_open()) return TENZO_ERROR_IO;
+    if (!wf.is_open()) {
+        std::cerr << "❌ [Tenzo Error] Failed to open binary weights file: " << weights_path << std::endl;
+        return TENZO_ERROR_IO;
+    }
     std::streamsize fsize = wf.tellg();
+    if (fsize <= 0) {
+        std::cerr << "❌ [Tenzo Error] Binary weights file is empty (0 bytes): " << weights_path << std::endl;
+        return TENZO_ERROR_MODEL_PARSE;
+    }
     wf.seekg(0, std::ios::beg);
     std::vector<uint8_t> raw_bytes(fsize);
-    if (!wf.read(reinterpret_cast<char*>(raw_bytes.data()), fsize)) return TENZO_ERROR_IO;
+    if (!wf.read(reinterpret_cast<char*>(raw_bytes.data()), fsize)) {
+        std::cerr << "❌ [Tenzo Error] Failed to read " << fsize << " bytes from binary weights file: " << weights_path << std::endl;
+        return TENZO_ERROR_IO;
+    }
 
     const int vocab_size = config.vocab_size;
     const int hidden_size = config.hidden_size;
     const int num_layers = config.num_layers;
     const int ff_dim = config.ffn_dim;
+    const int q_dim = config.num_q_heads * config.head_dim;
+    const int kv_dim = config.num_kv_heads * config.head_dim;
 
-    // Weight Integrity & Diagnostic Check
-    if (fsize < 100000000) {
-        std::cerr << "\n⚠️  [Tenzo Diagnostic] Warning: Model file (" << (fsize / (1024*1024)) 
-                  << " MB) is smaller than the expected ~1.8 GB for 30-layer BitNet-2B.\n";
+    // Strict Topology Size Validation: eliminate silent truncation
+    size_t embed_bytes = static_cast<size_t>(vocab_size) * hidden_size * sizeof(float);
+    size_t layer_bytes = hidden_size * sizeof(float)
+                       + static_cast<size_t>(q_dim) * (hidden_size / 4)
+                       + static_cast<size_t>(kv_dim) * (hidden_size / 4)
+                       + static_cast<size_t>(kv_dim) * (hidden_size / 4)
+                       + hidden_size * sizeof(float)
+                       + static_cast<size_t>(hidden_size) * (q_dim / 4)
+                       + hidden_size * sizeof(float)
+                       + static_cast<size_t>(ff_dim) * (hidden_size / 4)
+                       + static_cast<size_t>(ff_dim) * (hidden_size / 4)
+                       + static_cast<size_t>(ff_dim) * sizeof(float)
+                       + static_cast<size_t>(hidden_size) * (ff_dim / 4);
+    size_t final_norm_bytes = static_cast<size_t>(hidden_size) * sizeof(float);
+    size_t min_expected_bytes = embed_bytes + static_cast<size_t>(num_layers) * layer_bytes + final_norm_bytes;
+
+    if (static_cast<size_t>(fsize) < min_expected_bytes) {
+        std::cerr << "❌ [Tenzo Error] Binary weights file is truncated or corrupted: " << weights_path << "\n"
+                  << "   Actual size: " << fsize << " bytes (" << (fsize / (1024 * 1024)) << " MB)\n"
+                  << "   Expected minimum: " << min_expected_bytes << " bytes (" << (min_expected_bytes / (1024 * 1024))
+                  << " MB) for " << num_layers << "-layer topology." << std::endl;
+        return TENZO_ERROR_MODEL_PARSE;
     }
 
-    // 1. Embeddings
-    size_t embed_bytes = static_cast<size_t>(vocab_size) * hidden_size * 4;
+    // 1. Embeddings validation
+    if (raw_bytes.size() < embed_bytes) {
+        std::cerr << "❌ [Tenzo Error] Weights file buffer smaller than embedding table: " << raw_bytes.size()
+                  << " bytes, required " << embed_bytes << " bytes." << std::endl;
+        return TENZO_ERROR_MODEL_PARSE;
+    }
     const float* embed_f32 = reinterpret_cast<const float*>(raw_bytes.data());
 
     // Check for uniform synthetic placeholder weights
@@ -1967,9 +2013,9 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         }
     }
     if (is_dummy_data && vocab_size > 200) {
-        std::cerr << "\n⚠️  [Tenzo Diagnostic] Notice: Running on synthetic/placeholder model weights.\n"
-                  << "   To download genuine pre-trained weights from Hugging Face, run:\n"
-                  << "   python3 scripts/download_model.py\n\n";
+        std::cerr << "❌ [Tenzo Error] Binary weights file contains synthetic/placeholder model weights (uniform embedding rows).\n"
+                  << "   Genuine pre-trained weights are required. Download with: python3 scripts/download_model.py\n" << std::endl;
+        return TENZO_ERROR_MODEL_PARSE;
     }
 
     // INT8 LM Head quantization
@@ -1991,7 +2037,7 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         }
     }
 
-    // 2. Parse views and scales from MLIR or calculate sequential offsets safely
+    // 2. Parse views and scales from MLIR
     std::regex view_regex(R"((%\w+)\s*=\s*arith\.constant\s+(\d+)\s*:\s*index\s*\r?\n\s*(%\w+)\s*=\s*memref\.view\s+%\w+\[\1\]\[\]\s*:\s*memref<\?xi8>\s+to\s+memref<([^>]+)>)");
     std::vector<size_t> all_views;
     auto v_begin = std::sregex_iterator(mlir_text.begin(), mlir_text.end(), view_regex);
@@ -2008,24 +2054,61 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         all_scales.push_back(std::stof((*it)[2].str()));
     }
 
-    // Lambda helpers with strict bounds checking
-    auto safe_slice_f32 = [&](size_t off, size_t count) -> std::vector<float> {
-        std::vector<float> vec(count, 1.0f);
-        if (off + count * sizeof(float) <= raw_bytes.size()) {
-            const float* p = reinterpret_cast<const float*>(raw_bytes.data() + off);
-            vec.assign(p, p + count);
+    const size_t expected_scales = static_cast<size_t>(num_layers) * 7;
+    if (all_scales.size() < expected_scales) {
+        std::cerr << "❌ [Tenzo Error] MLIR graph is missing BitLinear scale constants: " << mlir_path << "\n"
+                  << "   Found " << all_scales.size() << " scales, expected " << expected_scales
+                  << " (7 scales per layer for " << num_layers << " layers)." << std::endl;
+        return TENZO_ERROR_MODEL_PARSE;
+    }
+
+    const size_t expected_views = 1 + static_cast<size_t>(num_layers) * 11 + 1;
+    if (!all_views.empty() && all_views.size() < expected_views) {
+        std::cerr << "❌ [Tenzo Error] MLIR graph has incomplete memref view declarations: " << mlir_path << "\n"
+                  << "   Found " << all_views.size() << " views, expected " << expected_views << " views." << std::endl;
+        return TENZO_ERROR_MODEL_PARSE;
+    }
+
+    // Strict slice and pack helpers without silent synthetic fallbacks
+    bool load_failed = false;
+
+    auto strict_slice_f32 = [&](size_t off, size_t count, const char* name, int layer) -> std::vector<float> {
+        if (load_failed) return {};
+        size_t needed = count * sizeof(float);
+        if (off + needed > raw_bytes.size()) {
+            std::cerr << "❌ [Tenzo Error] Out-of-bounds weight slice for " << name
+                      << " (layer " << layer << "): offset " << off << " + " << needed
+                      << " bytes exceeds file size " << raw_bytes.size() << " bytes." << std::endl;
+            load_failed = true;
+            return {};
         }
-        return vec;
+        const float* p = reinterpret_cast<const float*>(raw_bytes.data() + off);
+        return std::vector<float>(p, p + count);
     };
 
-    auto safe_pack_ternary = [&](size_t off, int64_t N, int64_t K) -> std::vector<int8_t> {
+    auto strict_pack_ternary = [&](size_t off, int64_t N, int64_t K, const char* name, int layer) -> std::vector<int8_t> {
+        if (load_failed) return {};
         size_t needed = static_cast<size_t>(N) * (K / 4);
-        if (off + needed <= raw_bytes.size()) {
-            return pack_ternary_weights_raw(raw_bytes.data() + off, N, K);
+        if (off + needed > raw_bytes.size()) {
+            std::cerr << "❌ [Tenzo Error] Out-of-bounds ternary weight slice for " << name
+                      << " (layer " << layer << "): offset " << off << " + " << needed
+                      << " bytes exceeds file size " << raw_bytes.size() << " bytes." << std::endl;
+            load_failed = true;
+            return {};
         }
-        int64_t n_blocks = N / 64;
-        int64_t K_half = K / 2;
-        return std::vector<int8_t>(n_blocks * K_half * 32, 0x55);
+        return pack_ternary_weights_raw(raw_bytes.data() + off, N, K);
+    };
+
+    auto strict_get_scale = [&](const char* name, int layer) -> float {
+        if (load_failed) return 0.0f;
+        if (s_idx >= all_scales.size()) {
+            std::cerr << "❌ [Tenzo Error] Missing scale factor for " << name
+                      << " (layer " << layer << "): scale index " << s_idx
+                      << " exceeds available scales (" << all_scales.size() << ")." << std::endl;
+            load_failed = true;
+            return 0.0f;
+        }
+        return all_scales[s_idx++];
     };
 
     size_t v_idx = 1;
@@ -2033,94 +2116,119 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
     size_t seq_offset = embed_bytes;
 
     for (int l = 0; l < num_layers; ++l) {
+        if (load_failed) break;
         auto& lw = layers[l];
 
-        auto get_offset = [&](size_t sz_bytes) -> size_t {
+        auto get_offset = [&](size_t sz_bytes, const char* name) -> size_t {
+            if (load_failed) return 0;
             size_t off;
             if (v_idx < all_views.size()) {
                 off = all_views[v_idx++];
             } else {
                 off = seq_offset;
             }
+            if (off + sz_bytes > raw_bytes.size()) {
+                std::cerr << "❌ [Tenzo Error] Offset overflow for " << name
+                          << " (layer " << l << "): offset " << off << " + " << sz_bytes
+                          << " bytes exceeds file size " << raw_bytes.size() << " bytes." << std::endl;
+                load_failed = true;
+                return 0;
+            }
             seq_offset += sz_bytes;
             return off;
         };
 
-        auto get_scale = [&]() -> float {
-            if (s_idx < all_scales.size()) {
-                return all_scales[s_idx++];
-            }
-            return 1.0f;
-        };
-
         // 1. in_norm
-        size_t off = get_offset(hidden_size * sizeof(float));
-        lw.in_norm = safe_slice_f32(off, hidden_size);
+        size_t off = get_offset(hidden_size * sizeof(float), "in_norm");
+        lw.in_norm = strict_slice_f32(off, hidden_size, "in_norm", l);
         lw.in_norm_ptr = lw.in_norm.data();
 
         // 2. q_proj
-        off = get_offset(2560 * (2560 / 4));
-        lw.q_w = safe_pack_ternary(off, 2560, 2560);
+        off = get_offset(q_dim * (hidden_size / 4), "q_proj");
+        lw.q_w = strict_pack_ternary(off, q_dim, hidden_size, "q_proj", l);
         lw.q_w_ptr = lw.q_w.data();
-        lw.q_scale = get_scale();
+        lw.q_scale = strict_get_scale("q_proj", l);
 
         // 3. k_proj
-        off = get_offset(640 * (2560 / 4));
-        lw.k_w = safe_pack_ternary(off, 640, 2560);
+        off = get_offset(kv_dim * (hidden_size / 4), "k_proj");
+        lw.k_w = strict_pack_ternary(off, kv_dim, hidden_size, "k_proj", l);
         lw.k_w_ptr = lw.k_w.data();
-        lw.k_scale = get_scale();
+        lw.k_scale = strict_get_scale("k_proj", l);
 
         // 4. v_proj
-        off = get_offset(640 * (2560 / 4));
-        lw.v_w = safe_pack_ternary(off, 640, 2560);
+        off = get_offset(kv_dim * (hidden_size / 4), "v_proj");
+        lw.v_w = strict_pack_ternary(off, kv_dim, hidden_size, "v_proj", l);
         lw.v_w_ptr = lw.v_w.data();
-        lw.v_scale = get_scale();
+        lw.v_scale = strict_get_scale("v_proj", l);
 
         // 5. attn_sub_norm
-        off = get_offset(hidden_size * sizeof(float));
-        lw.attn_sub_norm = safe_slice_f32(off, hidden_size);
+        off = get_offset(hidden_size * sizeof(float), "attn_sub_norm");
+        lw.attn_sub_norm = strict_slice_f32(off, hidden_size, "attn_sub_norm", l);
         lw.attn_sub_norm_ptr = lw.attn_sub_norm.data();
 
         // 6. out_proj
-        off = get_offset(2560 * (2560 / 4));
-        lw.out_w = safe_pack_ternary(off, 2560, 2560);
+        off = get_offset(hidden_size * (q_dim / 4), "out_proj");
+        lw.out_w = strict_pack_ternary(off, hidden_size, q_dim, "out_proj", l);
         lw.out_w_ptr = lw.out_w.data();
-        lw.out_scale = get_scale();
+        lw.out_scale = strict_get_scale("out_proj", l);
 
         // 7. post_norm
-        off = get_offset(hidden_size * sizeof(float));
-        lw.post_norm = safe_slice_f32(off, hidden_size);
+        off = get_offset(hidden_size * sizeof(float), "post_norm");
+        lw.post_norm = strict_slice_f32(off, hidden_size, "post_norm", l);
         lw.post_norm_ptr = lw.post_norm.data();
 
         // 8. gate_proj
-        off = get_offset(ff_dim * (2560 / 4));
-        lw.gate_w = safe_pack_ternary(off, ff_dim, 2560);
+        off = get_offset(ff_dim * (hidden_size / 4), "gate_proj");
+        lw.gate_w = strict_pack_ternary(off, ff_dim, hidden_size, "gate_proj", l);
         lw.gate_w_ptr = lw.gate_w.data();
-        lw.gate_scale = get_scale();
+        lw.gate_scale = strict_get_scale("gate_proj", l);
 
         // 9. up_proj
-        off = get_offset(ff_dim * (2560 / 4));
-        lw.up_w = safe_pack_ternary(off, ff_dim, 2560);
+        off = get_offset(ff_dim * (hidden_size / 4), "up_proj");
+        lw.up_w = strict_pack_ternary(off, ff_dim, hidden_size, "up_proj", l);
         lw.up_w_ptr = lw.up_w.data();
-        lw.up_scale = get_scale();
+        lw.up_scale = strict_get_scale("up_proj", l);
 
         // 10. ffn_sub_norm
-        off = get_offset(ff_dim * sizeof(float));
-        lw.ffn_sub_norm = safe_slice_f32(off, ff_dim);
+        off = get_offset(ff_dim * sizeof(float), "ffn_sub_norm");
+        lw.ffn_sub_norm = strict_slice_f32(off, ff_dim, "ffn_sub_norm", l);
         lw.ffn_sub_norm_ptr = lw.ffn_sub_norm.data();
 
         // 11. down_proj
-        off = get_offset(2560 * (ff_dim / 4));
-        lw.down_w = safe_pack_ternary(off, 2560, ff_dim);
+        off = get_offset(hidden_size * (ff_dim / 4), "down_proj");
+        lw.down_w = strict_pack_ternary(off, hidden_size, ff_dim, "down_proj", l);
         lw.down_w_ptr = lw.down_w.data();
-        lw.down_scale = get_scale();
+        lw.down_scale = strict_get_scale("down_proj", l);
+    }
+
+    if (load_failed) {
+        layers.clear();
+        layers.resize(num_layers);
+        final_norm_w.clear();
+        final_norm_ptr = nullptr;
+        embed_w_i8.clear();
+        embed_scales.clear();
+        return TENZO_ERROR_MODEL_PARSE;
     }
 
     size_t final_off = (v_idx < all_views.size()) ? all_views[v_idx] : seq_offset;
-    final_norm_w = safe_slice_f32(final_off, hidden_size);
+    final_norm_w = strict_slice_f32(final_off, hidden_size, "final_norm", num_layers);
+    if (load_failed || final_norm_w.empty()) {
+        layers.clear();
+        layers.resize(num_layers);
+        final_norm_w.clear();
+        final_norm_ptr = nullptr;
+        embed_w_i8.clear();
+        embed_scales.clear();
+        return TENZO_ERROR_MODEL_PARSE;
+    }
     final_norm_ptr = final_norm_w.data();
 
     return TENZO_SUCCESS;
+}
+
+bool TenzoEngineImpl::initialize(const char* weights_path, const char* mlir_path) {
+    return load_model_from_files(weights_path, mlir_path) == TENZO_SUCCESS;
 }
 
 } // namespace tenzo

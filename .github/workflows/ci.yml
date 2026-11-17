@@ -11,6 +11,10 @@ permissions:
   contents: read
   packages: write
 
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+
 env:
   BUILD_TYPE: Release
 

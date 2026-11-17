@@ -179,6 +179,7 @@ if(TENZO_HAS_MLIR_COMPILER)
             src/tests/HeteroTests.cpp
             src/tests/TernaryPackTest.cpp
             src/tests/BitwiseAttentionTest.cpp
+            src/tests/AuditJITTest.cpp
     )
 
     add_dependencies(tenzo-cli TenzoOpsIncGen)
@@ -190,6 +191,8 @@ if(TENZO_HAS_MLIR_COMPILER)
             MLIRBytecodeOpInterface
             MLIRFuncDialect
             MLIRArithDialect
+            MLIRMathDialect
+            MLIRMathToLLVM
             MLIRPass
             MLIRTransforms
             MLIRLinalgDialect
@@ -262,6 +265,7 @@ if(TENZO_HAS_MLIR_COMPILER)
     endif()
 
     target_compile_options(tenzo-cli PRIVATE ${TENZO_RUNTIME_FLAGS} -UNDEBUG)
+    set_source_files_properties(src/tests/AuditJITTest.cpp PROPERTIES COMPILE_OPTIONS "-fno-finite-math-only;-fno-fast-math")
 
     add_executable(micro_bench
         src/tests/IsolatedMicroKernel.cpp

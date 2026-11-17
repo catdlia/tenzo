@@ -6,6 +6,8 @@ if os.path.exists(libs_dir) and libs_dir not in sys.path:
     sys.path.insert(0, libs_dir)
 
 import argparse
+import json
+import shutil
 import struct
 import torch
 import numpy as np
@@ -77,9 +79,9 @@ def unpack_ternary_bytes(packed_bytes: bytes, count: int = None) -> list:
     return unpacked
 
 
-def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="export_output_bitnet", num_layers=2, quant_mode="i2_s", packed_attention=False):
+def _export_bitnet_core(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="export_output_bitnet", num_layers=2, quant_mode="i2_s", packed_attention=False):
     os.makedirs(output_dir, exist_ok=True)
-    print(f"Hey! Exporting {model_name} ({num_layers} layers, quant_mode={quant_mode}, packed_attention={packed_attention})...")
+    print(f"Hey! Generating {model_name} ({num_layers} layers, quant_mode={quant_mode}, packed_attention={packed_attention}) into '{output_dir}'...")
 
     # 1. Download & Extract Tokenizer Vocabulary
     print("[Export BitNet] Extracting Tokenizer Vocabulary...")
@@ -152,25 +154,42 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
     q_weight = np.round(embed_w_f32 / scales[:, None]).astype(np.int8)
     
     write_tensor("model.embed_tokens.weight", torch.from_numpy(q_weight))
-    write_tensor("model.embed_tokens.scales", torch.from_numpy(scales.astype(np.float32)))    # Read config if present
-    config_path = os.path.join(model_name, "config.json") if os.path.isdir(model_name) else None
-    if config_path and os.path.exists(config_path):
-        import json
-        with open(config_path, "r") as f:
-            cfg = json.load(f)
-        hidden_size = cfg.get("hidden_size", 2560)
-        ff_dim = cfg.get("intermediate_size", 6912)
-        n_kv_heads = cfg.get("num_key_value_heads", 5)
-        n_q_heads = cfg.get("num_attention_heads", 20)
-        head_dim = cfg.get("head_dim", hidden_size // n_q_heads)
-    else:
-        hidden_size = 2560
-        ff_dim = 6912
-        n_kv_heads = 5
-        n_q_heads = 20
-        head_dim = 128
+    write_tensor("model.embed_tokens.scales", torch.from_numpy(scales.astype(np.float32)))
 
+    # Read config if present
+    config_path = os.path.join(model_name, "config.json") if os.path.isdir(model_name) else None
+    cfg = None
+    if config_path and os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    else:
+        try:
+            cfg_file = hf_hub_download(model_name, "config.json")
+            with open(cfg_file, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            cfg = {}
+
+    hidden_size = cfg.get("hidden_size", 2560)
+    ff_dim = cfg.get("intermediate_size", 6912)
+    n_kv_heads = cfg.get("num_key_value_heads", 5)
+    n_q_heads = cfg.get("num_attention_heads", 20)
+    head_dim = cfg.get("head_dim", hidden_size // n_q_heads)
     vocab_size = len(sorted_vocab)
+
+    cfg["hidden_size"] = hidden_size
+    cfg["intermediate_size"] = ff_dim
+    cfg["num_key_value_heads"] = n_kv_heads
+    cfg["num_attention_heads"] = n_q_heads
+    cfg["head_dim"] = head_dim
+    cfg["vocab_size"] = vocab_size
+    cfg["num_layers_exported"] = num_layers
+    cfg["quant_mode"] = quant_mode
+
+    config_out_path = os.path.join(output_dir, "config.json")
+    with open(config_out_path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
+    print(f"  ✅ Saved model configuration to {config_out_path}")
 
     # Build dynamic function signature for num_layers KV caches
     kv_args_in = []
@@ -628,10 +647,72 @@ def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
     with open(mlir_path, "w") as f:
         f.write("\n".join(mlir_lines))
 
-    print(f"\n🎉 Successfully exported BitNet 2B model to '{output_dir}'")
-    print(f"  - Model MLIR: {mlir_path}")
-    print(f"  - Binary Weights: {weights_bin_path} ({current_offset} bytes)")
-    print(f"  - Vocabulary: {vocab_path}")
+    return current_offset
+
+
+def export_bitnet_model(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="export_output_bitnet", num_layers=2, quant_mode="i2_s", packed_attention=False):
+    target_dir = os.path.abspath(output_dir)
+    staging_dir = f"{target_dir}.staging_{os.getpid()}"
+    backup_dir = f"{target_dir}.backup_{os.getpid()}"
+
+    if os.path.exists(staging_dir):
+        shutil.rmtree(staging_dir, ignore_errors=True)
+    os.makedirs(staging_dir, exist_ok=True)
+
+    print(f"Hey! Exporting {model_name} ({num_layers} layers, quant_mode={quant_mode}, packed_attention={packed_attention}) via staging '{staging_dir}'...")
+
+    export_succeeded = False
+    try:
+        current_offset = _export_bitnet_core(
+            model_name=model_name,
+            output_dir=staging_dir,
+            num_layers=num_layers,
+            quant_mode=quant_mode,
+            packed_attention=packed_attention,
+        )
+
+        # Cohesive set verification
+        cohesive_files = {
+            "weights.bin": os.path.join(staging_dir, "weights.bin"),
+            "config.json": os.path.join(staging_dir, "config.json"),
+            "tokenizer.vocab": os.path.join(staging_dir, "tokenizer.vocab"),
+            "model.mlir": os.path.join(staging_dir, "model.mlir"),
+        }
+        for fname, fpath in cohesive_files.items():
+            if not os.path.isfile(fpath) or os.path.getsize(fpath) == 0:
+                raise RuntimeError(f"Export staging cohesive set verification failed: {fname} missing or empty in {staging_dir}")
+
+        export_succeeded = True
+
+    except Exception as e:
+        print(f"\n❌ [Export BitNet] Export failed: {e}", file=sys.stderr)
+        if os.path.exists(staging_dir):
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            print(f"🧹 Staging directory '{staging_dir}' cleanly wiped. Previous cohesive set untouched.", file=sys.stderr)
+        raise
+
+    if export_succeeded:
+        try:
+            if os.path.exists(target_dir):
+                if os.path.exists(backup_dir):
+                    shutil.rmtree(backup_dir, ignore_errors=True)
+                os.replace(target_dir, backup_dir)
+            os.replace(staging_dir, target_dir)
+            if os.path.exists(backup_dir):
+                shutil.rmtree(backup_dir, ignore_errors=True)
+
+            print(f"\n🎉 Successfully committed cohesive set to '{target_dir}'")
+            print(f"  - Model MLIR:     {os.path.join(target_dir, 'model.mlir')}")
+            print(f"  - Binary Weights: {os.path.join(target_dir, 'weights.bin')} ({current_offset} bytes)")
+            print(f"  - Vocabulary:     {os.path.join(target_dir, 'tokenizer.vocab')}")
+            print(f"  - Config:         {os.path.join(target_dir, 'config.json')}")
+        except Exception as e:
+            if os.path.exists(backup_dir) and not os.path.exists(target_dir):
+                os.replace(backup_dir, target_dir)
+            if os.path.exists(staging_dir):
+                shutil.rmtree(staging_dir, ignore_errors=True)
+            raise RuntimeError(f"Failed to atomically commit staging directory: {e}") from e
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export Microsoft BitNet 2B model to Tenzo MLIR format")

@@ -7,12 +7,17 @@
 #include "tests/HeteroTests.h"
 #include "tests/TernaryPackTest.h"
 #include "tests/BitwiseAttentionTest.h"
+#include "tests/AuditJITTest.h"
 #include "runtime/TenzoEngine.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstring>
 #include <cstdlib>
 #include <thread>
 #include <chrono>
+
+namespace tenzo {
+bool runTestTL1(mlir::MLIRContext& context, const std::string& custom_weights_path = "");
+}
 
 void printUsage() {
     llvm::outs() << "Usage: tenzo-cli [command] [options]\n\n";
@@ -36,6 +41,8 @@ void printUsage() {
     llvm::outs() << "  validate  Run single-pass E2E math validation\n";
     llvm::outs() << "  gpu       Run GPU pipeline test\n";
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
+    llvm::outs() << "  gpu-nan-test Run GPU NaN/Inf detection regression test\n";
+    llvm::outs() << "  tl1 [path] Run TL1 fixture test (optional custom weights fixture path)\n";
     llvm::outs() << "  packing   Run packing kernels bandwidth benchmark\n";
     llvm::outs() << "  gemm      Run GotoBLAS 5-loop GEMM benchmark\n";
     llvm::outs() << "  gemm-e2e  Run GEMM end-to-end native AVX2 benchmark\n";
@@ -45,6 +52,8 @@ void printUsage() {
     llvm::outs() << "  generate-microkernel Generate MLIR micro-kernel\n";
     llvm::outs() << "  test      Run quick validation tests\n";
     llvm::outs() << "  attention Run bitwise attention (tenzo.packed_attention) tests\n";
+    llvm::outs() << "  audit     Run Audit JIT regression tests against independent references\n";
+    llvm::outs() << "            Subcommands: [all|pack|fused|consumer|explicit|explicit-integer|explicit-gqa|linalg|linalg-gqa]\n";
     llvm::outs() << "  all       Run all tests\n";
     llvm::outs() << "  version   Show version info\n";
 }
@@ -75,10 +84,10 @@ int main(int argc, char* argv[]) {
 
     if (strcmp(mode, "cpu") == 0) {
         llvm::outs() << "--- Running CPU Pipeline Test ---\n";
-        tenzo::runFullPipelineTest(context);
+        if (!tenzo::runFullPipelineTest(context)) return 1;
     } else if (strcmp(mode, "explicit") == 0) {
         llvm::outs() << "--- Running Explicit Micro-Kernel Benchmark ---\n";
-        tenzo::runExplicitKernelBenchmark(context);
+        if (!tenzo::runExplicitKernelBenchmark(context)) return 1;
     } else if (strcmp(mode, "large") == 0) {
         llvm::outs() << "--- Running Large Matrix Benchmark (1024x1024) ---\n";
         tenzo::runLargeMatrixBenchmark(context);
@@ -109,11 +118,13 @@ int main(int argc, char* argv[]) {
         tenzo::runTransformDialectTest(context);
     } else if (strcmp(mode, "conv2d") == 0) {
         llvm::outs() << "--- Running Conv2D Benchmark ---\n";
-        tenzo::runConv2DTest(context);
+        if (!tenzo::runConv2DTest(context)) return 1;
     } else if (strcmp(mode, "gpu") == 0) {
-        tenzo::gpu::runGPUPipelineTest(context);
+        if (!tenzo::gpu::runGPUPipelineTest(context)) return 1;
     } else if (strcmp(mode, "gpu-bench") == 0) {
         tenzo::gpu::runGPUBenchmark(context);
+    } else if (strcmp(mode, "gpu-nan-test") == 0) {
+        return tenzo::gpu::runGPUNaNRegressionTest() ? 0 : 1;
     } else if (strcmp(mode, "hybrid-bench") == 0) {
         llvm::outs() << "--- Running Hybrid Affinity A/B Benchmark ---\n";
         tenzo::runHybridAffinityBenchmark(context);
@@ -125,7 +136,8 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(mode, "bridge") == 0) {
         tenzo::runZeroCopyBridgeTest(context);
     } else if (strcmp(mode, "tl1") == 0) {
-        tenzo::runTestTL1(context);
+        std::string custom_w = (argc > 2) ? argv[2] : "";
+        if (!tenzo::runTestTL1(context, custom_w)) return 1;
     } else if (strcmp(mode, "hetero") == 0 || strcmp(mode, "hetero-test") == 0) {
         tenzo::runHeteroPipelineTests();
         tenzo::runDistributedNetworkTests();
@@ -142,11 +154,39 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     } else if (strcmp(mode, "ternary") == 0 || strcmp(mode, "ternary-pack") == 0) {
-        tenzo::runTernaryPackTest(context);
+        if (!tenzo::runTernaryPackTest(context)) return 1;
     } else if (strcmp(mode, "attention") == 0 || strcmp(mode, "bitwise-attention") == 0) {
-        tenzo::runBitwiseAttentionTest(context);
+        if (!tenzo::runBitwiseAttentionTest(context)) return 1;
+    } else if (strcmp(mode, "audit") == 0) {
+        llvm::outs() << "--- Running Audit JIT Regression Tests ---\n\n";
+        std::string submode = (argc > 2) ? argv[2] : "all";
+        bool ok = false;
+        if (submode == "all") {
+            ok = tenzo::runAuditJITTests(context, tenzo::AuditTestMode::All);
+        } else if (submode == "pack") {
+            ok = tenzo::auditTernaryPack(context, /*fused=*/false);
+        } else if (submode == "fused") {
+            ok = tenzo::auditTernaryPack(context, /*fused=*/true);
+        } else if (submode == "consumer" || submode == "fusion-consumer") {
+            ok = tenzo::auditFusionMultiConsumer(context);
+        } else if (submode == "explicit") {
+            ok = tenzo::auditExplicitAttention(context, /*B=*/1, /*Hq=*/1, /*Hkv=*/1, /*T=*/8, /*D=*/32, /*fractional=*/true);
+        } else if (submode == "explicit-integer") {
+            ok = tenzo::auditExplicitAttention(context, /*B=*/1, /*Hq=*/1, /*Hkv=*/1, /*T=*/8, /*D=*/32, /*fractional=*/false);
+        } else if (submode == "explicit-gqa") {
+            ok = tenzo::auditExplicitAttention(context, /*B=*/2, /*Hq=*/20, /*Hkv=*/5, /*T=*/8, /*D=*/32, /*fractional=*/true);
+        } else if (submode == "linalg") {
+            ok = tenzo::auditLinalgAttention(context, /*B=*/1, /*Hq=*/1, /*Hkv=*/1, /*T=*/8, /*D=*/32, /*fractional=*/true);
+        } else if (submode == "linalg-gqa") {
+            ok = tenzo::auditLinalgAttention(context, /*B=*/2, /*Hq=*/20, /*Hkv=*/5, /*T=*/8, /*D=*/32, /*fractional=*/true);
+        } else {
+            llvm::errs() << "Unknown audit submode: " << submode << "\n";
+            return 1;
+        }
+        return ok ? 0 : 1;
     } else if (strcmp(mode, "validate") == 0) {
         tenzo::runEndToEndMathTest(context);
+        return 0;
     } else if (strcmp(mode, "generate") == 0) {
         tenzo::GenerationConfig config;
         
@@ -175,40 +215,48 @@ int main(int argc, char* argv[]) {
         }
 
         tenzo::runGenerationTest(context, config);
+        return 0;
 
     } else if (strcmp(mode, "test") == 0) {
         llvm::outs() << "--- Running Quick Validation Tests ---\n\n";
         bool allPassed = true;
 
-        llvm::outs() << "[1/5] CPU MatMul... ";
-        tenzo::runFullPipelineTest(context);
+        llvm::outs() << "[1/6] CPU MatMul... ";
+        if (!tenzo::runFullPipelineTest(context)) allPassed = false;
 
-        llvm::outs() << "\n[2/5] Conv2D... ";
-        tenzo::runConv2DTest(context);
+        llvm::outs() << "\n[2/6] Conv2D... ";
+        if (!tenzo::runConv2DTest(context)) allPassed = false;
 
-        llvm::outs() << "\n[3/5] GPU Pipeline... ";
-        tenzo::gpu::runGPUPipelineTest(context);
+        llvm::outs() << "\n[3/6] GPU Pipeline... ";
+        if (!tenzo::gpu::runGPUPipelineTest(context)) allPassed = false;
 
-        llvm::outs() << "\n[4/5] Ternary Pack (1.58-bit AVX2 Micro-Kernel)... ";
-        tenzo::runTernaryPackTest(context);
+        llvm::outs() << "\n[4/6] Ternary Pack (1.58-bit AVX2 Micro-Kernel)... ";
+        if (!tenzo::runTernaryPackTest(context)) allPassed = false;
 
-        llvm::outs() << "\n[5/5] Bitwise Attention (SIMD Packed Attention Micro-Kernel)... ";
-        tenzo::runBitwiseAttentionTest(context);
+        llvm::outs() << "\n[5/6] Bitwise Attention (SIMD Packed Attention Micro-Kernel)... ";
+        if (!tenzo::runBitwiseAttentionTest(context)) allPassed = false;
+
+        llvm::outs() << "\n[6/6] Audit JIT (Independent Reference Regressions)... \n";
+        if (!tenzo::runAuditJITTests(context)) allPassed = false;
 
         llvm::outs() << "\n--- All Tests Complete ---\n";
         return allPassed ? 0 : 1;
     } else if (strcmp(mode, "all") == 0) {
         llvm::outs() << "--- Running All Tests ---\n\n";
+        bool allPassed = true;
         llvm::outs() << "=== CPU Tests ===\n";
-        tenzo::runFullPipelineTest(context);
+        if (!tenzo::runFullPipelineTest(context)) allPassed = false;
         llvm::outs() << "\n=== Conv2D Tests ===\n";
-        tenzo::runConv2DTest(context);
+        if (!tenzo::runConv2DTest(context)) allPassed = false;
         llvm::outs() << "\n=== GPU Tests ===\n";
-        tenzo::gpu::runGPUPipelineTest(context);
+        if (!tenzo::gpu::runGPUPipelineTest(context)) allPassed = false;
         llvm::outs() << "\n=== Ternary Pack Tests ===\n";
-        tenzo::runTernaryPackTest(context);
+        if (!tenzo::runTernaryPackTest(context)) allPassed = false;
         llvm::outs() << "\n=== Bitwise Attention Tests ===\n";
-        tenzo::runBitwiseAttentionTest(context);
+        if (!tenzo::runBitwiseAttentionTest(context)) allPassed = false;
+        llvm::outs() << "\n=== Audit JIT Tests ===\n";
+        if (!tenzo::runAuditJITTests(context)) allPassed = false;
+        return allPassed ? 0 : 1;
     } else if (strcmp(mode, "help") == 0 || strcmp(mode, "-h") == 0 || strcmp(mode, "--help") == 0) {
         printUsage();
         return 0;

@@ -5,5 +5,5 @@ class MLIRContext;
 }
 
 namespace tenzo {
-void runTernaryPackTest(mlir::MLIRContext &context);
+bool runTernaryPackTest(mlir::MLIRContext &context);
 }

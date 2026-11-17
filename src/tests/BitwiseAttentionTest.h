@@ -5,5 +5,5 @@ class MLIRContext;
 }
 
 namespace tenzo {
-void runBitwiseAttentionTest(mlir::MLIRContext &context);
+bool runBitwiseAttentionTest(mlir::MLIRContext &context);
 }

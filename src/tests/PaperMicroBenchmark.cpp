@@ -1,19 +1,19 @@
 // ==============================================================================
-// Tenzo Compiler: Paper Micro-Benchmark
+// Native C++ Synthetic Attention Micro-Benchmark
 // File: src/tests/PaperMicroBenchmark.cpp
 //
 // Comparing:
-//   1. BaselineAttention: Classical FP32 GEMM Attention + GQA Physical Copy/Reshape
-//   2. TenzoPackedAttention: Fused 1.58-bit Bitwise Attention + Implicit Shuffle GQA
+//   1. BaselineAttention: FP32 Attention + Explicit Per-Head Copy Ablation
+//   2. TenzoPackedAttention: 2-bit Packed Ternary Attention + Direct GQA Indexing
 //
 // Metrics Measured:
-//   - Latency (ms) & Throughput (tokens/sec)
-//   - Memory Footprint (Allocated bytes & Active working set in MB)
-//   - Effective Memory Bandwidth (GB/s)
+//   - Latency (ms) & Throughput (invocations/sec)
+//   - Memory Footprint (Allocated bytes & Active working set in MiB)
+//   - Analytical Footprint Divided By Time (not physical bandwidth) (GB/s (footprint/time; not measured traffic))
 //
 // Cross-platform support:
 //   - x86_64: AVX2 + FMA intrinsics
-//   - ARM64: ARM NEON + DotProd / SVE2 fallback
+//   - ARM64: NEON FP32 / scalar packed fallback
 // ==============================================================================
 
 #include <iostream>
@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <numeric>
 #include <fstream>
+#include <stdexcept>
 
 #if defined(__x86_64__) || defined(_M_X64)
   #include <immintrin.h>
@@ -118,6 +119,8 @@ void run_baseline_attention(
     int64_t H_q, int64_t H_kv, int64_t T, int64_t D,
     float scale
 ) {
+    if (H_q <= 0 || H_kv <= 0 || H_q % H_kv || T <= 0 || D <= 0 || D % 32)
+        throw std::invalid_argument("attention requires positive sizes, Hq divisible by Hkv, D divisible by 32");
     int64_t gqa_ratio = H_q / H_kv;
 
     // Allocate intermediate copy buffers simulating physical GQA memory copy / reshape / transpose
@@ -231,6 +234,8 @@ void run_tenzo_packed_attention(
     int64_t H_q, int64_t H_kv, int64_t T, int64_t D,
     float scale
 ) {
+    if (H_q <= 0 || H_kv <= 0 || H_q % H_kv || T <= 0 || D <= 0 || D % 32)
+        throw std::invalid_argument("attention requires positive sizes, Hq divisible by Hkv, D divisible by 32");
     int64_t gqa_ratio = H_q / H_kv;
     int64_t bytes_per_token = D / 4;
     std::vector<float> scores(T);
@@ -366,11 +371,12 @@ void run_context_benchmark(int64_t T, const BenchmarkConfig &cfg, std::vector<Be
               << ", H_kv=" << H_kv << ", D=" << D << ")\n";
     std::cout << "══════════════════════════════════════════════════════════════════════\n";
 
+    std::cout << "Native C++ synthetic attention; analytical buffer sizes are NOT process RSS.\n";
     // Memory Footprint calculation:
     // Baseline: Key cache [H_kv, T, D] + Val cache [H_kv, T, D] in FP32 (4 bytes)
     //           Plus intermediate GQA replicated working buffer [H_q, T, D] in FP32
     double base_kv_bytes = 2.0 * H_kv * T * D * sizeof(float);
-    double base_working_bytes = base_kv_bytes + (2.0 * H_q * T * D * sizeof(float)); // KV copy buffer
+    double base_working_bytes = base_kv_bytes + (2.0 * T * D * sizeof(float)); // KV copy buffer
     double base_mem_mb = base_working_bytes / (1024.0 * 1024.0);
 
     // Tenzo: Key cache [H_kv, T, D/4] + Val cache [H_kv, T, D/4] in uint8_t (1 byte)
@@ -383,9 +389,9 @@ void run_context_benchmark(int64_t T, const BenchmarkConfig &cfg, std::vector<Be
 
     std::cout << "  [Memory Footprint]\n";
     std::cout << "    • Baseline Allocated (KV + Copy Buffer): " << std::fixed << std::setprecision(2) 
-              << base_mem_mb << " MB\n";
+              << base_mem_mb << " MiB\n";
     std::cout << "    • Tenzo Allocated (Packed KV, Zero Copy): " << std::fixed << std::setprecision(2) 
-              << tenzo_mem_mb << " MB (" << std::setprecision(1) << mem_reduction << "x reduction)\n";
+              << tenzo_mem_mb << " MiB (" << std::setprecision(1) << mem_reduction << "x reduction)\n";
 
     // Allocate and populate test vectors
     std::vector<float> queries(H_q * D);
@@ -473,13 +479,13 @@ void run_context_benchmark(int64_t T, const BenchmarkConfig &cfg, std::vector<Be
     std::cout << "  [Performance & Throughput]\n";
     if (cfg.run_baseline) {
         std::cout << "    • Baseline FP32 Attention Latency : " << std::fixed << std::setprecision(3) 
-                  << base_latency_ms << " ms  (" << std::setprecision(1) << base_tokens_sec << " tok/sec, "
-                  << std::setprecision(2) << base_bw_gbps << " GB/s)\n";
+                  << base_latency_ms << " ms  (" << std::setprecision(1) << base_tokens_sec << " invocations/sec, "
+                  << std::setprecision(2) << base_bw_gbps << " GB/s (footprint/time; not measured traffic))\n";
     }
     if (cfg.run_tenzo) {
         std::cout << "    • Tenzo Packed Attention Latency  : " << std::fixed << std::setprecision(3) 
-                  << tenzo_latency_ms << " ms  (" << std::setprecision(1) << tenzo_tokens_sec << " tok/sec, "
-                  << std::setprecision(2) << tenzo_bw_gbps << " GB/s)\n";
+                  << tenzo_latency_ms << " ms  (" << std::setprecision(1) << tenzo_tokens_sec << " invocations/sec, "
+                  << std::setprecision(2) << tenzo_bw_gbps << " GB/s (footprint/time; not measured traffic))\n";
     }
     if (cfg.run_baseline && cfg.run_tenzo) {
         std::cout << "    ⚡ Speedup: " << std::setprecision(2) << speedup << "x faster\n";
@@ -522,7 +528,7 @@ void export_csv(const std::string &path, const std::vector<BenchmarkResult> &res
         return;
     }
     ofs << "context_length,baseline_latency_ms,tenzo_latency_ms,speedup,"
-        << "baseline_tok_sec,tenzo_tok_sec,baseline_mem_mb,tenzo_mem_mb,mem_reduction_ratio,"
+        << "baseline_invocations_sec,tenzo_invocations_sec,baseline_mem_mb,tenzo_mem_mb,mem_reduction_ratio,"
         << "baseline_bw_gbps,tenzo_bw_gbps\n";
     for (const auto &r : results) {
         ofs << r.context_length << ","

@@ -266,7 +266,7 @@ struct AttentionLoweringToLinalg
     Value zeroF =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(elemType));
     Value negInfF = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(elemType, -1e9));
+        loc, rewriter.getFloatAttr(elemType, -1e30));
 
     int64_t D = queryType.getDimSize(rank - 1);
     double scaleVal = 1.0 / std::sqrt(static_cast<double>(D));
@@ -301,7 +301,17 @@ struct AttentionLoweringToLinalg
         H = queryType.getDimSize(1);
       }
 
-      int64_t gqaRatio = (H_kv > 0) ? (H / H_kv) : 1;
+      if (H_kv <= 0 || H <= 0 || (H % H_kv != 0))
+        return failure();
+
+      int64_t K_Dh = keyType.getDimSize(keyType.getRank() - 1);
+      if (Dh <= 0 || K_Dh != Dh)
+        return failure();
+
+      if (valType.getRank() != keyType.getRank() || valType.getShape() != keyType.getShape())
+        return failure();
+
+      int64_t gqaRatio = H / H_kv;
 
       // --- Step 1: Compute Q @ K^T -> scores [B, H, MaxSeq] ---
       RankedTensorType scoresType =
@@ -696,7 +706,7 @@ struct PackedAttentionLoweringToLinalg
     Value zeroF =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getZeroAttr(elemType));
     Value negInfF = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getFloatAttr(elemType, -1e9));
+        loc, rewriter.getFloatAttr(elemType, -1e30));
 
     int64_t Dh = queryType.getDimSize(qRank - 1);
     Value scaleF;
@@ -757,8 +767,21 @@ struct PackedAttentionLoweringToLinalg
         H = 1;
       }
 
-      int64_t gqaRatio = (H_kv > 0) ? (H / H_kv) : 1;
+      if (H_kv <= 0 || H <= 0 || (H % H_kv != 0))
+        return failure();
+      if (valType.getRank() != keyType.getRank() || valType.getShape() != keyType.getShape())
+        return failure();
+
       bool isPacked = keyElemType.isInteger(8) || (K_Dh * 4 == Dh);
+      if (isPacked) {
+        if (Dh <= 0 || (Dh % 4 != 0) || K_Dh != (Dh / 4))
+          return failure();
+      } else {
+        if (Dh <= 0 || K_Dh != Dh)
+          return failure();
+      }
+
+      int64_t gqaRatio = H / H_kv;
 
       // --- Step 1: Compute Q @ K^T -> scores [B, H, MaxSeq] ---
       RankedTensorType scoresType =
@@ -1069,8 +1092,20 @@ struct PackedAttentionLoweringToLinalg
     }
 
     // 3D / 2D Tensor Fallback
+    if (valType.getRank() != keyType.getRank() || valType.getShape() != keyType.getShape())
+      return failure();
     int64_t B = (qRank >= 2) ? queryType.getDimSize(0) : 1;
     int64_t MaxSeq = (kRank >= 2) ? keyType.getDimSize(kRank - 2) : 1;
+    int64_t K_Dh = keyType.getDimSize(kRank - 1);
+    bool isPacked = keyElemType.isInteger(8) || (K_Dh * 4 == Dh);
+    if (isPacked) {
+      if (Dh <= 0 || (Dh % 4 != 0) || K_Dh != (Dh / 4))
+        return failure();
+    } else {
+      if (Dh <= 0 || K_Dh != Dh)
+        return failure();
+    }
+    auto i32Type = rewriter.getI32Type();
 
     RankedTensorType scoresType = RankedTensorType::get({B, MaxSeq}, elemType);
     Value emptyScores = rewriter.create<tensor::EmptyOp>(
@@ -1084,28 +1119,96 @@ struct PackedAttentionLoweringToLinalg
     auto d1 = rewriter.getAffineDimExpr(1);
     auto d2 = rewriter.getAffineDimExpr(2);
 
-    AffineMap qMap =
-        AffineMap::get(3, 0, {d0, rewriter.getAffineConstantExpr(0), d2},
-                       rewriter.getContext());
-    AffineMap kMap = AffineMap::get(3, 0, {d0, d1, d2}, rewriter.getContext());
     AffineMap scoresMap = AffineMap::get(3, 0, {d0, d1}, rewriter.getContext());
 
     SmallVector<utils::IteratorType, 3> qkIterators = {
         utils::IteratorType::parallel, utils::IteratorType::parallel,
         utils::IteratorType::reduction};
 
-    Value rawScores =
-        rewriter
-            .create<linalg::GenericOp>(
-                loc, scoresType, ValueRange{query, keyCache},
-                ValueRange{filledScores},
-                ArrayRef<AffineMap>{qMap, kMap, scoresMap}, qkIterators,
-                [&](OpBuilder &b, Location l, ValueRange args) {
-                  Value mul = b.create<arith::MulFOp>(l, args[0], args[1]);
-                  Value add = b.create<arith::AddFOp>(l, args[2], mul);
-                  b.create<linalg::YieldOp>(l, add);
-                })
-            .getResult(0);
+    Value rawScores;
+    if (isPacked) {
+      // Key is packed uint8 (4 ternary values per byte).
+      // kMap: (d1, d2) for rank-2 or (d0, d1, d2) for rank-3.
+      AffineMap kMap = (kRank == 2)
+          ? AffineMap::get(3, 0, {d1, d2}, rewriter.getContext())
+          : AffineMap::get(3, 0, {d0, d1, d2}, rewriter.getContext());
+
+      rawScores = rewriter
+          .create<linalg::GenericOp>(
+              loc, scoresType, ValueRange{keyCache},
+              ValueRange{filledScores},
+              ArrayRef<AffineMap>{kMap, scoresMap}, qkIterators,
+              [&](OpBuilder &b, Location l, ValueRange args) {
+                Value kByte = args[0];
+                Value curAcc = args[1];
+
+                Value d0Idx = b.create<linalg::IndexOp>(l, 0);
+                Value d2Idx = b.create<linalg::IndexOp>(l, 2);
+                Value c0Idx = b.create<arith::ConstantIndexOp>(l, 0);
+                Value c4Idx = b.create<arith::ConstantIndexOp>(l, 4);
+                Value baseD = b.create<arith::MulIOp>(l, d2Idx, c4Idx);
+
+                Value kU32 = b.create<arith::ExtUIOp>(l, i32Type, kByte);
+                Value c3_32 = b.create<arith::ConstantIntOp>(l, 3, 32);
+                Value c1_32 = b.create<arith::ConstantIntOp>(l, 1, 32);
+
+                Value acc = curAcc;
+                for (int i = 0; i < 4; ++i) {
+                  Value offsetIdx = b.create<arith::ConstantIndexOp>(l, i);
+                  Value dIdx = b.create<arith::AddIOp>(l, baseD, offsetIdx);
+
+                  SmallVector<Value> qCoords;
+                  if (qRank == 1) {
+                    qCoords = {dIdx};
+                  } else if (qRank == 2) {
+                    qCoords = {d0Idx, dIdx};
+                  } else if (qRank == 3) {
+                    qCoords = {d0Idx, c0Idx, dIdx};
+                  } else {
+                    qCoords = {d0Idx, c0Idx, c0Idx, dIdx};
+                  }
+
+                  Value qVal = b.create<tensor::ExtractOp>(l, query, qCoords);
+
+                  Value shiftVal = b.create<arith::ConstantIntOp>(l, i * 2, 32);
+                  Value shifted = b.create<arith::ShRUIOp>(l, kU32, shiftVal);
+                  Value masked = b.create<arith::AndIOp>(l, shifted, c3_32);
+                  Value ternI32 = b.create<arith::SubIOp>(l, masked, c1_32);
+                  Value ternF = b.create<arith::SIToFPOp>(l, elemType, ternI32);
+
+                  Value prod = b.create<arith::MulFOp>(l, qVal, ternF);
+                  acc = b.create<arith::AddFOp>(l, acc, prod);
+                }
+                b.create<linalg::YieldOp>(l, acc);
+              })
+          .getResult(0);
+    } else {
+      // FP32 fallback
+      AffineMap qMap;
+      if (qRank == 1) {
+        qMap = AffineMap::get(3, 0, {d2}, rewriter.getContext());
+      } else if (qRank == 2) {
+        qMap = AffineMap::get(3, 0, {d0, d2}, rewriter.getContext());
+      } else {
+        qMap = AffineMap::get(3, 0, {d0, rewriter.getAffineConstantExpr(0), d2},
+                              rewriter.getContext());
+      }
+      AffineMap kMap = (kRank == 2)
+          ? AffineMap::get(3, 0, {d1, d2}, rewriter.getContext())
+          : AffineMap::get(3, 0, {d0, d1, d2}, rewriter.getContext());
+
+      rawScores = rewriter
+          .create<linalg::GenericOp>(
+              loc, scoresType, ValueRange{query, keyCache},
+              ValueRange{filledScores},
+              ArrayRef<AffineMap>{qMap, kMap, scoresMap}, qkIterators,
+              [&](OpBuilder &b, Location l, ValueRange args) {
+                Value mul = b.create<arith::MulFOp>(l, args[0], args[1]);
+                Value add = b.create<arith::AddFOp>(l, args[2], mul);
+                b.create<linalg::YieldOp>(l, add);
+              })
+          .getResult(0);
+    }
 
     RankedTensorType scalarType = RankedTensorType::get({B}, elemType);
     Value emptyMax =
@@ -1205,23 +1308,71 @@ struct PackedAttentionLoweringToLinalg
                           .getResult(0);
 
     AffineMap probMap = AffineMap::get(3, 0, {d0, d2}, rewriter.getContext());
-    AffineMap vMap = AffineMap::get(3, 0, {d0, d2, d1}, rewriter.getContext());
-    AffineMap outMap =
-        AffineMap::get(3, 0, {d0, rewriter.getAffineConstantExpr(0), d1},
-                       rewriter.getContext());
+
+    AffineMap outMap;
+    if (outType.getRank() == 1) {
+      outMap = AffineMap::get(3, 0, {d1}, rewriter.getContext());
+    } else if (outType.getRank() == 2) {
+      outMap = AffineMap::get(3, 0, {d0, d1}, rewriter.getContext());
+    } else if (outType.getRank() == 3) {
+      outMap = AffineMap::get(3, 0, {d0, rewriter.getAffineConstantExpr(0), d1},
+                              rewriter.getContext());
+    } else {
+      outMap = AffineMap::get(3, 0, {d0, d1}, rewriter.getContext());
+    }
 
     SmallVector<utils::IteratorType, 3> pvIterators = {
         utils::IteratorType::parallel, utils::IteratorType::parallel,
         utils::IteratorType::reduction};
 
-    rewriter.replaceOpWithNewOp<linalg::GenericOp>(
-        op, outType, ValueRange{probs, valCache}, ValueRange{filledOut},
-        ArrayRef<AffineMap>{probMap, vMap, outMap}, pvIterators,
-        [&](OpBuilder &b, Location l, ValueRange args) {
-          Value mul = b.create<arith::MulFOp>(l, args[0], args[1]);
-          Value add = b.create<arith::AddFOp>(l, args[2], mul);
-          b.create<linalg::YieldOp>(l, add);
-        });
+    int vRank = valType.getRank();
+    if (isPacked) {
+      AffineExpr vByteExpr = d1.floorDiv(4);
+      AffineMap vMap = (vRank == 2)
+          ? AffineMap::get(3, 0, {d2, vByteExpr}, rewriter.getContext())
+          : AffineMap::get(3, 0, {d0, d2, vByteExpr}, rewriter.getContext());
+
+      rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+          op, outType, ValueRange{probs, valCache}, ValueRange{filledOut},
+          ArrayRef<AffineMap>{probMap, vMap, outMap}, pvIterators,
+          [&](OpBuilder &b, Location l, ValueRange args) {
+            Value prob = args[0];
+            Value vByte = args[1];
+            Value curAcc = args[2];
+
+            Value d1Idx = b.create<linalg::IndexOp>(l, 1);
+            Value c4Idx = b.create<arith::ConstantIndexOp>(l, 4);
+            Value subIdx = b.create<arith::RemUIOp>(l, d1Idx, c4Idx);
+            Value subIdx32 = b.create<arith::IndexCastOp>(l, i32Type, subIdx);
+            Value c1_32 = b.create<arith::ConstantIntOp>(l, 1, 32);
+            Value shift32 = b.create<arith::ShLIOp>(l, subIdx32, c1_32);
+
+            Value vU32 = b.create<arith::ExtUIOp>(l, i32Type, vByte);
+            Value shifted = b.create<arith::ShRUIOp>(l, vU32, shift32);
+            Value c3_32 = b.create<arith::ConstantIntOp>(l, 3, 32);
+            Value masked = b.create<arith::AndIOp>(l, shifted, c3_32);
+            Value ternI32 = b.create<arith::SubIOp>(l, masked, c1_32);
+            Value ternF = b.create<arith::SIToFPOp>(l, elemType, ternI32);
+
+            Value mul = b.create<arith::MulFOp>(l, prob, ternF);
+            Value add = b.create<arith::AddFOp>(l, curAcc, mul);
+            b.create<linalg::YieldOp>(l, add);
+          });
+    } else {
+      // FP32 fallback
+      AffineMap vMap = (vRank == 2)
+          ? AffineMap::get(3, 0, {d2, d1}, rewriter.getContext())
+          : AffineMap::get(3, 0, {d0, d2, d1}, rewriter.getContext());
+
+      rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+          op, outType, ValueRange{probs, valCache}, ValueRange{filledOut},
+          ArrayRef<AffineMap>{probMap, vMap, outMap}, pvIterators,
+          [&](OpBuilder &b, Location l, ValueRange args) {
+            Value mul = b.create<arith::MulFOp>(l, args[0], args[1]);
+            Value add = b.create<arith::AddFOp>(l, args[2], mul);
+            b.create<linalg::YieldOp>(l, add);
+          });
+    }
     return success();
   }
 };

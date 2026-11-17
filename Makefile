@@ -1,7 +1,7 @@
 # Tenzo Compiler Makefile
 # Convenience wrapper for common operations
 
-.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help
+.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help audit verify-references
 
 # Default target
 all: build
@@ -13,7 +13,7 @@ all: build
 # Головний білд: використовує Hetzner
 build:
 	@echo "🚀 Запуск віддаленої компіляції через Hetzner..."
-	./remote_build.sh
+	./remote_build.sh $(TARGETS)
 
 # Локальний білд компілятора та SDK
 build-local:
@@ -28,6 +28,17 @@ build-sdk:
 # ==========================================
 # 🧪 TESTING & RUNNING (via Docker)
 # ==========================================
+
+# Run Audit JIT regression tests against independent references
+# Usage: make audit [ARGS=explicit-gqa]
+audit: build
+	@echo "🔬 Running Audit JIT tests..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-cli audit $(ARGS)
+
+# Run independent mathematical reference verification suite
+verify-references:
+	@echo "📐 Running independent mathematical reference verification..."
+	docker compose run --rm dev python3 /app/scripts/verify_references.py --all
 
 # Quick rebuild and test (fastest iteration)
 q: build

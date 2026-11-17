@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <cstring>
 #include <vector>
+#include <cstdlib>
 
 using namespace mlir;
 using namespace tenzo::runtime;
@@ -24,23 +25,20 @@ namespace tenzo {
 void runZeroCopyBridgeTest(MLIRContext& context) {
     llvm::outs() << "\n=== [End-to-End] Zero-Copy Bridge & mmap() Test ===\n";
 
-    // 1. Prepare weights file path
-    const char* weights_path = "tenzo-frontend/export_output/weights.bin";
-    if (access(weights_path, F_OK) != 0) {
-        weights_path = "weights.bin";
-    }
-
-    int fd = open(weights_path, O_RDWR | O_CREAT, 0644);
+    // Use an anonymous temporary file; never truncate model weights.
+    char weights_path[] = "/tmp/tenzo-bridge-XXXXXX";
+    int fd = mkstemp(weights_path);
     if (fd < 0) {
-        llvm::errs() << "❌ Failed to open/create weights.bin\n";
-        return;
+        llvm::errs() << "Failed to create bridge test fixture\n";
+        std::exit(EXIT_FAILURE);
     }
+    unlink(weights_path);
 
     size_t fileSize = 128 * 64 / 4 + 64 * 10 / 4; // 2-bit packed weight size
     if (ftruncate(fd, fileSize) != 0) {
         llvm::errs() << "❌ Failed to set weights file size\n";
         close(fd);
-        return;
+        std::exit(EXIT_FAILURE);
     }
 
     // 2. Memory-map weights file (Zero-Copy)
@@ -48,7 +46,7 @@ void runZeroCopyBridgeTest(MLIRContext& context) {
     if (mapped_ptr == MAP_FAILED) {
         llvm::errs() << "❌ mmap() failed\n";
         close(fd);
-        return;
+        std::exit(EXIT_FAILURE);
     }
 
     // Fill dummy packed ternary bytes

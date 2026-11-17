@@ -353,7 +353,7 @@ compileAndGetEngine(mlir::MLIRContext &context, bool enableVectorization) {
   }
   return std::move(maybeEngine.get());
 }
-void runBenchmark(mlir::MLIRContext &context) {
+bool runBenchmark(mlir::MLIRContext &context) {
   llvm::outs() << "\n=========================================\n";
   llvm::outs() << "🚀 BENCHMARK: 512x512 MatMul\n";
   llvm::outs() << "=========================================\n\n";
@@ -367,7 +367,7 @@ void runBenchmark(mlir::MLIRContext &context) {
   auto vectorEngine = compileAndGetEngine(context, true);
   if (!scalarEngine || !vectorEngine) {
     llvm::errs() << "Engine creation failed.\n";
-    return;
+    return false;
   }
   float scalarRes = 0.0f, vectorRes = 0.0f;
   void *scalarArgs[] = {&scalarRes};
@@ -420,9 +420,16 @@ void runBenchmark(mlir::MLIRContext &context) {
     llvm::outs() << "🐢 No speedup yet (Need Affine Tiling!)\n";
   }
   llvm::outs() << "Check: " << vectorRes << " (Expected 3072.0)\n";
+  if (std::abs(vectorRes - 3072.0f) < 0.001f && std::abs(scalarRes - 3072.0f) < 0.001f) {
+    llvm::outs() << "✅ Correctness verified!\n";
+    return true;
+  } else {
+    llvm::outs() << "❌ Result mismatch!\n";
+    return false;
+  }
 }
 
-void runConv2DTest(mlir::MLIRContext &context) {
+bool runConv2DTest(mlir::MLIRContext &context) {
   llvm::outs() << "\n=========================================\n";
   llvm::outs() << "🎯 Conv2D Benchmark (NHWC format)\n";
   llvm::outs() << "=========================================\n\n";
@@ -480,7 +487,7 @@ void runConv2DTest(mlir::MLIRContext &context) {
 
   if (!module) {
     llvm::errs() << "Failed to parse MLIR\n";
-    return;
+    return false;
   }
 
   mlir::PassManager pm(&context);
@@ -491,7 +498,7 @@ void runConv2DTest(mlir::MLIRContext &context) {
 
   if (mlir::failed(pm.run(*module))) {
     llvm::errs() << "Pipeline failed\n";
-    return;
+    return false;
   }
 
   llvm::InitializeNativeTarget();
@@ -507,7 +514,7 @@ void runConv2DTest(mlir::MLIRContext &context) {
   auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
   if (!maybeEngine) {
     llvm::errs() << "Failed to create execution engine\n";
-    return;
+    return false;
   }
   auto engine = std::move(maybeEngine.get());
 
@@ -547,8 +554,10 @@ void runConv2DTest(mlir::MLIRContext &context) {
 
   if (std::abs(result - 27.0f) < 0.001f) {
     llvm::outs() << "✅ Conv2D correct!\n";
+    return true;
   } else {
     llvm::outs() << "❌ Result mismatch!\n";
+    return false;
   }
 }
 
@@ -1115,7 +1124,7 @@ void runLargeMatrixBenchmark(mlir::MLIRContext &context) {
 }
 
 // NEW: Explicit Micro-Kernel Benchmark
-void runExplicitKernelBenchmark(mlir::MLIRContext &context) {
+bool runExplicitKernelBenchmark(mlir::MLIRContext &context) {
   llvm::outs() << "\n=========================================\n";
   llvm::outs() << "🔥 EXPLICIT MICRO-KERNEL: 512x512 MatMul\n";
   llvm::outs() << "=========================================\n\n";
@@ -1154,7 +1163,7 @@ void runExplicitKernelBenchmark(mlir::MLIRContext &context) {
 
   if (!module) {
     llvm::errs() << "Failed to parse MLIR\n";
-    return;
+    return false;
   }
 
   // Simple strategy: Use standard pipeline but with 6x16 micro-kernel tiles
@@ -1198,7 +1207,7 @@ void runExplicitKernelBenchmark(mlir::MLIRContext &context) {
 
   if (mlir::failed(pm.run(*module))) {
     llvm::errs() << "Pipeline failed\n";
-    return;
+    return false;
   }
 
   // JIT Setup
@@ -1215,7 +1224,7 @@ void runExplicitKernelBenchmark(mlir::MLIRContext &context) {
   auto maybeEngine = mlir::ExecutionEngine::create(*module, engineOptions);
   if (!maybeEngine) {
     llvm::errs() << "Failed to create execution engine\n";
-    return;
+    return false;
   }
   auto engine = std::move(maybeEngine.get());
 
@@ -1250,10 +1259,12 @@ void runExplicitKernelBenchmark(mlir::MLIRContext &context) {
 
   if (std::abs(result - 3072.0f) < 0.001f) {
     llvm::outs() << "✅ Correctness verified!\n";
+    return true;
   } else {
     llvm::outs() << "❌ Result mismatch!\n";
+    return false;
   }
 }
 
-void runFullPipelineTest(mlir::MLIRContext &context) { runBenchmark(context); }
+bool runFullPipelineTest(mlir::MLIRContext &context) { return runBenchmark(context); }
 } // namespace tenzo

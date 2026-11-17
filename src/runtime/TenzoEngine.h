@@ -250,6 +250,7 @@ public:
     void set_lm_head_i8(const int8_t* embed_w, const float* scales, int vocab_size, int hidden_size);
 
     tenzo_status_t load_model_from_files(const char* weights_path, const char* mlir_path);
+    bool initialize(const char* weights_path, const char* mlir_path);
 
     void embedding_lookup(int token_id);
     void forward_layer_raw(int layer_idx);

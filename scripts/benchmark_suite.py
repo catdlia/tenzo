@@ -187,28 +187,11 @@ def bench_needle_in_haystack(model_path, kv_mode="tl1_fused"):
         print(f"  {ANSI_DIM}Output: \"{res['output_text'][:80]}\"{ANSI_RESET}")
 
 def bench_perplexity(model_path, kv_mode="tl1_fused"):
-    print(f"\n{ANSI_BOLD}{ANSI_CYAN}════════════════════════════════════════════════════════════════════════════════════════{ANSI_RESET}")
-    print(f"{ANSI_BOLD}📉 3. PERPLEXITY & QUANTIZATION ACCURACY BENCHMARK (WikiText-2 Methodology){ANSI_RESET}")
-    print(f"{ANSI_DIM}Measures predictive cross-entropy loss across KV-cache quantization modes{ANSI_RESET}")
-    print(f"{ANSI_BOLD}{ANSI_CYAN}════════════════════════════════════════════════════════════════════════════════════════{ANSI_RESET}\n")
-
-    corpus = (
-        "In computer science, a compiler is a computer program that translates computer code written in one programming "
-        "language (the source language) into another language (the target language). The name compiler is primarily used for "
-        "programs that translate source code from a high-level programming language to a low-level programming language "
-        "(e.g., assembly language, object code, or machine code) to create an executable program."
+    raise NotImplementedError(
+        "Perplexity requires measured token NLL on a documented dataset split; "
+        "the previous hard-coded values were not evaluation results."
     )
 
-    print(f"{'KV QUANT MODE':<16} | {'ESTIMATED PPL':<16} | {'DEGRADE VS FP32':<18} | {'KV RAM (8K)':<12}")
-    print("─" * 70)
-    
-    # Empirical PPL estimates calibrated on BitNet 2B WikiText evaluation
-    modes = [("fp32", 7.82, "0.00% (Baseline)"), ("int8_fused", 7.85, "+0.38% (Negligible)"), ("tl1_fused", 7.91, "+1.15% (Retained)")]
-    for m, ppl, loss in modes:
-        ram = f"{calculate_kv_memory_mb(seq_len=8192, kv_mode=m):.1f} MB"
-        print(f"{m:<16} | {ppl:>14.2f} | {loss:<18} | {ram:>12}")
-    print("─" * 70)
-    print(f"💡 {ANSI_GREEN}PPL Loss for TL1 1.58b is only 1.15% while saving 1.1 GB of RAM per session!{ANSI_RESET}\n")
 
 def bench_throughput_sweep(model_path):
     print(f"\n{ANSI_BOLD}{ANSI_CYAN}════════════════════════════════════════════════════════════════════════════════════════{ANSI_RESET}")

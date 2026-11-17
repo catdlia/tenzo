@@ -103,7 +103,7 @@ static void avx2_fused_ternary_pack_4x16(const float* input_4x16, float scale, u
     }
 }
 
-void runTernaryPackTest(mlir::MLIRContext &context) {
+bool runTernaryPackTest(mlir::MLIRContext &context) {
     llvm::outs() << "\n╔════════════════════════════════════════════════════════╗\n";
     llvm::outs() << "║  🧪 TERNARY PACK & AVX2 FUSED MICRO-KERNEL TESTS       ║\n";
     llvm::outs() << "╚════════════════════════════════════════════════════════╝\n\n";
@@ -843,6 +843,7 @@ void runTernaryPackTest(mlir::MLIRContext &context) {
     }
 
     llvm::outs() << "\n🎉 ALL TERNARY PACK & AVX2 FUSED MICRO-KERNEL TESTS PASSED! 🎉\n\n";
+    return true;
 }
 
 } // namespace tenzo
