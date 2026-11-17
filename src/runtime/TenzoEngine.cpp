@@ -2099,6 +2099,7 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         return pack_ternary_weights_raw(raw_bytes.data() + off, N, K);
     };
 
+    size_t s_idx = 0;
     auto strict_get_scale = [&](const char* name, int layer) -> float {
         if (load_failed) return 0.0f;
         if (s_idx >= all_scales.size()) {
@@ -2112,7 +2113,6 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
     };
 
     size_t v_idx = 1;
-    size_t s_idx = 0;
     size_t seq_offset = embed_bytes;
 
     for (int l = 0; l < num_layers; ++l) {
