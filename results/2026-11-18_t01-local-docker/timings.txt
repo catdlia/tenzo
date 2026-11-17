@@ -1,0 +1,11 @@
+G1_test: exit=0 time=15s
+G2_audit: exit=0 time=0s
+G3_fixture_regressions: exit=1 time=1s
+G4_diag: exit=0 time=6s
+G3x_tl1_truncated_direct: exit=1 time=0s
+G5_truncated_weights: exit=1 time=2s
+G6_generate: exit=0 time=10s
+G7_e2e_parity: exit=0 time=7s
+R1_verify_references: exit=0 time=1s
+S1_compiler_regressions: exit=0 time=0s
+P1_model_parity: exit=0 time=8s
