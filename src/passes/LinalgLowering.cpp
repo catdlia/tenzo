@@ -260,6 +260,7 @@ struct AttentionLoweringToLinalg
 
     auto queryType = mlir::cast<RankedTensorType>(query.getType());
     auto keyType = mlir::cast<RankedTensorType>(keyCache.getType());
+    auto valType = mlir::cast<RankedTensorType>(valCache.getType());
     auto elemType = queryType.getElementType();
     int rank = queryType.getRank();
 
