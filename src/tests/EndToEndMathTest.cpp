@@ -1,5 +1,5 @@
 #include "EndToEndMathTest.h"
-#include "include/tenzo.h"
+#include "tenzo.h"
 #include "runtime/Tokenizer.h"
 #include "llvm/Support/raw_ostream.h"
 
