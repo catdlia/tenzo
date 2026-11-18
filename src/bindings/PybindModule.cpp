@@ -163,44 +163,48 @@ void gemm_avx2_dense(
 
 namespace {
 
+// Activation quantization + LUT construction for the ternary GEMV.
+// Semantics follow HF integrations/bitnet.py ActQuant: per-token absmax, scale = 127 / max(|x|).clamp(min=1e-5),
+// q = round(x * scale) (torch.round = half-to-even, here std::nearbyint in the default rounding mode),
+// clamp(-128, 127); the matmul result is divided by scale. Because |x * scale| <= 127, every |q| <= 127.
+// For each activation pair (a0, a1) two 16-entry tables are built, indexed by the 4-bit weight code
+// idx = (w0 + 1) | ((w1 + 1) << 2):  lut[2k][idx] = w0 * a0  and  lut[2k+1][idx] = w1 * a1  (each fits int8).
+// (Before 2026-11-19 a single table held w0*a0 + w1*a1, which forced activations down to +-31, i.e. ~6 bit.)
 inline float build_lut(
     const float* __restrict__ act,
     int64_t K,
     __m256i* __restrict__ lut_vecs
 ) {
     const int64_t K_half = K / 2;
-    float max_abs = 1e-6f;
+    float max_abs = 0.0f;
     for (int64_t k = 0; k < K; ++k) {
         float val = std::abs(act[k]);
         if (val > max_abs) max_abs = val;
     }
+    max_abs = std::max(max_abs, 1e-5f);
 
-    const float scale_act = 31.0f / max_abs;
-    const float inv_scale_act = max_abs / 31.0f;
-
-    static const int w0_vals[3] = {-1, 0, 1};
-    static const int w1_vals[3] = {-1, 0, 1};
+    const float scale_act = 127.0f / max_abs;
+    const float inv_scale_act = 1.0f / scale_act;
 
     for (int64_t k = 0; k < K_half; ++k) {
-        int16_t a0 = static_cast<int16_t>(std::round(act[2 * k] * scale_act));
-        int16_t a1 = static_cast<int16_t>(std::round(act[2 * k + 1] * scale_act));
+        int a0 = static_cast<int>(std::clamp(std::nearbyint(act[2 * k] * scale_act), -128.0f, 127.0f));
+        int a1 = static_cast<int>(std::clamp(std::nearbyint(act[2 * k + 1] * scale_act), -128.0f, 127.0f));
 
-        alignas(32) int8_t lut_bytes[32] = {0};
-
+        alignas(32) int8_t t0[32] = {0};
+        alignas(32) int8_t t1[32] = {0};
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                int w0 = w0_vals[i];
-                int w1 = w1_vals[j];
+                int w0 = i - 1;
+                int w1 = j - 1;
                 int idx = (w0 + 1) | ((w1 + 1) << 2);
-
-                int32_t sum = w0 * a0 + w1 * a1;
-                int8_t val_i8 = static_cast<int8_t>(std::clamp(sum, -128, 127));
-
-                lut_bytes[idx] = val_i8;
-                lut_bytes[idx + 16] = val_i8; // Duplicate for top 128-bit lane
+                int8_t v0 = static_cast<int8_t>(std::clamp(w0 * a0, -128, 127));
+                int8_t v1 = static_cast<int8_t>(std::clamp(w1 * a1, -128, 127));
+                t0[idx] = v0; t0[idx + 16] = v0; // duplicated for the upper 128-bit lane
+                t1[idx] = v1; t1[idx + 16] = v1;
             }
         }
-        lut_vecs[k] = _mm256_load_si256(reinterpret_cast<const __m256i*>(lut_bytes));
+        lut_vecs[2 * k] = _mm256_load_si256(reinterpret_cast<const __m256i*>(t0));
+        lut_vecs[2 * k + 1] = _mm256_load_si256(reinterpret_cast<const __m256i*>(t1));
     }
     return inv_scale_act;
 }
@@ -213,18 +217,19 @@ inline void compute_single_block(
     __m256 scale_vec,
     __m256i mask_low
 ) {
-    __m256i acc_low_32_0 = _mm256_setzero_si256(); // ch 0..7
-    __m256i acc_low_32_1 = _mm256_setzero_si256(); // ch 8..15
-    __m256i acc_low_32_2 = _mm256_setzero_si256(); // ch 16..23
-    __m256i acc_low_32_3 = _mm256_setzero_si256(); // ch 24..31
+    __m256i acc_low_32_0 = _mm256_setzero_si256();
+    __m256i acc_low_32_1 = _mm256_setzero_si256();
+    __m256i acc_low_32_2 = _mm256_setzero_si256();
+    __m256i acc_low_32_3 = _mm256_setzero_si256();
 
-    __m256i acc_high_32_0 = _mm256_setzero_si256(); // ch 32..39
-    __m256i acc_high_32_1 = _mm256_setzero_si256(); // ch 40..47
-    __m256i acc_high_32_2 = _mm256_setzero_si256(); // ch 48..55
-    __m256i acc_high_32_3 = _mm256_setzero_si256(); // ch 56..63
+    __m256i acc_high_32_0 = _mm256_setzero_si256();
+    __m256i acc_high_32_1 = _mm256_setzero_si256();
+    __m256i acc_high_32_2 = _mm256_setzero_si256();
+    __m256i acc_high_32_3 = _mm256_setzero_si256();
 
     int64_t k = 0;
     while (k < K_half) {
+        // int16 accumulators: each pair adds at most 2 * 127, 64 pairs -> |sum| <= 16256 < 32767
         int64_t chunk = std::min<int64_t>(64, K_half - k);
         __m256i acc_low_16_0 = _mm256_setzero_si256();
         __m256i acc_low_16_1 = _mm256_setzero_si256();
@@ -233,19 +238,25 @@ inline void compute_single_block(
 
         for (int64_t c = 0; c < chunk; ++c, ++k) {
             __m256i w_bytes = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(block_w + k * 32));
-            __m256i lut = lut_vecs[k];
+            __m256i lut0 = lut_vecs[2 * k];
+            __m256i lut1 = lut_vecs[2 * k + 1];
 
             __m256i idx_low = _mm256_and_si256(w_bytes, mask_low);
             __m256i idx_high = _mm256_and_si256(_mm256_srli_epi16(w_bytes, 4), mask_low);
 
-            __m256i res_low = _mm256_shuffle_epi8(lut, idx_low);
-            __m256i res_high = _mm256_shuffle_epi8(lut, idx_high);
+            __m256i rl0 = _mm256_shuffle_epi8(lut0, idx_low);
+            __m256i rl1 = _mm256_shuffle_epi8(lut1, idx_low);
+            __m256i rh0 = _mm256_shuffle_epi8(lut0, idx_high);
+            __m256i rh1 = _mm256_shuffle_epi8(lut1, idx_high);
 
-            acc_low_16_0 = _mm256_add_epi16(acc_low_16_0, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 0)));
-            acc_low_16_1 = _mm256_add_epi16(acc_low_16_1, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 1)));
-
-            acc_high_16_0 = _mm256_add_epi16(acc_high_16_0, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 0)));
-            acc_high_16_1 = _mm256_add_epi16(acc_high_16_1, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 1)));
+            acc_low_16_0 = _mm256_add_epi16(acc_low_16_0, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rl0)), _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rl1))));
+            acc_low_16_1 = _mm256_add_epi16(acc_low_16_1, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rl0, 1)), _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rl1, 1))));
+            acc_high_16_0 = _mm256_add_epi16(acc_high_16_0, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rh0)), _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rh1))));
+            acc_high_16_1 = _mm256_add_epi16(acc_high_16_1, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rh0, 1)), _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rh1, 1))));
         }
 
         acc_low_32_0 = _mm256_add_epi32(acc_low_32_0, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_low_16_0, 0)));
@@ -300,7 +311,7 @@ void bitlinear_tl1_avx2_single(
     const int64_t K_half = K / 2;
     const int64_t n_blocks = N / 64;
 
-    std::vector<Vec256i> lut_vecs(K_half);
+    std::vector<Vec256i> lut_vecs(2 * K_half); // two LUT vectors per activation pair
     float inv_scale_act = build_lut(act, K, reinterpret_cast<__m256i*>(lut_vecs.data()));
     compute_from_lut(reinterpret_cast<const __m256i*>(lut_vecs.data()), packed_w, n_blocks, K_half, out, inv_scale_act * weight_scale);
 }
@@ -512,6 +523,7 @@ public:
     int kv_dim;
     int current_seq_len;
     std::string kv_mode; // "fp32" or "int8_fused"
+    float rope_theta;    // RoPE base (HF config.rope_theta; 500000 for BitNet-b1.58-2B-4T)
 
     // FP32 Cache: k_cache_fp32[layer_idx], v_cache_fp32[layer_idx]
     std::vector<std::vector<float>> k_cache_fp32;
@@ -532,11 +544,13 @@ public:
         int num_kv_heads,
         int head_dim,
         int max_seq_len = 8192,
-        const std::string& kv_mode = "int8_fused"
+        const std::string& kv_mode = "int8_fused",
+        float rope_theta = 500000.0f
     ) : num_layers(num_layers), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
         head_dim(head_dim), max_seq_len(max_seq_len),
         q_dim(num_q_heads * head_dim), kv_dim(num_kv_heads * head_dim),
-        current_seq_len(0), kv_mode(kv_mode) {
+        current_seq_len(0), kv_mode(kv_mode), rope_theta(rope_theta) {
+        if (!(rope_theta > 0.0f)) throw std::invalid_argument("rope_theta must be > 0");
         
         size_t cache_elements = static_cast<size_t>(num_kv_heads) * max_seq_len * head_dim;
         size_t scale_elements = static_cast<size_t>(num_kv_heads) * max_seq_len;
@@ -581,10 +595,11 @@ public:
         }
     }
 
-    static void apply_rope(float* head_ptr, int head_dim, int pos) {
+    // HF BitNetRotaryEmbedding: inv_freq = 1 / rope_theta^(2i/D), rotate_half pairing (i, i + D/2).
+    static void apply_rope(float* head_ptr, int head_dim, int pos, float rope_theta) {
         int half_dim = head_dim / 2;
         for (int i = 0; i < half_dim; ++i) {
-            float freq = 1.0f / std::pow(10000.0f, (2.0f * i) / static_cast<float>(head_dim));
+            float freq = 1.0f / std::pow(rope_theta, (2.0f * i) / static_cast<float>(head_dim));
             float angle = static_cast<float>(pos) * freq;
             float cos_val = std::cos(angle);
             float sin_val = std::sin(angle);
@@ -609,10 +624,10 @@ public:
 
         // In-place zero-copy RoPE
         for (int h = 0; h < num_q_heads; ++h) {
-            apply_rope(q_ptr + h * head_dim, head_dim, current_seq_len);
+            apply_rope(q_ptr + h * head_dim, head_dim, current_seq_len, rope_theta);
         }
         for (int h = 0; h < num_kv_heads; ++h) {
-            apply_rope(k_ptr + h * head_dim, head_dim, current_seq_len);
+            apply_rope(k_ptr + h * head_dim, head_dim, current_seq_len, rope_theta);
         }
 
         int t_idx = current_seq_len;
@@ -907,11 +922,12 @@ public:
         int num_layers,
         int max_seq_len = 8192,
         const std::string& quant_scheme = "classic_tl1",
-        const std::string& kv_mode = "int8_fused"
+        const std::string& kv_mode = "int8_fused",
+        float rope_theta = 500000.0f
     ) : hidden_size(hidden_size), num_q_heads(num_q_heads), num_kv_heads(num_kv_heads),
         head_dim(head_dim), num_layers(num_layers), max_seq_len(max_seq_len),
         quant_scheme(quant_scheme),
-        kv_cache(num_layers, num_q_heads, num_kv_heads, head_dim, max_seq_len, kv_mode) {
+        kv_cache(num_layers, num_q_heads, num_kv_heads, head_dim, max_seq_len, kv_mode, rope_theta) {
         
         layers.resize(num_layers);
         q_dim = num_q_heads * head_dim;
@@ -934,7 +950,7 @@ public:
         buf_act.resize(max_dim);
         buf_ffn_norm.resize(max_dim);
         buf_down.resize(max_dim);
-        lut_buf.resize(max_dim / 2);
+        lut_buf.resize(max_dim); // two LUT vectors per activation pair (see build_lut)
     }
 
     void reset() {
@@ -1707,9 +1723,9 @@ PYBIND11_MODULE(tenzo_runtime, m) {
           py::arg("input"), py::arg("weight"), py::arg("bias") = py::none(), py::arg("quant_scheme") = "fp32", py::arg("scale") = 1.0f);
 
     py::class_<KVCache>(m, "KVCache")
-        .def(py::init<int, int, int, int, int, const std::string&>(),
+        .def(py::init<int, int, int, int, int, const std::string&, float>(),
              py::arg("num_layers"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"),
-             py::arg("max_seq_len") = 8192, py::arg("kv_mode") = "int8_fused")
+             py::arg("max_seq_len") = 8192, py::arg("kv_mode") = "int8_fused", py::arg("rope_theta") = 500000.0f)
         .def_readonly("max_seq_len", &KVCache::max_seq_len)
         .def("reset", &KVCache::reset)
         .def("get_seq_len", &KVCache::get_seq_len)
@@ -1718,10 +1734,10 @@ PYBIND11_MODULE(tenzo_runtime, m) {
              py::arg("layer_idx"), py::arg("q"), py::arg("k"), py::arg("v"));
 
     py::class_<ExecutionContext>(m, "ExecutionContext")
-        .def(py::init<int, int, int, int, int, int, const std::string&, const std::string&>(),
+        .def(py::init<int, int, int, int, int, int, const std::string&, const std::string&, float>(),
              py::arg("hidden_size"), py::arg("num_q_heads"), py::arg("num_kv_heads"), py::arg("head_dim"),
              py::arg("num_layers"), py::arg("max_seq_len") = 8192, py::arg("quant_scheme") = "classic_tl1",
-             py::arg("kv_mode") = "int8_fused")
+             py::arg("kv_mode") = "int8_fused", py::arg("rope_theta") = 500000.0f)
         .def_readonly("max_seq_len", &ExecutionContext::max_seq_len)
         .def("reset", &ExecutionContext::reset)
         .def("get_seq_len", &ExecutionContext::get_seq_len)
