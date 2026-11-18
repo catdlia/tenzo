@@ -46,3 +46,6 @@ Times are local (EET). Memory readings before each heavy step: `logs/mem.log`.
 - **D12** `test_fixture_regressions.py` run on the host fails with rc=127 (`libMLIR.so.21.1` missing on the host);
   it is a Docker-only suite: the gate was re-run inside the dev container -> exit 0. The host log is kept as
   `logs/gate_test_fixture_regressions_host_wrongenv.log`.
+- **D13 (23:59)** Block D finalists limited to 2 (S3+s4r32 and K8V:S3) on 16 EN + 8 UK so that the final report fits
+  the budget; ctx-2048 runs not done. Block E skipped for time (last block start 00:46).
+- **D14 (00:37)** Final: weights sha256 identical to start; both systemd-inhibit processes stopped.
