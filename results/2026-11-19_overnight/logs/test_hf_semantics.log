@@ -1,0 +1,15 @@
+ Container untitled-dev-run-8917c804f9d9 Creating 
+ Container untitled-dev-run-8917c804f9d9 Created 
+loc("-":5:10): error: 'tenzo.rope' op requires a positive 'theta' attribute (RoPE base, HF config.rope_theta)
+loc("-":5:10): error: failed to legalize operation 'tenzo.rope' that was explicitly marked illegal
+--- HF semantics regressions (rope_theta, 8-bit ActQuant) ---
+[DEBUG] registerAllTenzoDialectTranslations called
+  tenzo.rope theta=5e5 pos=37: rel_l2 vs HF ref 3.682576e-07 (theta=1e4 would be 1.019525e+00)
+  tenzo.rope without theta: lowering rejected as expected
+[DEBUG] registerAllTenzoDialectTranslations called
+  tenzo.bitlinear_tl1_pack K=256 (185/256 codes with |q|>31): rel_l2 vs HF ref 0.000000e+00 (31 levels would be 2.176443e-02)
+[DEBUG] registerAllTenzoDialectTranslations called
+  tenzo.bitlinear_tl1 K=128 (all +1 weights): rel_l2 vs HF ref 0.000000e+00 (old 63-level truncation would be 6.233703e-02)
+  engine 1-layer fp32-KV, 8 positions: max rel_l2(logits) vs HF ref 1.150474e-07 (theta=1e4 would be 3.095710e-02, 31-level activations 5.016324e-02)
+✅ [PASS] HF semantics regressions
+exit=0

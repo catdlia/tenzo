@@ -1,0 +1,81 @@
+ Container untitled-dev-run-1c46c1ba5b4b Creating 
+ Container untitled-dev-run-1c46c1ba5b4b Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[0/1] Re-running CMake...
+-- 🚀 Using CCache: /usr/bin/ccache
+-- 🚀 Using LLD linker: /usr/lib/llvm-21/bin/lld
+-- 🚀 Target Architecture: x86_64 (AVX2 / FMA / F16C)
+-- 🚀 Vulkan GPU runtime enabled: /usr/lib/x86_64-linux-gnu/libvulkan.so
+-- 🚀 Full MLIR Compiler Pipeline Enabled
+-- 🚀 OpenMP found: 4.5
+-- pybind11 v2.11.1 
+-- Configuring done (0.5s)
+CMake Warning at CMakeLists.txt:131 (add_executable):
+  Cannot generate a safe runtime search path for target tenzo-cli because
+  files in some directories may conflict with libraries in implicit
+  directories:
+
+    runtime library [libgomp.so.1] in /usr/lib/gcc/x86_64-linux-gnu/13 may be hidden by files in:
+      /usr/lib/llvm-21/lib
+
+  Some of these libraries may not be found correctly.
+
+
+-- Generating done (0.0s)
+-- Build files have been written to: /app/cmake-build-debug
+[1/20] Building TenzoDialect.cpp.inc...
+[2/20] Building TenzoDialect.h.inc...
+[3/20] Building TenzoOps.h.inc...
+[4/20] Building TenzoOps.cpp.inc...
+[5/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/main.cpp.o
+[6/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/passes/Lowering.cpp.o
+[7/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/dialect/TenzoDialect.cpp.o
+[8/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/PipelineTests.cpp.o
+/app/src/tests/PipelineTests.cpp: In function 'std::unique_ptr<mlir::ExecutionEngine> tenzo::compileWithOpenMP(mlir::MLIRContext&, bool)':
+/app/src/tests/PipelineTests.cpp:206:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  206 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /app/src/tests/PipelineTests.cpp:150:
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'std::unique_ptr<mlir::ExecutionEngine> tenzo::compileAndGetEngine(mlir::MLIRContext&, bool)':
+/app/src/tests/PipelineTests.cpp:305:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  305 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'void tenzo::runSmallMatMulTest(mlir::MLIRContext&)':
+/app/src/tests/PipelineTests.cpp:614:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  614 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'std::unique_ptr<mlir::ExecutionEngine> tenzo::compileLargeMatrix(mlir::MLIRContext&, bool)':
+/app/src/tests/PipelineTests.cpp:994:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  994 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'bool tenzo::runExplicitKernelBenchmark(mlir::MLIRContext&)':
+/app/src/tests/PipelineTests.cpp:1179:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+ 1179 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[9/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/MicroKernelBench.cpp.o
+[10/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/context/TenzoContext.cpp.o
+[11/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/BLISBenchmark.cpp.o
+[12/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/passes/ExplicitMicroKernelPass.cpp.o
+[13/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/passes/LinalgLowering.cpp.o
+[14/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/DynamicInferenceTest.cpp.o
+[15/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/ZeroCopyBridgeTest.cpp.o
+[16/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TestHFSemantics.cpp.o
+[17/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TernaryPackTest.cpp.o
+[18/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/BitwiseAttentionTest.cpp.o
+[19/20] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/AuditJITTest.cpp.o
+[20/20] Linking CXX executable tenzo-cli

@@ -1,0 +1,6 @@
+ Container untitled-dev-run-1c243e30e68e Creating 
+ Container untitled-dev-run-1c243e30e68e Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/2] Building CXX object CMakeFiles/tenzo_runtime.dir/src/bindings/PybindModule.cpp.o
+[2/2] Linking CXX shared module tenzo_runtime.cpython-312-x86_64-linux-gnu.so
+pybind build exit=0

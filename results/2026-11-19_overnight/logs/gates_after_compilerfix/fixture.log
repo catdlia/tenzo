@@ -1,0 +1,26 @@
+ Container untitled-dev-run-e8a753dfafb1 Creating 
+ Container untitled-dev-run-e8a753dfafb1 Created 
+╔════════════════════════════════════════════════════════════════════════╗
+║   Tenzo TL1 Fixture Corruption Regression Test Suite                   ║
+║   Milestone 2 Continuation: Requirement R2.b                           ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+ℹ️ Found tenzo-cli binary: /app/cmake-build-debug/tenzo-cli
+✅ [PASS] Test 1 (Ref): Truncated (256B) fixture rejected: Invalid fixture size: 256 bytes, expected exactly 4096 bytes
+✅ [PASS] Test 1 (CLI): tenzo-cli rejected truncated (256B) fixture via fixture validation [TL1-FIXTURE-INVALID] (code 1).
+✅ [PASS] Test 2 (Ref): Truncated (4095B) fixture rejected: Invalid fixture size: 4095 bytes, expected exactly 4096 bytes
+✅ [PASS] Test 2 (CLI): tenzo-cli rejected truncated (4095B) fixture via fixture validation [TL1-FIXTURE-INVALID] (code 1).
+✅ [PASS] Test 3 (Ref): Oversized (5000B) fixture rejected: Invalid fixture size: 5000 bytes, expected exactly 4096 bytes
+✅ [PASS] Test 3 (CLI): tenzo-cli rejected oversized (5000B) fixture via fixture validation [TL1-FIXTURE-INVALID] (code 1).
+✅ [PASS] Test 4 (Ref): Corrupted low nibble fixture rejected: Invalid nibble at byte 100: low=9, high=0 (max allowable: 8)
+✅ [PASS] Test 4 (CLI): tenzo-cli rejected corrupted low nibble fixture via fixture validation [TL1-FIXTURE-INVALID] (code 1).
+✅ [PASS] Test 5 (Ref): Corrupted high nibble fixture rejected: Invalid nibble at byte 200: low=0, high=9 (max allowable: 8)
+✅ [PASS] Test 5 (CLI): tenzo-cli rejected corrupted high nibble fixture via fixture validation [TL1-FIXTURE-INVALID] (code 1).
+✅ [PASS] Test 6 (Ref): Missing fixture cleanly rejected: Fixture file not found: /tmp/tmpvb5s4dqa/nonexistent_weights.bin
+✅ [PASS] Test 6 (CLI): tenzo-cli rejected missing fixture via fixture validation [TL1-FIXTURE-INVALID] (code 1).
+✅ [PASS] Test 7 (Ref): Valid TL1 fixture correctly accepted.
+✅ [PASS] Test 7 (CLI): tenzo-cli correctly accepted valid fixture.
+
+════════════════════════════════════════════════════════════════════════
+🎉 ALL TL1 FIXTURE REGRESSION TESTS PASSED SUCCESSFULLY! 🎉
+fixture exit=0
