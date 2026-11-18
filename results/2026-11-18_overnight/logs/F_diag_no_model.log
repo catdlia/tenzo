@@ -1,0 +1,55 @@
+ Container untitled-dev-run-3ff49c2f51c5 Creating 
+ Container untitled-dev-run-3ff49c2f51c5 Created 
+[1;36m[1m╔══════════════════════════════════════════════════════════════════╗
+║       Tenzo Compiler Diagnostic Suite v1.1.0-beta (Release)      ║
+╚══════════════════════════════════════════════════════════════════╝
+[0m
+[1;36m[1m════════════════════════════════════════════════════════════════════[0m
+ 🔬 [1m1. Target Hardware & Compiler Environment[0m
+[1;36m────────────────────────────────────────────────────────────────────[0m
+  Architecture:         [1;32mx86_64 (AVX2 / FMA / VNNI)[0m
+  Compiler:             GCC 13.3
+  OpenMP Max Threads:   4 threads
+
+[1;36m[1m════════════════════════════════════════════════════════════════════[0m
+ 🔬 [1m2. SIMD & Mathematical Kernels Verification[0m
+[1;36m────────────────────────────────────────────────────────────────────[0m
+  AVX2/NEON _mm256_shuffle_epi8 (eLUT)          [1;32m[PASS][0m
+  AVX2/NEON _mm256_srli_epi16 (4-bit unpack)    [1;32m[PASS][0m
+  AVX2/NEON _mm256_cvtepi8_epi16                [1;32m[PASS][0m
+  AVX2/NEON _mm256_cvtepi16_epi32               [1;32m[PASS][0m
+  AVX2/NEON _mm256_madd_epi16                   [1;32m[PASS][0m
+  AVX2/NEON _mm256_fmadd_ps                     [1;32m[PASS][0m
+
+[1;36m[1m════════════════════════════════════════════════════════════════════[0m
+ 🔬 [1m3. Heterogeneous Backends & Microarch Diagnostics[0m
+[1;36m────────────────────────────────────────────────────────────────────[0m
+  Microarch Profiler                            [1;32m[PASS][0m [1;33mx86_64, 256-bit SIMD, L1=48KB[0m
+  RISC-V RVV BitLinear Math                     [1;32m[PASS][0m [1;33mCalculated: -0.500000, Expected: -0.500[0m
+⚡ [CUDA Engine] Native CUDA Driver not found. Initializing Vulkan Translation Layer...
+[Vulkan] Error: -9 at /app/src/runtime/VulkanRuntime.cpp:68
+  CUDA Backend (Vulkan Translation)             [1;33m[SKIP][0m [1;33munavailable on this device (CUDA Backend Unavailable)[0m
+⚡ [ROCm Engine] Native ROCm Driver not found. Initializing Vulkan Translation Layer...
+[Vulkan] Error: -9 at /app/src/runtime/VulkanRuntime.cpp:68
+  ROCm Backend (Vulkan Translation)             [1;33m[SKIP][0m [1;33munavailable on this device (ROCm Backend Unavailable)[0m
+
+[1;36m[1m════════════════════════════════════════════════════════════════════[0m
+ 🔬 [1m4. Model Weights & Vocabulary Verification[0m
+[1;36m────────────────────────────────────────────────────────────────────[0m
+  Model files present                           [1;33m[SKIP][0m [1;33mno model at /nonexistent - specify MODEL=<path>[0m
+
+[1;36m[1m════════════════════════════════════════════════════════════════════[0m
+ 🔬 [1m5. Native Inference & Sampling Validation[0m
+[1;36m────────────────────────────────────────────────────────────────────[0m
+  Engine inference test                         [1;33m[SKIP][0m [1;33mrequires weights.bin[0m
+
+[1;36m[1m════════════════════════════════════════════════════════════════════[0m
+ 🔬 [1mDiagnostic Summary[0m
+[1;36m────────────────────────────────────────────────────────────────────[0m
+  passed=8 failed=0 skipped=4
+    skipped: CUDA Backend (Vulkan Translation)
+    skipped: ROCm Backend (Vulkan Translation)
+    skipped: Model files present
+    skipped: Engine inference test
+[1;32m[1mNO FAILURES: 8 checks passed, 4 skipped (unavailable or not requested). Not every component was exercised.[0m
+

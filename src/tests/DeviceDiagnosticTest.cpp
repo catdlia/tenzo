@@ -39,8 +39,21 @@ void print_header(const std::string& title) {
     std::cout << ANSI_CYAN << "────────────────────────────────────────────────────────────────────" << ANSI_RESET << "\n";
 }
 
+// Summary counters: an unavailable optional component is a SKIP (not a failure); a real failure must change the exit code
+// and must never be followed by an "ALL ... PASSED" banner.
+int g_pass = 0, g_fail = 0, g_skip = 0;
+std::vector<std::string> g_skipped;
+
+void report_skip(const std::string& test_name, const std::string& details) {
+    ++g_skip;
+    g_skipped.push_back(test_name);
+    std::cout << "  " << std::left << std::setw(45) << test_name << " " << ANSI_YELLOW << "[SKIP]" << ANSI_RESET
+              << " " << ANSI_YELLOW << details << ANSI_RESET << "\n";
+}
+
 void report_status(const std::string& test_name, bool success, const std::string& details = "") {
     std::cout << "  " << std::left << std::setw(45) << test_name << " ";
+    (success ? g_pass : g_fail)++;
     if (success) {
         std::cout << ANSI_GREEN << "[PASS]" << ANSI_RESET;
     } else {
@@ -311,7 +324,8 @@ bool run_backend_diagnostics() {
 
     // 1. Profiler
     auto& prof = tenzo::MicroarchProfiler::getProfile();
-    report_status("Microarch Profiler", prof.num_threads > 0, 
+    bool prof_ok = prof.num_threads > 0;
+    report_status("Microarch Profiler", prof_ok, 
                   prof.cpu_arch + ", " + std::to_string(prof.vector_bits) + "-bit SIMD, L1=" + std::to_string(prof.l1d_cache_size/1024) + "KB");
 
     // 2. RISC-V RVV Kernel Test
@@ -326,14 +340,16 @@ bool run_backend_diagnostics() {
     // 3. CUDA Translation Layer
     auto& cuda = tenzo::CUDARuntime::getInstance();
     bool cuda_init = cuda.initialize();
-    report_status("CUDA Backend (Vulkan Translation)", cuda_init, cuda.getDeviceName());
+    if (cuda_init) report_status("CUDA Backend (Vulkan Translation)", true, cuda.getDeviceName());
+    else report_skip("CUDA Backend (Vulkan Translation)", "unavailable on this device (" + cuda.getDeviceName() + ")");
 
     // 4. ROCm Translation Layer
     auto& rocm = tenzo::ROCmRuntime::getInstance();
     bool rocm_init = rocm.initialize();
-    report_status("ROCm Backend (Vulkan Translation)", rocm_init, rocm.getDeviceName());
+    if (rocm_init) report_status("ROCm Backend (Vulkan Translation)", true, rocm.getDeviceName());
+    else report_skip("ROCm Backend (Vulkan Translation)", "unavailable on this device (" + rocm.getDeviceName() + ")");
 
-    return rvv_ok;
+    return prof_ok && rvv_ok;
 }
 
 } // namespace
@@ -360,17 +376,24 @@ int main(int argc, char** argv) {
         engine_ok = run_engine_inference_test(model_dir);
     } else {
         print_header("4. Model Weights & Vocabulary Verification");
-        report_status("Model files present", true, "Skipped (no model at " + model_dir + " - specify MODEL=<path>)");
+        report_skip("Model files present", "no model at " + model_dir + " - specify MODEL=<path>");
         print_header("5. Native Inference & Sampling Validation");
-        report_status("Engine inference test", true, "Skipped (requires weights.bin)");
+        report_skip("Engine inference test", "requires weights.bin");
     }
 
     print_header("Diagnostic Summary");
-    if (simd_ok && backend_ok && weights_ok && engine_ok) {
-        std::cout << ANSI_GREEN << ANSI_BOLD << "🎉 ALL SYSTEM CHECKS PASSED! Tenzo v1.1.0-beta is fully operational on this device." << ANSI_RESET << "\n\n";
-        return 0;
-    } else {
-        std::cout << ANSI_RED << ANSI_BOLD << "⚠️  DIAGNOSTIC ISSUES DETECTED. Review the logs above for details." << ANSI_RESET << "\n\n";
+    std::cout << "  passed=" << g_pass << " failed=" << g_fail << " skipped=" << g_skip << "\n";
+    for (const auto& n : g_skipped) std::cout << "    skipped: " << n << "\n";
+    bool all_ok = simd_ok && backend_ok && weights_ok && engine_ok && g_fail == 0;
+    if (!all_ok) {
+        std::cout << ANSI_RED << ANSI_BOLD << "⚠️  DIAGNOSTIC ISSUES DETECTED (" << g_fail << " failed). Review the logs above for details." << ANSI_RESET << "\n\n";
         return 1;
     }
+    if (g_skip == 0) {
+        std::cout << ANSI_GREEN << ANSI_BOLD << "🎉 ALL SYSTEM CHECKS PASSED! Tenzo v1.1.0-beta is fully operational on this device." << ANSI_RESET << "\n\n";
+    } else {
+        std::cout << ANSI_GREEN << ANSI_BOLD << "NO FAILURES: " << g_pass << " checks passed, " << g_skip
+                  << " skipped (unavailable or not requested). Not every component was exercised." << ANSI_RESET << "\n\n";
+    }
+    return 0;
 }

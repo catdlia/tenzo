@@ -5,3 +5,4 @@ model loaded 16.8s dtype=bfloat16
 resumed with 5 complete windows
 window 5 ppl 20.043
 window 6 ppl 27.411
+window 7 ppl 20.727
