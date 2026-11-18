@@ -1,0 +1,25 @@
+ Container untitled-dev-run-319fee09daeb Creating 
+ Container untitled-dev-run-319fee09daeb Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens)
+warning: /app/models/bitnet-1.58b/config.json has no rope_theta; using default 500000 (microsoft/bitnet-b1.58-2B-4T)
+[Tenzo] EXPERIMENT: FP32 embeddings / LM head (TENZO_EXPERIMENT_FP32_LM set)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: fp32[0m[36m, Max Context: 1024)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b...[0m[32m [OK] [0m(2850.8 ms)
+
+score window 0 tokens=511 ppl=12.3 running_ppl=12.3
+score window 1 tokens=511 ppl=20.7 running_ppl=16.0
+score window 2 tokens=511 ppl=29.4 running_ppl=19.6
+score window 3 tokens=511 ppl=10.3 running_ppl=16.7
+score window 4 tokens=511 ppl=11.1 running_ppl=15.4
+score window 5 tokens=511 ppl=20.1 running_ppl=16.1
+score window 6 tokens=511 ppl=27.6 running_ppl=17.4
+

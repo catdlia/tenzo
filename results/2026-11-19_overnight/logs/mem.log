@@ -17,3 +17,6 @@ MemAvailable:   11524828 kB
 2026-11-18T13:22:28+02:00 golden emulate both MemAvailable=12252232kB
 2026-11-18T13:26:29+02:00 build theta MemAvailable=12267460kB
 2026-11-18T13:27:57+02:00 ppl fp32 theta MemAvailable=12198504kB
+2026-11-18T13:36:39+02:00 build actquant MemAvailable=12207068kB
+2026-11-18T13:37:46+02:00 ppl fp32 actquant MemAvailable=12256580kB
+2026-11-18T13:47:28+02:00 ppl fp32 actquant fp32lm MemAvailable=12296416kB

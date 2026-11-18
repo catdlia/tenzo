@@ -19,44 +19,48 @@ namespace tenzo {
 
 namespace {
 
+// Activation quantization + LUT construction for the ternary GEMV.
+// Semantics follow HF integrations/bitnet.py ActQuant: per-token absmax, scale = 127 / max(|x|).clamp(min=1e-5),
+// q = round(x * scale) (torch.round = half-to-even, here std::nearbyint in the default rounding mode),
+// clamp(-128, 127); the matmul result is divided by scale. Because |x * scale| <= 127, every |q| <= 127.
+// For each activation pair (a0, a1) two 16-entry tables are built, indexed by the 4-bit weight code
+// idx = (w0 + 1) | ((w1 + 1) << 2):  lut[2k][idx] = w0 * a0  and  lut[2k+1][idx] = w1 * a1  (each fits int8).
+// (Before 2026-11-19 a single table held w0*a0 + w1*a1, which forced activations down to +-31, i.e. ~6 bit.)
 inline float build_lut(
     const float* __restrict__ act,
     int64_t K,
     __m256i* __restrict__ lut_vecs
 ) {
     const int64_t K_half = K / 2;
-    float max_abs = 1e-6f;
+    float max_abs = 0.0f;
     for (int64_t k = 0; k < K; ++k) {
         float val = std::abs(act[k]);
         if (val > max_abs) max_abs = val;
     }
+    max_abs = std::max(max_abs, 1e-5f);
 
-    const float scale_act = 31.0f / max_abs;
-    const float inv_scale_act = max_abs / 31.0f;
-
-    static const int w0_vals[3] = {-1, 0, 1};
-    static const int w1_vals[3] = {-1, 0, 1};
+    const float scale_act = 127.0f / max_abs;
+    const float inv_scale_act = 1.0f / scale_act;
 
     for (int64_t k = 0; k < K_half; ++k) {
-        int16_t a0 = static_cast<int16_t>(std::round(act[2 * k] * scale_act));
-        int16_t a1 = static_cast<int16_t>(std::round(act[2 * k + 1] * scale_act));
+        int a0 = static_cast<int>(std::clamp(std::nearbyint(act[2 * k] * scale_act), -128.0f, 127.0f));
+        int a1 = static_cast<int>(std::clamp(std::nearbyint(act[2 * k + 1] * scale_act), -128.0f, 127.0f));
 
-        alignas(32) int8_t lut_bytes[32] = {0};
-
+        alignas(32) int8_t t0[32] = {0};
+        alignas(32) int8_t t1[32] = {0};
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < 3; ++j) {
-                int w0 = w0_vals[i];
-                int w1 = w1_vals[j];
+                int w0 = i - 1;
+                int w1 = j - 1;
                 int idx = (w0 + 1) | ((w1 + 1) << 2);
-
-                int32_t sum = w0 * a0 + w1 * a1;
-                int8_t val_i8 = static_cast<int8_t>(std::clamp(sum, -128, 127));
-
-                lut_bytes[idx] = val_i8;
-                lut_bytes[idx + 16] = val_i8; // Duplicate for top 128-bit lane
+                int8_t v0 = static_cast<int8_t>(std::clamp(w0 * a0, -128, 127));
+                int8_t v1 = static_cast<int8_t>(std::clamp(w1 * a1, -128, 127));
+                t0[idx] = v0; t0[idx + 16] = v0; // duplicated for the upper 128-bit lane
+                t1[idx] = v1; t1[idx + 16] = v1;
             }
         }
-        lut_vecs[k] = _mm256_load_si256(reinterpret_cast<const __m256i*>(lut_bytes));
+        lut_vecs[2 * k] = _mm256_load_si256(reinterpret_cast<const __m256i*>(t0));
+        lut_vecs[2 * k + 1] = _mm256_load_si256(reinterpret_cast<const __m256i*>(t1));
     }
     return inv_scale_act;
 }
@@ -81,6 +85,7 @@ inline void compute_single_block(
 
     int64_t k = 0;
     while (k < K_half) {
+        // int16 accumulators: each pair adds at most 2 * 127, 64 pairs -> |sum| <= 16256 < 32767
         int64_t chunk = std::min<int64_t>(64, K_half - k);
         __m256i acc_low_16_0 = _mm256_setzero_si256();
         __m256i acc_low_16_1 = _mm256_setzero_si256();
@@ -89,19 +94,25 @@ inline void compute_single_block(
 
         for (int64_t c = 0; c < chunk; ++c, ++k) {
             __m256i w_bytes = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(block_w + k * 32));
-            __m256i lut = lut_vecs[k];
+            __m256i lut0 = lut_vecs[2 * k];
+            __m256i lut1 = lut_vecs[2 * k + 1];
 
             __m256i idx_low = _mm256_and_si256(w_bytes, mask_low);
             __m256i idx_high = _mm256_and_si256(_mm256_srli_epi16(w_bytes, 4), mask_low);
 
-            __m256i res_low = _mm256_shuffle_epi8(lut, idx_low);
-            __m256i res_high = _mm256_shuffle_epi8(lut, idx_high);
+            __m256i rl0 = _mm256_shuffle_epi8(lut0, idx_low);
+            __m256i rl1 = _mm256_shuffle_epi8(lut1, idx_low);
+            __m256i rh0 = _mm256_shuffle_epi8(lut0, idx_high);
+            __m256i rh1 = _mm256_shuffle_epi8(lut1, idx_high);
 
-            acc_low_16_0 = _mm256_add_epi16(acc_low_16_0, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 0)));
-            acc_low_16_1 = _mm256_add_epi16(acc_low_16_1, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_low, 1)));
-
-            acc_high_16_0 = _mm256_add_epi16(acc_high_16_0, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 0)));
-            acc_high_16_1 = _mm256_add_epi16(acc_high_16_1, _mm256_cvtepi8_epi16(_mm256_extracti128_si256(res_high, 1)));
+            acc_low_16_0 = _mm256_add_epi16(acc_low_16_0, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rl0)), _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rl1))));
+            acc_low_16_1 = _mm256_add_epi16(acc_low_16_1, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rl0, 1)), _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rl1, 1))));
+            acc_high_16_0 = _mm256_add_epi16(acc_high_16_0, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rh0)), _mm256_cvtepi8_epi16(_mm256_castsi256_si128(rh1))));
+            acc_high_16_1 = _mm256_add_epi16(acc_high_16_1, _mm256_add_epi16(
+                _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rh0, 1)), _mm256_cvtepi8_epi16(_mm256_extracti128_si256(rh1, 1))));
         }
 
         acc_low_32_0 = _mm256_add_epi32(acc_low_32_0, _mm256_cvtepi16_epi32(_mm256_extracti128_si256(acc_low_16_0, 0)));
@@ -1246,7 +1257,7 @@ TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
     buf_act.resize(max_dim);
     buf_ffn_norm.resize(max_dim);
     buf_down.resize(max_dim);
-    lut_buf.resize(max_dim / 2);
+    lut_buf.resize(max_dim); // two LUT vectors per activation pair (see build_lut)
     logits_scratch.resize(cfg.vocab_size);
     buf_x_i8.resize(max_dim);
     buf_x_expanded.resize(max_dim / 16);
