@@ -1,0 +1,23 @@
+total 104556
+-rw-r--r-- 1 root root       281 Nov 17 23:56 config.json
+-rwxr-xr-x 1 root root    212707 Nov 17 23:56 model.mlir
+-rw-r--r-- 1 root root   1988383 Nov 17 23:56 tokenizer.vocab
+-rw-r--r-- 1 root root 104857600 Nov 17 23:56 weights.bin
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+❌ [Tenzo Error] Binary weights file is truncated or corrupted: /tmp/m/weights.bin
+   Actual size: 104857600 bytes (100 MB)
+   Expected minimum: 1836113920 bytes (1751 MB) for 30-layer topology.
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 8192)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /tmp/m...[0m[31m [FAILED][0m
+❌ Error loading model: Failed to load Tenzo model from /tmp/m/weights.bin
+tenzo-inference exit code: 1
+

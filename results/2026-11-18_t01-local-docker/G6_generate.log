@@ -1,0 +1,28 @@
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 8192)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b...[0m[32m [OK] [0m(8069.3 ms)
+
+[1m💬 Prompt: [0mThe capital of France is
+[1m[36m⚡ Output: [0m Paris. Paris has a population of about 2.1 million people, making it the most populous city in Europe.
+
+
+[1m╔════════════════════════════════════════════════════════╗
+║             Tenzo Engine Inference Profile             ║
+╠════════════════════════════════════════════════════════╣
+[0m║ Model Architecture:      BitNet-b1.58-2B-4T (30 Layers)║
+║ KV-Cache Quantization:   int8_fused (300 MB for 8K)    ║
+║ Prompt Context Length:   6 tokens                      ║
+║ Generated Tokens:        24 tokens                     ║
+║ Time To First Token:     140 ms                        ║
+║ Total Decode Time:       960 ms                        ║
+║ [1m[32mDecode Speed:            24.97 tok/sec          [0m║
+╚════════════════════════════════════════════════════════╝

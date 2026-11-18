@@ -1,0 +1,4 @@
+loc("-":6:12): error: failed to legalize operation 'tenzo.bitlinear_tl1' that was explicitly marked illegal
+❌ [TL1-FAIL] MLIR compilation failed
+--- Running Test TL1 ---
+

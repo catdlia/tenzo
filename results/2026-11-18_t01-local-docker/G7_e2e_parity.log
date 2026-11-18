@@ -1,0 +1,23 @@
+=================================================================
+  Tenzo End-to-End Model Inference Parity Verification Suite (F18)
+=================================================================
+Model directory: /app/models/bitnet-1.58b
+
+▶ Running Parity Test: France Capital Factoid Prompt
+  Prompt: "The capital of France is"
+  ✅ Weight integrity check: Genuine weights active (no synthetic fallbacks detected).
+  Observed completion: "[0m Paris. Paris is a"
+  ✅ Parity match: Detected expected prefix "Paris".
+✅ PASSED: France Capital Factoid Prompt
+
+▶ Running Parity Test: Compiler Definition Technical Prompt
+  Prompt: "In computer science, a compiler translates source code written in a high-level programming language into"
+  ✅ Weight integrity check: Genuine weights active (no synthetic fallbacks detected).
+  Observed completion: "[0m machine code that can be"
+  ✅ Parity match: Detected expected prefix "machine code".
+✅ PASSED: Compiler Definition Technical Prompt
+
+-----------------------------------------------------------------
+Parity Verification Summary: 2/2 test cases passed.
+-----------------------------------------------------------------
+🎉 ALL END-TO-END INFERENCE PARITY TESTS PASSED SUCCESSFULLY!

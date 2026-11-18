@@ -1,0 +1,33 @@
+⚠️ УВАГА: Запуск локальної компіляції (може бути довго)...
+docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo-diag paper_benchmark tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
+ninja: Entering directory `/app/cmake-build-debug'
+[1/44] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o
+FAILED: CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o 
+/usr/bin/ccache /usr/bin/c++ -DTENZO_HAS_VULKAN -I/app/cmake-build-debug -I/app/src -I/app/include -isystem /usr/lib/llvm-21/include -g -std=gnu++17 -fdiagnostics-color=always   -D_GNU_SOURCE -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -ffast-math -fno-math-errno -funroll-loops -mavx2 -mfma -mf16c -O3 -fopenmp -UNDEBUG -fopenmp -MD -MT CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o -MF CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o.d -o CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o -c /app/src/tests/EndToEndMathTest.cpp
+/app/src/tests/EndToEndMathTest.cpp:2:10: fatal error: include/tenzo.h: No such file or directory
+    2 | #include "include/tenzo.h"
+      |          ^~~~~~~~~~~~~~~~~
+compilation terminated.
+[2/44] Building CXX object CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o
+FAILED: CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o 
+/usr/bin/ccache /usr/bin/c++ -DTENZO_HAS_VULKAN -I/app/cmake-build-debug -I/app/src -I/app/include -isystem /usr/lib/llvm-21/include -g -std=gnu++17 -fdiagnostics-color=always   -D_GNU_SOURCE -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -ffast-math -fno-math-errno -funroll-loops -mavx2 -mfma -mf16c -O3 -fopenmp -UNDEBUG -fopenmp -MD -MT CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o -MF CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o.d -o CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o -c /app/src/runtime/TenzoEngine.cpp
+/app/src/runtime/TenzoEngine.cpp: In lambda function:
+/app/src/runtime/TenzoEngine.cpp:2104:13: error: 's_idx' was not declared in this scope
+ 2104 |         if (s_idx >= all_scales.size()) {
+      |             ^~~~~
+/app/src/runtime/TenzoEngine.cpp:2111:27: error: 's_idx' was not declared in this scope
+ 2111 |         return all_scales[s_idx++];
+      |                           ^~~~~
+[3/44] Building CXX object CMakeFiles/tenzo-cli.dir/src/main.cpp.o
+[4/44] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/GPUTests.cpp.o
+[5/44] Building CXX object CMakeFiles/tenzo-cli.dir/src/passes/LinalgLowering.cpp.o
+FAILED: CMakeFiles/tenzo-cli.dir/src/passes/LinalgLowering.cpp.o 
+/usr/bin/ccache /usr/bin/c++ -DTENZO_HAS_VULKAN -I/app/cmake-build-debug -I/app/src -I/app/include -isystem /usr/lib/llvm-21/include -g -std=gnu++17 -fdiagnostics-color=always   -D_GNU_SOURCE -DEXPERIMENTAL_KEY_INSTRUCTIONS -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -ffast-math -fno-math-errno -funroll-loops -mavx2 -mfma -mf16c -O3 -fopenmp -UNDEBUG -fopenmp -MD -MT CMakeFiles/tenzo-cli.dir/src/passes/LinalgLowering.cpp.o -MF CMakeFiles/tenzo-cli.dir/src/passes/LinalgLowering.cpp.o.d -o CMakeFiles/tenzo-cli.dir/src/passes/LinalgLowering.cpp.o -c /app/src/passes/LinalgLowering.cpp
+/app/src/passes/LinalgLowering.cpp: In member function 'virtual llvm::LogicalResult {anonymous}::AttentionLoweringToLinalg::matchAndRewrite(tenzo::AttentionOp, mlir::OpConversionPattern<tenzo::AttentionOp>::OpAdaptor, mlir::ConversionPatternRewriter&) const':
+/app/src/passes/LinalgLowering.cpp:311:11: error: 'valType' was not declared in this scope
+  311 |       if (valType.getRank() != keyType.getRank() || valType.getShape() != keyType.getShape())
+      |           ^~~~~~~
+[6/44] Building CXX object CMakeFiles/tenzo-cli.dir/src/passes/ExplicitMicroKernelPass.cpp.o
+ninja: build stopped: subcommand failed.
+
+make: *** [Makefile:21: build-local] Error 1

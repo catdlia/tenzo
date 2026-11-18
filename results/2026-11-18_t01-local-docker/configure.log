@@ -1,0 +1,23 @@
+⚙️ Configuring CMake...
+docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev cmake -B/app/cmake-build-debug -S/app -GNinja -DCMAKE_BUILD_TYPE=Debug
+-- 🚀 Using CCache: /usr/bin/ccache
+-- 🚀 Using LLD linker: /usr/lib/llvm-21/bin/lld
+-- 🚀 Target Architecture: x86_64 (AVX2 / FMA / F16C)
+-- 🚀 Vulkan GPU runtime enabled: /usr/lib/x86_64-linux-gnu/libvulkan.so
+-- 🚀 Full MLIR Compiler Pipeline Enabled
+-- 🚀 OpenMP found: 4.5
+-- pybind11 v2.11.1 
+-- Configuring done (0.3s)
+CMake Warning at CMakeLists.txt:131 (add_executable):
+  Cannot generate a safe runtime search path for target tenzo-cli because
+  files in some directories may conflict with libraries in implicit
+  directories:
+
+    runtime library [libgomp.so.1] in /usr/lib/gcc/x86_64-linux-gnu/13 may be hidden by files in:
+      /usr/lib/llvm-21/lib
+
+  Some of these libraries may not be found correctly.
+
+
+-- Generating done (0.0s)
+-- Build files have been written to: /app/cmake-build-debug

@@ -1,0 +1,47 @@
+=================================================================
+  Tenzo True Model Parity & Numerical Evaluator Suite (R5 / F18)
+=================================================================
+Model Directory:     models/bitnet-1.58b
+Cosine Tolerance:    0.999
+Max Diff Tolerance:  0.25
+
+=======================================================
+▶ Test: France Capital Factoid
+  Description: Standard zero-shot factual completion test
+  Prompt:      "The capital of France is"
+=======================================================
+  ✅ Exit Code: 0 (Process executed successfully)
+  ✅ Weight Integrity: Genuine weights verified (no synthetic fallback).
+  ⚡ Output: "Paris. Paris is a"
+  ✅ Generated Greedy Token IDs: [12366, 13, 12366, 374, 264]
+  ✅ First-Step Token ID Parity: token 12366 matches expected [12366, 264].
+  ✅ Token Sequence Parity: First 5 tokens match expected sequence [12366, 13, 12366, 374, 264].
+  ℹ️ Logits Vector: Full first-step logits dump pending recompiled CLI flags (--dump-logits).
+✅ PASSED: France Capital Factoid
+
+=======================================================
+▶ Test: Compiler Definition Technical
+  Description: Technical domain terminology generation
+  Prompt:      "In computer science, a compiler translates source code written in a high-level programming language into"
+=======================================================
+  ✅ Exit Code: 0 (Process executed successfully)
+  ✅ Weight Integrity: Genuine weights verified (no synthetic fallback).
+  ⚡ Output: "machine code that can be"
+  ✅ Generated Greedy Token IDs: [5780, 2082, 430, 649, 387]
+  ✅ First-Step Token ID Parity: token 5780 matches expected [5780, 644, 33256].
+  ✅ Token Sequence Parity: First 5 tokens match expected sequence [5780, 2082, 430, 649, 387].
+  ℹ️ Logits Vector: Full first-step logits dump pending recompiled CLI flags (--dump-logits).
+✅ PASSED: Compiler Definition Technical
+
+=======================================================
+▶ Test: Negative Control: Truncated Weights
+  Description: Engine must reject truncated weights with non-zero exit code (F16)
+  Prompt:      "Test prompt"
+=======================================================
+  Observed Return Code: 1
+  ✅ PASSED: Engine correctly rejected truncated weights with non-zero exit code.
+
+-----------------------------------------------------------------
+Parity Summary: 3/3 tests passed.
+-----------------------------------------------------------------
+🎉 ALL TRUE MODEL PARITY EVALUATIONS PASSED!
