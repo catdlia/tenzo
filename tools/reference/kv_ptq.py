@@ -41,6 +41,25 @@ def ternary(x, delta_mult):
     return torch.sign(x) * nz * s
 
 
+def ternary_opt(x):
+    """Least-squares optimal ternary approximation s*t, t in {-1,0,1}, over the last dim: for the k largest |x| the
+    best scale is mean of those |x| and the error decreases with (sum_k)^2 / k -> pick the maximizing k."""
+    a = x.abs()
+    srt, idx = a.sort(-1, descending=True)
+    c = srt.cumsum(-1)
+    k = torch.arange(1, x.shape[-1] + 1, dtype=x.dtype)
+    best = (c * c / k).argmax(-1, keepdim=True)                     # index of k* - 1
+    s = c.gather(-1, best) / (best + 1).to(x.dtype)
+    th = srt.gather(-1, best)                                        # keep |x| >= th (ties: all kept)
+    return torch.sign(x) * (a >= th) * s
+
+
+def ternary_residual2(x):
+    """Two-term residual ternary: x ~ s1 t1 + s2 t2 (comparator, ~4 bits + scales)."""
+    r1 = ternary_opt(x)
+    return r1 + ternary_opt(x - r1)
+
+
 def uniform_asym(x, bits):
     lo = x.amin(-1, keepdim=True); hi = x.amax(-1, keepdim=True)
     n = 2 ** bits - 1
@@ -109,6 +128,16 @@ def tern_g32_rot(x): return rotated(tern_g32, x)                         # S3
 def tl1_engine(x): return ternary(x, 0.5)                                 # engine tl1_fused
 
 
+def topt_g32_rot(x): return rotated(lambda y: grouped(ternary_opt, y, 32), x)              # S10
+def topt_g16_rot(x): return rotated(lambda y: grouped(ternary_opt, y, 16), x)              # S11
+def res2_g32_rot(x): return rotated(lambda y: grouped(ternary_residual2, y, 32), x)        # S14
+
+
+def kivi_rot_k(k):                                                                         # S12 (K)
+    R = hadamard().to(k.dtype)
+    return per_channel_token_groups(lambda y: ternary_opt(y), k @ R, 32) @ R.T
+
+
 def int2_rot(x): return rotated(lambda y: grouped(lambda z: uniform_asym(z, 2), y, 32), x)   # S8
 def int4_g32(x): return grouped(lambda z: uniform_asym(z, 4), x, 32)                          # S9
 
@@ -124,6 +153,12 @@ SCHEMES = {
     "S4":          ("kivi", tern_g32, True, 0, 0, "K per-channel ternary over 32-token groups, V per-token g=32"),
     "S8":          (int2_rot, int2_rot, False, 0, 0, "2-bit asym g=32 + Hadamard (comparator)"),
     "S9":          (int4_g32, int4_g32, False, 0, 0, "INT4 asym g=32 (comparator)"),
+    # round 2 (2026-11-20)
+    "S10":         (topt_g32_rot, topt_g32_rot, False, 0, 0, "LS-optimal ternary g=32 + Hadamard"),
+    "S11":         (topt_g16_rot, topt_g16_rot, False, 0, 0, "LS-optimal ternary g=16 + Hadamard"),
+    "S12":         ("kivi_rot", topt_g32_rot, True, 0, 0, "K: Hadamard + per-channel LS-opt ternary over 32-token groups; V: S10"),
+    "S13":         (int4_g32, topt_g32_rot, False, 0, 0, "K INT4 asym g=32, V S10"),
+    "S14":         (res2_g32_rot, res2_g32_rot, False, 0, 0, "2-term residual ternary g=32 + Hadamard (comparator)"),
 }
 
 
@@ -167,6 +202,8 @@ def _apply(fn, x):
         return x
     if fn == "kivi":
         return kivi_k(x)
+    if fn == "kivi_rot":
+        return kivi_rot_k(x)
     return fn(x)
 
 
@@ -179,7 +216,7 @@ def install(name, golden_module):
         kh = _apply(kf, k)
         vh = _apply(vf, v)
         mask = None
-        if pc or kf == "kivi":
+        if pc or kf in ("kivi", "kivi_rot"):
             mask = incomplete_group_mask(T, 32)
         if sinks or recent:
             wm = window_mask(T, sinks, recent)
@@ -212,8 +249,12 @@ def _bits_fn(fn, pc):
         return 2 + SCALE_BITS / D
     if fn in (tern_g32, tern_g32_rot):
         return 2 + SCALE_BITS / 32
-    if fn == "kivi":
+    if fn in ("kivi", "kivi_rot", topt_g32_rot):
         return 2 + SCALE_BITS / 32
+    if fn is topt_g16_rot:
+        return 2 + SCALE_BITS / 16
+    if fn is res2_g32_rot:
+        return 4 + 2 * SCALE_BITS / 32
     return None
 
 
@@ -229,7 +270,7 @@ def bits(name, ctx=None, base_bits=None):
         return (kb + vb) / 2
     hi = min(ctx, sinks + recent)
     kpart = (hi * i8 + (ctx - hi) * kb) / ctx
-    if pc or kf == "kivi":  # incomplete group (avg 15.5 tokens) in INT8
+    if pc or kf in ("kivi", "kivi_rot"):  # incomplete group (avg 15.5 tokens) in INT8
         extra = min(ctx - hi, 15.5)
         kpart += extra * (i8 - kb) / ctx
     vpart = (hi * i8 + (ctx - hi) * vb) / ctx
