@@ -1,0 +1,76 @@
+engine,kv,prompt_len,gen_len,rep,pp_tps,tg_tps,pg_tps,rss_mb,threads,cpus,governor,note
+tenzo,fp32,16,128,0,37.97768810823641,24.816782349063555,25.810614615260523,2778.12109375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,1,38.213518032003826,23.649397679402853,24.6951690075629,2778.4375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,2,35.10311540149188,23.417489937797292,24.316930662974094,2778.390625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,3,35.242290748898675,23.558426738814347,24.459429619689843,2778.2109375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,4,35.157108327840035,23.63106007458553,24.524413713234665,2778.3359375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,0,33.91267486222976,23.06430978251077,23.914307066345597,2666.90234375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,1,34.8280365694384,23.50219415015699,24.383222987960785,2667.171875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,2,35.10311540149188,23.563197231324327,24.456521739130434,2667.0390625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,3,35.03393912853076,23.639352134005577,24.525666791565897,2666.8359375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,4,35.03393912853076,23.5836020267158,24.47231569287244,2667.12890625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,16,128,0,34.76749239461104,22.948115744558788,23.84895660814839,2638.85546875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,16,128,1,35.16483516483516,23.2452556070099,24.154994548351926,2638.89453125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,16,128,2,34.8280365694384,23.232176564541888,24.12464399396884,2638.94921875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,16,128,3,34.69963131641726,23.312570575164823,24.194767881445635,2638.953125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,16,128,4,34.81288076588338,23.412350014632718,24.296416278598905,2639.04296875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+bitnet.cpp,f16,16,128,0,69.170158,19.023889,20.65273,1215.97265625,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,1,70.002156,19.110012,20.608676,1216.25390625,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,2,70.078428,18.899826,20.59786,1215.64453125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,3,68.764306,19.044478,20.650715,1214.859375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,4,69.734277,19.085569,20.64344,1216.24609375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,0,67.651686,18.896239,20.454172,1210.71875,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,1,66.933462,18.910996,20.456285,1210.7578125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,2,63.018877,18.764778,20.461424,1210.58984375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,3,68.433543,18.840535,20.417301,1210.60546875,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,4,68.571112,18.791409,20.446354,1210.55078125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+tenzo,fp32,128,128,0,35.18997085830539,22.935368847318532,27.77084711931701,2778.36328125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,1,35.0675323963727,22.89885147948048,27.705927553328497,2778.41796875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,2,35.22871139979083,22.95470033356049,27.79708130646282,2778.41796875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,3,35.157108327840035,22.33817908937017,27.318614007192476,2778.203125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,4,35.13394817742644,22.778637908636306,27.638326585695008,2778.5390625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,0,35.44920793176027,23.21658534815809,28.057561841715895,2667.12109375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,1,35.25685167332323,23.238081405903927,28.012737041373498,2667.21484375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,2,35.473768810797324,23.346587385547,28.160028160028155,2667.13671875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,3,35.47180268809755,23.238503295147144,28.080644099774037,2667.19140625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,4,35.55061796972643,22.887386904123307,27.84697218566098,2667.18359375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,128,128,0,35.18513428076638,23.129325454906848,27.911033580462274,2638.76953125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,128,128,1,35.15421163933976,23.09927273383502,27.879421502003837,2638.93359375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,128,128,2,35.282119132280386,23.141452126120914,27.950344466159336,2638.92578125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,128,128,3,34.393809114359414,23.014545912221084,27.576400633395455,2638.5859375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,128,128,4,35.13877069206907,22.976538799834856,27.7850134583659,2638.7890625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+bitnet.cpp,f16,128,128,0,69.355691,19.010564,29.110895,1227.99609375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,1,69.081595,18.62476,28.95857,1228.0234375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,2,70.396459,19.007609,29.189506,1228.07421875,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,3,70.566687,19.025394,29.183047,1228.00390625,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,4,70.030759,19.050451,29.052159,1228.0703125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,0,64.758879,18.894975,28.376873,1221.86328125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,1,65.197588,18.561341,28.087369,1221.890625,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,2,64.522774,18.3832,27.990678,1221.8984375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,3,65.167101,18.85627,28.370355,1221.89453125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,4,66.953334,18.961807,28.74792,1221.90234375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+tenzo,fp32,512,128,0,33.426693042416645,21.254690976719473,29.99161172109676,2778.265625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,1,33.60021000131251,21.45742879653999,30.18398079544222,2778.4140625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,2,33.331163335720326,21.348633187117432,29.967176576905608,2778.265625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,3,33.40553801184853,21.40110349439893,30.03594927679066,2778.53515625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,4,33.539241567697516,21.413992705858735,30.127429612438863,2778.4375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,0,34.48903019810984,22.302759966545864,31.09135514586218,2666.921875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,1,34.21064940097955,22.272489994779885,30.89832038661524,2667.05078125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,2,34.367490501953306,22.447476412612676,31.06796116504854,2667.22265625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,3,34.61587868216268,22.355735643426016,31.194404503692148,2667.1328125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,4,34.68317730419585,22.509452211377827,31.29783311408549,2666.94921875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,512,128,0,34.316583891312945,21.986327252739702,30.855715780288016,2638.98046875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,512,128,1,34.18986056947486,21.929448851273794,30.75134176752947,2638.9765625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,512,128,2,34.28464289062396,22.13230971400906,30.89220551039716,2638.875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,512,128,3,34.29566615312479,22.037429196150338,30.86226268607775,2638.859375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,tl1_fused,512,128,4,34.19693964106571,22.106699366159475,30.825249732687286,2638.9296875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+bitnet.cpp,f16,512,128,0,66.489216,19.219287,41.380193,1289.30859375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,1,65.561316,19.226164,41.51275,1289.30078125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,2,65.797029,19.188482,41.50936,1289.30078125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,3,65.732512,19.219355,41.75843,1289.30859375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,4,65.500737,19.239316,41.700818,1289.3125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,0,54.224052,19.040246,37.595252,1276.4375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,1,53.922902,19.02667,37.247695,1276.41015625,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,2,54.103145,18.9623,37.283005,1276.33984375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,3,53.881824,18.993988,37.358102,1276.38671875,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,4,54.119976,19.03176,37.267976,1276.390625,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
