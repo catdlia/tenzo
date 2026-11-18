@@ -1,0 +1,9 @@
+[FAIL] p1_fact_en     vs hf    cos=0.940729 max_abs=4.4057 top1=True top5=0.8 KL=0.0051 greedy=6/32
+[FAIL] p2_tech_en     vs hf    cos=0.994274 max_abs=3.6320 top1=True top5=0.8 KL=0.0892 greedy=10/32
+[FAIL] p3_code        vs hf    cos=0.998419 max_abs=3.0471 top1=True top5=1.0 KL=0.0021 greedy=32/32
+[FAIL] p4_ukrainian   vs hf    cos=0.999131 max_abs=4.4895 top1=True top5=0.6 KL=0.2163 greedy=7/32
+[FAIL] p5_long_ctx    vs hf    cos=0.913559 max_abs=4.2553 top1=True top5=0.8 KL=0.4143 greedy=10/32
+[FAIL] p6_weird       vs hf    cos=0.980200 max_abs=6.2642 top1=True top5=0.6 KL=0.2717 greedy=3/32
+[FAIL] p7_math_en     vs hf    cos=0.998316 max_abs=2.7361 top1=True top5=0.8 KL=0.0001 greedy=7/32
+[PASS] negative control truncated_weights: rc=1
+PARITY RESULT: GATE FAILURES (see numbers above)

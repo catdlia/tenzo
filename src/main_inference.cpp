@@ -422,9 +422,9 @@ int main(int argc, char** argv) {
 
         if (!opt.dump_prefix.empty()) {
             auto seqs = read_id_lines(opt.ids_file);
-            if (seqs.empty()) { std::cerr << "error: --dump-prefix needs --ids-file with one sequence\\n"; return 2; }
+            if (seqs.empty()) { std::cerr << "error: --dump-prefix needs --ids-file with one sequence\n"; return 2; }
             const std::vector<int>& ids = seqs[0];
-            if ((int)ids.size() + opt.greedy_steps >= opt.ctx_size) { std::cerr << "error: ids + greedy_steps exceed --ctx-size\\n"; return 2; }
+            if ((int)ids.size() + opt.greedy_steps >= opt.ctx_size) { std::cerr << "error: ids + greedy_steps exceed --ctx-size\n"; return 2; }
             engine.reset();
             for (int id : ids) engine.forward_logits(id, logits);
             {
@@ -434,22 +434,22 @@ int main(int argc, char** argv) {
             std::ofstream gf(opt.dump_prefix + ".greedy.txt");
             for (int k = 0; k < opt.greedy_steps; ++k) {
                 int nxt = argmax_f(logits);
-                gf << nxt << (k + 1 < opt.greedy_steps ? " " : "\\n");
+                gf << nxt << (k + 1 < opt.greedy_steps ? " " : "\n");
                 if (k + 1 < opt.greedy_steps) engine.forward_logits(nxt, logits);
             }
-            std::cout << "DUMP_OK prefix=" << opt.dump_prefix << " prompt_tokens=" << ids.size() << " kv=" << opt.kv_mode << "\\n";
+            std::cout << "DUMP_OK prefix=" << opt.dump_prefix << " prompt_tokens=" << ids.size() << " kv=" << opt.kv_mode << "\n";
         }
 
         if (!opt.score_file.empty()) {
             auto windows = read_id_lines(opt.score_file);
-            if (windows.empty() || opt.score_out.empty()) { std::cerr << "error: --score needs windows and --score-out\\n"; return 2; }
+            if (windows.empty() || opt.score_out.empty()) { std::cerr << "error: --score needs windows and --score-out\n"; return 2; }
             std::ofstream of(opt.score_out);
             of << std::setprecision(9);
-            of << "# kv_mode=" << opt.kv_mode << " ctx=" << opt.ctx_size << " windows=" << windows.size() << "\\n";
+            of << "# kv_mode=" << opt.kv_mode << " ctx=" << opt.ctx_size << " windows=" << windows.size() << "\n";
             double tot_nll = 0.0; long tot_n = 0;
             for (size_t w = 0; w < windows.size(); ++w) {
                 const auto& ids = windows[w];
-                if ((int)ids.size() > opt.ctx_size) { std::cerr << "error: window longer than --ctx-size\\n"; return 2; }
+                if ((int)ids.size() > opt.ctx_size) { std::cerr << "error: window longer than --ctx-size\n"; return 2; }
                 engine.reset();
                 std::vector<double> lps;
                 lps.reserve(ids.size());
@@ -460,10 +460,10 @@ int main(int argc, char** argv) {
                 double nll = 0.0;
                 for (double lp : lps) nll -= lp;
                 tot_nll += nll; tot_n += (long)lps.size();
-                of << "w " << w << " " << lps.size() << " " << nll << "\\n";
+                of << "w " << w << " " << lps.size() << " " << nll << "\n";
                 of << "lp";
                 for (double lp : lps) of << " " << lp;
-                of << "\\n";
+                of << "\n";
                 of.flush();
                 std::cout << "score window " << w << " tokens=" << lps.size() << " ppl=" << std::exp(nll / lps.size())
                           << " running_ppl=" << std::exp(tot_nll / tot_n) << std::endl;
@@ -472,8 +472,8 @@ int main(int argc, char** argv) {
 
         if (opt.bench_pp > 0) {
             auto seqs = read_id_lines(opt.ids_file);
-            if (seqs.empty() || (int)seqs[0].size() < opt.bench_pp) { std::cerr << "error: --ids-file must hold >= --bench-pp ids\\n"; return 2; }
-            if (opt.bench_pp + opt.bench_tg >= opt.ctx_size) { std::cerr << "error: pp+tg exceed --ctx-size\\n"; return 2; }
+            if (seqs.empty() || (int)seqs[0].size() < opt.bench_pp) { std::cerr << "error: --ids-file must hold >= --bench-pp ids\n"; return 2; }
+            if (opt.bench_pp + opt.bench_tg >= opt.ctx_size) { std::cerr << "error: pp+tg exceed --ctx-size\n"; return 2; }
             const std::vector<int>& ids = seqs[0];
             using clk = std::chrono::steady_clock;
             auto run_once = [&](int pp, int tg, double& pp_ms, double& tg_ms) {
@@ -500,10 +500,10 @@ int main(int argc, char** argv) {
                       << ",tg_tokens=" << opt.bench_tg << ",tg_ms=" << tg_ms
                       << ",pp_tps=" << (pp_ms > 0 ? opt.bench_pp / (pp_ms / 1000.0) : 0.0)
                       << ",tg_tps=" << (tg_ms > 0 ? opt.bench_tg / (tg_ms / 1000.0) : 0.0)
-                      << ",rss_kb=" << rss << ",hwm_kb=" << hwm << "\\n";
+                      << ",rss_kb=" << rss << ",hwm_kb=" << hwm << "\n";
         }
         long rss, hwm; read_rss_kb(rss, hwm);
-        std::cout << "PROC_RSS_KB=" << rss << " PROC_HWM_KB=" << hwm << "\\n";
+        std::cout << "PROC_RSS_KB=" << rss << " PROC_HWM_KB=" << hwm << "\n";
         return 0;
     }
 

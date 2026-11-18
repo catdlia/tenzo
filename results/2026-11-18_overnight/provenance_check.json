@@ -1,0 +1,246 @@
+{
+ "n_mlir_scales": 210,
+ "n_expected": 210,
+ "rows": [
+  {
+   "layer": 0,
+   "tensor": "attn_q",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.2188547849655151,
+   "hf_weight_scale": 1.21875,
+   "ratio_gguf_over_hf": 1.000085977407602
+  },
+  {
+   "layer": 0,
+   "tensor": "attn_k",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.7940564155578613,
+   "hf_weight_scale": 1.796875,
+   "ratio_gguf_over_hf": 0.998431396484375
+  },
+  {
+   "layer": 0,
+   "tensor": "attn_v",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.2931101322174072,
+   "hf_weight_scale": 2.296875,
+   "ratio_gguf_over_hf": 0.9983608738905718
+  },
+  {
+   "layer": 0,
+   "tensor": "attn_output",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 0.965597927570343,
+   "hf_weight_scale": 0.96484375,
+   "ratio_gguf_over_hf": 1.000781657724728
+  },
+  {
+   "layer": 0,
+   "tensor": "ffn_gate",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.5512433052062988,
+   "hf_weight_scale": 1.5546875,
+   "ratio_gguf_over_hf": 0.9977846385246545
+  },
+  {
+   "layer": 0,
+   "tensor": "ffn_up",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.8309355974197388,
+   "hf_weight_scale": 1.828125,
+   "ratio_gguf_over_hf": 1.0015374208107972
+  },
+  {
+   "layer": 0,
+   "tensor": "ffn_down",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.163161277770996,
+   "hf_weight_scale": 2.15625,
+   "ratio_gguf_over_hf": 1.003205230270607
+  },
+  {
+   "layer": 15,
+   "tensor": "attn_q",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.677456021308899,
+   "hf_weight_scale": 1.6796875,
+   "ratio_gguf_over_hf": 0.9986714917559957
+  },
+  {
+   "layer": 15,
+   "tensor": "attn_k",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.7184839248657227,
+   "hf_weight_scale": 2.71875,
+   "ratio_gguf_over_hf": 0.999902133283944
+  },
+  {
+   "layer": 15,
+   "tensor": "attn_v",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 4.493652820587158,
+   "hf_weight_scale": 4.5,
+   "ratio_gguf_over_hf": 0.9985895156860352
+  },
+  {
+   "layer": 15,
+   "tensor": "attn_output",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.8107123374938965,
+   "hf_weight_scale": 2.8125,
+   "ratio_gguf_over_hf": 0.9993643866644966
+  },
+  {
+   "layer": 15,
+   "tensor": "ffn_gate",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.173977851867676,
+   "hf_weight_scale": 2.171875,
+   "ratio_gguf_over_hf": 1.000968219564973
+  },
+  {
+   "layer": 15,
+   "tensor": "ffn_up",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.1298775672912598,
+   "hf_weight_scale": 2.125,
+   "ratio_gguf_over_hf": 1.0022953257841223
+  },
+  {
+   "layer": 15,
+   "tensor": "ffn_down",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.612762212753296,
+   "hf_weight_scale": 2.609375,
+   "ratio_gguf_over_hf": 1.0012980935102451
+  },
+  {
+   "layer": 29,
+   "tensor": "attn_q",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.1274330615997314,
+   "hf_weight_scale": 1.125,
+   "ratio_gguf_over_hf": 1.0021627214219835
+  },
+  {
+   "layer": 29,
+   "tensor": "attn_k",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.6596884727478027,
+   "hf_weight_scale": 1.65625,
+   "ratio_gguf_over_hf": 1.0020760590175413
+  },
+  {
+   "layer": 29,
+   "tensor": "attn_v",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 1.7768195867538452,
+   "hf_weight_scale": 1.7734375,
+   "ratio_gguf_over_hf": 1.001907079755472
+  },
+  {
+   "layer": 29,
+   "tensor": "attn_output",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 0.9527681469917297,
+   "hf_weight_scale": 0.953125,
+   "ratio_gguf_over_hf": 0.999625596843782
+  },
+  {
+   "layer": 29,
+   "tensor": "ffn_gate",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.8299777507781982,
+   "hf_weight_scale": 2.828125,
+   "ratio_gguf_over_hf": 1.0006551162972634
+  },
+  {
+   "layer": 29,
+   "tensor": "ffn_up",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.602970838546753,
+   "hf_weight_scale": 2.609375,
+   "ratio_gguf_over_hf": 0.9975457105807916
+  },
+  {
+   "layer": 29,
+   "tensor": "ffn_down",
+   "ternary_equal_gguf_vs_hf": true,
+   "mismatch_frac_gguf_vs_hf": 0.0,
+   "weights_bin_equals_pack_of_gguf": true,
+   "weights_bin_equals_pack_of_hf": true,
+   "gguf_embedded_scale_f32": 2.288531541824341,
+   "hf_weight_scale": 2.28125,
+   "ratio_gguf_over_hf": 1.0031919087449166
+  }
+ ],
+ "mlir_scales_first7_layer0": [
+  1.21875,
+  1.796875,
+  2.296875,
+  0.96484375,
+  1.5546875,
+  1.828125,
+  2.15625
+ ]
+}
