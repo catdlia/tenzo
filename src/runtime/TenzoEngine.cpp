@@ -1313,6 +1313,7 @@ void TenzoEngineImpl::embedding_lookup(int token_id) {
             buf_x[i] = static_cast<float>(row[i]) * scale;
         }
     }
+    if (dumper.enabled()) dumper.dump("embed", -1, get_seq_len(), buf_x.data(), h_dim);
 }
 
 void TenzoEngineImpl::forward_layer_gpu(int layer_idx) {
@@ -1537,9 +1538,13 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
 
     const auto& lw = layers[layer_idx];
     const int h_dim = config.hidden_size;
+    const int dpos = dumper.enabled() ? get_seq_len() : -1;
+    const bool dmp = dumper.enabled() && dumper.want(dpos, layer_idx);
+#define TENZO_DUMP(name, buf, n) do { if (dmp) dumper.dump(name, layer_idx, dpos, (buf).data(), (n)); } while (0)
 
     // 1. Pre-RMSNorm
     rms_norm_raw(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
+    TENZO_DUMP("input_norm", buf_norm_x, h_dim);
 
     // 2. Build LUT for norm_x ONCE (reused across Q, K, V)
     float inv_scale_act = build_lut(buf_norm_x.data(), h_dim, lut_ptr());
@@ -1571,27 +1576,38 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
         }
     }
 
+    TENZO_DUMP("q", buf_q, q_dim);
+    TENZO_DUMP("k", buf_k, kv_dim);
+    TENZO_DUMP("v", buf_v, kv_dim);
+
     // 4. In-place Zero-Copy Attention with RoPE and Compressed/Paged KV-Cache
     if (use_paged_kv) {
         paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
     } else {
         kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
     }
+    TENZO_DUMP("q_rope", buf_q, q_dim); // RoPE is applied in place by forward_attention_raw
+    TENZO_DUMP("k_rope", buf_k, kv_dim);
+    TENZO_DUMP("attn_out", buf_attn_out, h_dim);
 
     // 5. Attn Sub-Norm
     rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+    TENZO_DUMP("attn_sub_norm", buf_attn_sub, h_dim);
 
     // 6. Out Projection
     float inv_s_out = build_lut(buf_attn_sub.data(), h_dim, lut_ptr());
     compute_from_lut(lut_ptr(), lw.out_w_ptr, h_dim / 64, k_half, buf_out.data(), inv_s_out * lw.out_scale);
+    TENZO_DUMP("o_proj", buf_out, h_dim);
 
     // 7. Residual 1
     #pragma omp simd
     for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+    TENZO_DUMP("resid_attn", buf_h1, h_dim);
 
     // 8. Fused MLP Block
     if (lw.gate_w_ptr && lw.up_w_ptr && lw.down_w_ptr) {
         rms_norm_raw(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        TENZO_DUMP("post_attn_norm", buf_post_norm, h_dim);
 
         float inv_s_mlp = build_lut(buf_post_norm.data(), h_dim, lut_ptr());
         int cur_ffn = ffn_dim;
@@ -1613,22 +1629,29 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
             }
         }
 
+        TENZO_DUMP("gate", buf_gate, cur_ffn);
+        TENZO_DUMP("up", buf_up, cur_ffn);
         #pragma omp simd
         for (int i = 0; i < cur_ffn; ++i) {
             float r = std::max(0.0f, buf_gate[i]);
             buf_act[i] = (r * r) * buf_up[i];
         }
+        TENZO_DUMP("act", buf_act, cur_ffn);
 
         rms_norm_raw(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), cur_ffn);
+        TENZO_DUMP("ffn_sub_norm", buf_ffn_norm, cur_ffn);
 
         float inv_s_down = build_lut(buf_ffn_norm.data(), cur_ffn, lut_ptr());
         compute_from_lut(lut_ptr(), lw.down_w_ptr, h_dim / 64, cur_ffn / 2, buf_down.data(), inv_s_down * lw.down_scale);
+        TENZO_DUMP("down", buf_down, h_dim);
 
         #pragma omp simd
         for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
     } else {
         std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
     }
+    TENZO_DUMP("resid_ffn", buf_x, h_dim);
+#undef TENZO_DUMP
 }
 
 void TenzoEngineImpl::compute_logits() {
@@ -1636,6 +1659,8 @@ void TenzoEngineImpl::compute_logits() {
     const int vocab_size = config.vocab_size;
 
     rms_norm_raw(buf_x.data(), final_norm_ptr, buf_norm_x.data(), h_dim);
+    // compute_logits runs after the KV position was advanced: the token just processed is at get_seq_len() - 1
+    if (dumper.enabled()) dumper.dump("final_norm", -1, get_seq_len() - 1, buf_norm_x.data(), h_dim);
 
     if (!is_lm_i8) {
         const float* x_ptr = buf_norm_x.data();
@@ -1717,6 +1742,7 @@ void TenzoEngineImpl::compute_logits() {
             logits_scratch[v] = static_cast<float>(sum) * (s_x * scales_ptr[v]);
         }
     }
+    if (dumper.enabled()) dumper.dump("logits", -1, get_seq_len() - 1, logits_scratch.data(), vocab_size);
 }
 
 int TenzoEngineImpl::sample_top_k_top_p(

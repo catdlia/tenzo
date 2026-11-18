@@ -1,0 +1,8 @@
+fp32: 9aa9c108c939 ⚡ Output:  Paris. Paris is a city in the Ãİle-de-France region of France. It is the capital city
+int8_fused: 9aa9c108c939 ⚡ Output:  Paris. Paris is a city in the Ãİle-de-France region of France. It is the capital city
+tl1_fused: 59cdda9cc0cc ⚡ Output:  Paris. Paris is the capital of France. It is also the capital of the European Union, wh
+popcount_fused: a09018c46d06 ⚡ Output:  Paris. Paris is the capital of france. Paris is the capital of france. Paris is the the
+fp32 identical
+int8_fused identical
+tl1_fused identical
+popcount_fused identical

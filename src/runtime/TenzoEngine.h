@@ -6,6 +6,7 @@
 #ifndef TENZO_ENGINE_H
 #define TENZO_ENGINE_H
 
+#include "TensorDump.h"
 #include "tenzo.h"
 #include "simd_arm_compat.h"
 #include <vector>
@@ -262,6 +263,7 @@ public:
     int sample_top_k_top_p(const tenzo_sampling_params_t* params, const int* past_tokens, int past_tokens_len);
 
     HeteroPipeline hetero_pipeline;
+    TensorDumper dumper; // opt-in (TENZO_DUMP_DIR); disabled => no effect on results or speed
 
     void forward_layer_dispatch(int layer_idx, HeteroDeviceType dev_type);
     void forward_layers_range(int start_layer, int end_layer, HeteroDeviceType dev_type);

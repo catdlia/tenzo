@@ -1,0 +1,10 @@
+ Container untitled-dev-run-504222e7a3ea Creating 
+ Container untitled-dev-run-504222e7a3ea Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/7] Building CXX object CMakeFiles/tenzo-cli.dir/src/main.cpp.o
+[2/7] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/HeteroTests.cpp.o
+[3/7] Building CXX object CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o
+[4/7] Linking CXX executable tenzo-cli
+[5/7] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/TenzoEngine.cpp.o
+[6/7] Linking CXX static library libtenzo_runtime.a
+[7/7] Linking CXX executable tenzo-inference

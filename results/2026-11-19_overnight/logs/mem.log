@@ -9,3 +9,11 @@ MemAvailable:   11524828 kB
 2026-11-18T12:58:45+02:00 golden bf16 2w MemAvailable=12418084kB
 2026-11-18T13:01:58+02:00 golden fp32 EN MemAvailable=12327200kB
 2026-11-18T13:08:21+02:00 golden fp32 UK MemAvailable=12304296kB
+2026-11-18T13:12:39+02:00 build dumps MemAvailable=12272808kB
+2026-11-18T13:13:31+02:00 engine dumps before-fix MemAvailable=12259040kB
+2026-11-18T13:14:27+02:00 golden fp32 dumps MemAvailable=12266896kB
+2026-11-18T13:15:49+02:00 golden emulate theta10000 MemAvailable=12292852kB
+2026-11-18T13:19:00+02:00 golden emulate act31 MemAvailable=12258988kB
+2026-11-18T13:22:28+02:00 golden emulate both MemAvailable=12252232kB
+2026-11-18T13:26:29+02:00 build theta MemAvailable=12267460kB
+2026-11-18T13:27:57+02:00 ppl fp32 theta MemAvailable=12198504kB
