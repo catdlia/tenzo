@@ -1,0 +1,2581 @@
+
+/app/cmake-build-debug/CMakeFiles/tenzo_runtime_static.dir/src/runtime/TenzoEngine.cpp.o:	file format elf64-x86-64
+
+Disassembly of section .text:
+
+00000000000050b0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0>:
+    50b0:      	endbr64
+    50b4:      	leaq	0x8(%rsp), %r10
+    50b9:      	andq	$-0x20, %rsp
+    50bd:      	pushq	-0x8(%r10)
+    50c1:      	pushq	%rbp
+    50c2:      	movq	%rsp, %rbp
+    50c5:      	pushq	%r15
+    50c7:      	pushq	%r14
+    50c9:      	pushq	%r13
+    50cb:      	pushq	%r12
+    50cd:      	pushq	%r10
+    50cf:      	pushq	%rbx
+    50d0:      	leaq	-0x8000(%rsp), %r11
+    50d8:      	subq	$0x1000, %rsp           # imm = 0x1000
+    50df:      	orq	$0x0, (%rsp)
+    50e4:      	cmpq	%r11, %rsp
+    50e7:      	jne	0x50d8 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x28>
+    50e9:      	subq	$0x2a0, %rsp            # imm = 0x2A0
+    50f0:      	vmovss	0x24(%rdi), %xmm4
+    50f5:      	movq	%fs:0x28, %rdx
+    50fe:      	movq	%rdx, -0x38(%rbp)
+    5102:      	xorl	%edx, %edx
+    5104:      	movq	%rdi, %rax
+    5107:      	movl	0x20(%rdi), %edi
+    510a:      	leaq	-0x8158(%rbp), %r12
+    5111:      	movl	0x1c(%rax), %edx
+    5114:      	movq	(%rax), %rbx
+    5117:      	leaq	-0x8160(%rbp), %r14
+    511e:      	movq	%r12, %r9
+    5121:      	movq	0x10(%rax), %rcx
+    5125:      	movq	0x8(%rax), %rsi
+    5129:      	movl	%edi, -0x8270(%rbp)
+    512f:      	movq	%r14, %r8
+    5132:      	movl	%edx, -0x8234(%rbp)
+    5138:      	movl	%edx, %r15d
+    513b:      	xorl	%edi, %edi
+    513d:      	movl	$0x1, %edx
+    5142:      	movq	%rsi, -0x8298(%rbp)
+    5149:      	movslq	0x4(%rcx), %rsi
+    514d:      	movq	%rcx, -0x8240(%rbp)
+    5154:      	movl	$0x2, %ecx
+    5159:      	movl	0x18(%rax), %r13d
+    515d:      	movq	%rbx, -0x8258(%rbp)
+    5164:      	vmovss	%xmm4, -0x82a4(%rbp)
+    516c:      	callq	0x5171 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xc1>
+    5171:      	testb	%al, %al
+    5173:      	je	0x5fb6 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xf06>
+    5179:      	movslq	%r15d, %r8
+    517c:      	movl	$0x1, %r11d
+    5182:      	movslq	%r13d, %r10
+    5185:      	movq	%r14, -0x82c8(%rbp)
+    518c:      	movq	%r8, %r9
+    518f:      	shlq	$0x2, %r8
+    5193:      	leaq	-0x8050(%rbp), %r15
+    519a:      	movq	%r10, -0x82a0(%rbp)
+    51a1:      	testl	%r9d, %r9d
+    51a4:      	movl	%r9d, %edx
+    51a7:      	leal	-0x1(%r9), %edi
+    51ab:      	movq	%r8, -0x8248(%rbp)
+    51b2:      	cmovgl	%r9d, %r11d
+    51b6:      	shrl	$0x3, %edx
+    51b9:      	andl	$-0x8, %r9d
+    51bd:      	movl	%edi, -0x82bc(%rbp)
+    51c3:      	shlq	$0x5, %rdx
+    51c7:      	movl	%r9d, -0x8268(%rbp)
+    51ce:      	movl	%r11d, %eax
+    51d1:      	movl	%r11d, -0x8264(%rbp)
+    51d8:      	shrl	$0x3, %r11d
+    51dc:      	shlq	$0x5, %r11
+    51e0:      	andl	$-0x8, %eax
+    51e3:      	movq	%rdx, -0x82b8(%rbp)
+    51ea:      	movq	%r11, -0x82b0(%rbp)
+    51f1:      	movl	%eax, -0x82a8(%rbp)
+    51f7:      	movq	%r15, -0x8260(%rbp)
+    51fe:      	movq	%r12, -0x82d0(%rbp)
+    5205:      	movl	-0x8160(%rbp), %ecx
+    520b:      	movl	-0x8158(%rbp), %esi
+    5211:      	movl	%ecx, -0x8238(%rbp)
+    5217:      	movl	%esi, -0x826c(%rbp)
+    521d:      	nopl	(%rax)
+    5220:      	movl	-0x8238(%rbp), %eax
+    5226:      	movq	-0x8240(%rbp), %r8
+    522d:      	movq	-0x8258(%rbp), %rbx
+    5234:      	cltd
+    5235:      	movl	0xc(%r8), %r14d
+    5239:      	idivl	-0x8270(%rbp)
+    523f:      	movslq	%eax, %r12
+    5242:      	movl	-0x8238(%rbp), %eax
+    5248:      	imull	%r14d, %eax
+    524c:      	cmpl	$0x2000, -0x8234(%rbp)  # imm = 0x2000
+    5256:      	cltq
+    5258:      	leaq	(,%rax,4), %r15
+    5260:      	movq	%rax, -0x8250(%rbp)
+    5267:      	leaq	(%rbx,%r15), %rbx
+    526b:      	jg	0x628e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x11de>
+    5271:      	movq	-0x8260(%rbp), %r13
+    5278:      	movq	%r8, %rsi
+    527b:      	movslq	0x8(%rsi), %r10
+    527f:      	movq	-0x82a0(%rbp), %r11
+    5286:      	movq	0x20(%rsi), %r9
+    528a:      	movslq	0x10(%rsi), %rdi
+    528e:      	imulq	%r11, %r10
+    5292:      	movq	%r9, -0x81b0(%rbp)
+    5299:      	movq	%rdi, -0x81d0(%rbp)
+    52a0:      	addq	%r12, %r10
+    52a3:      	movq	%r10, -0x8170(%rbp)
+    52aa:      	cmpq	$0xa, %r9
+    52ae:      	je	0x6010 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xf60>
+    52b4:      	cmpq	$0x9, -0x81b0(%rbp)
+    52bc:      	jne	0x62b0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1200>
+    52c2:      	movabsq	$0x657375665f316c74, %rdx # imm = 0x657375665F316C74
+    52cc:      	movq	0x18(%rsi), %r9
+    52d0:      	cmpq	%rdx, (%r9)
+    52d3:      	je	0x6bbe <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1b0e>
+    52d9:      	movq	-0x8170(%rbp), %rdx
+    52e0:      	movq	-0x81d0(%rbp), %r11
+    52e7:      	movslq	%r14d, %r8
+    52ea:      	movq	-0x8240(%rbp), %r10
+    52f1:      	movl	-0x8234(%rbp), %eax
+    52f7:      	imulq	%r11, %rdx
+    52fb:      	movq	0x40(%r10), %r10
+    52ff:      	imulq	%r8, %rdx
+    5303:      	testl	%eax, %eax
+    5305:      	jle	0x5c50 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xba0>
+    530b:      	movq	-0x8248(%rbp), %r11
+    5312:      	movq	%r13, %rsi
+    5315:      	leaq	(%r10,%rdx,4), %rdx
+    5319:      	vmovss	(%rip), %xmm1           # 0x5321 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x271>
+    5321:      	vmovss	-0x82a4(%rbp), %xmm4
+    5329:      	leaq	(,%r8,4), %rdi
+    5331:      	leaq	(%r11,%r13), %r8
+    5335:      	nopl	(%rax)
+    5338:      	testl	%r14d, %r14d
+    533b:      	jle	0x697e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x18ce>
+    5341:      	leal	-0x1(%r14), %ecx
+    5345:      	vmovups	(%rbx), %ymm14
+    5349:      	vxorps	%xmm8, %xmm8, %xmm8
+    534e:      	movl	$0x8, %r12d
+    5354:      	shrl	$0x3, %ecx
+    5357:      	vfmadd231ps	(%rdx), %ymm14, %ymm8 # ymm8 = (ymm14 * mem) + ymm8
+    535c:      	andl	$0x7, %ecx
+    535f:      	cmpl	$0x8, %r14d
+    5363:      	jle	0x549c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3ec>
+    5369:      	testl	%ecx, %ecx
+    536b:      	je	0x5409 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x359>
+    5371:      	cmpl	$0x1, %ecx
+    5374:      	je	0x53f0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x340>
+    5376:      	cmpl	$0x2, %ecx
+    5379:      	je	0x53e0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x330>
+    537b:      	cmpl	$0x3, %ecx
+    537e:      	je	0x53d0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x320>
+    5380:      	cmpl	$0x4, %ecx
+    5383:      	je	0x53c0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x310>
+    5385:      	cmpl	$0x5, %ecx
+    5388:      	je	0x53b0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x300>
+    538a:      	cmpl	$0x6, %ecx
+    538d:      	je	0x53a0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2f0>
+    538f:      	vmovups	0x20(%rbx), %ymm13
+    5394:      	vfmadd231ps	0x20(%rdx), %ymm13, %ymm8 # ymm8 = (ymm13 * mem) + ymm8
+    539a:      	movl	$0x10, %r12d
+    53a0:      	vmovups	(%rbx,%r12,4), %ymm12
+    53a6:      	vfmadd231ps	(%rdx,%r12,4), %ymm12, %ymm8 # ymm8 = (ymm12 * mem) + ymm8
+    53ac:      	addq	$0x8, %r12
+    53b0:      	vmovups	(%rbx,%r12,4), %ymm11
+    53b6:      	vfmadd231ps	(%rdx,%r12,4), %ymm11, %ymm8 # ymm8 = (ymm11 * mem) + ymm8
+    53bc:      	addq	$0x8, %r12
+    53c0:      	vmovups	(%rbx,%r12,4), %ymm10
+    53c6:      	vfmadd231ps	(%rdx,%r12,4), %ymm10, %ymm8 # ymm8 = (ymm10 * mem) + ymm8
+    53cc:      	addq	$0x8, %r12
+    53d0:      	vmovups	(%rbx,%r12,4), %ymm9
+    53d6:      	vfmadd231ps	(%rdx,%r12,4), %ymm9, %ymm8 # ymm8 = (ymm9 * mem) + ymm8
+    53dc:      	addq	$0x8, %r12
+    53e0:      	vmovups	(%rbx,%r12,4), %ymm5
+    53e6:      	vfmadd231ps	(%rdx,%r12,4), %ymm5, %ymm8 # ymm8 = (ymm5 * mem) + ymm8
+    53ec:      	addq	$0x8, %r12
+    53f0:      	vmovups	(%rbx,%r12,4), %ymm15
+    53f6:      	vfmadd231ps	(%rdx,%r12,4), %ymm15, %ymm8 # ymm8 = (ymm15 * mem) + ymm8
+    53fc:      	addq	$0x8, %r12
+    5400:      	cmpl	%r12d, %r14d
+    5403:      	jle	0x549c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3ec>
+    5409:      	vmovups	(%rbx,%r12,4), %ymm2
+    540f:      	vfmadd231ps	(%rdx,%r12,4), %ymm2, %ymm8 # ymm8 = (ymm2 * mem) + ymm8
+    5415:      	vmovups	0x20(%rbx,%r12,4), %ymm6
+    541c:      	vfmadd231ps	0x20(%rdx,%r12,4), %ymm6, %ymm8 # ymm8 = (ymm6 * mem) + ymm8
+    5423:      	vmovups	0x40(%rbx,%r12,4), %ymm0
+    542a:      	vfmadd231ps	0x40(%rdx,%r12,4), %ymm0, %ymm8 # ymm8 = (ymm0 * mem) + ymm8
+    5431:      	vmovups	0x60(%rbx,%r12,4), %ymm3
+    5438:      	vfmadd231ps	0x60(%rdx,%r12,4), %ymm3, %ymm8 # ymm8 = (ymm3 * mem) + ymm8
+    543f:      	vmovups	0x80(%rbx,%r12,4), %ymm7
+    5449:      	vfmadd231ps	0x80(%rdx,%r12,4), %ymm7, %ymm8 # ymm8 = (ymm7 * mem) + ymm8
+    5453:      	vmovups	0xa0(%rbx,%r12,4), %ymm14
+    545d:      	vfmadd231ps	0xa0(%rdx,%r12,4), %ymm14, %ymm8 # ymm8 = (ymm14 * mem) + ymm8
+    5467:      	vmovups	0xc0(%rbx,%r12,4), %ymm13
+    5471:      	vfmadd231ps	0xc0(%rdx,%r12,4), %ymm13, %ymm8 # ymm8 = (ymm13 * mem) + ymm8
+    547b:      	vmovups	0xe0(%rbx,%r12,4), %ymm12
+    5485:      	vfmadd231ps	0xe0(%rdx,%r12,4), %ymm12, %ymm8 # ymm8 = (ymm12 * mem) + ymm8
+    548f:      	addq	$0x40, %r12
+    5493:      	cmpl	%r12d, %r14d
+    5496:      	jg	0x5409 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x359>
+    549c:      	vextractf128	$0x1, %ymm8, %xmm11
+    54a2:      	vaddps	%xmm8, %xmm11, %xmm10
+    54a7:      	vmovhlps	%xmm10, %xmm10, %xmm9   # xmm9 = xmm10[1,1]
+    54ac:      	vaddps	%xmm10, %xmm9, %xmm5
+    54b1:      	vshufps	$0x55, %xmm5, %xmm5, %xmm15 # xmm15 = xmm5[1,1,1,1]
+    54b6:      	vaddps	%xmm5, %xmm15, %xmm8
+    54ba:      	vmulss	%xmm8, %xmm4, %xmm2
+    54bf:      	vmovss	%xmm2, (%rsi)
+    54c3:      	addq	$0x4, %rsi
+    54c7:      	vmaxss	%xmm2, %xmm1, %xmm1
+    54cb:      	addq	%rdi, %rdx
+    54ce:      	cmpq	%rsi, %r8
+    54d1:      	jne	0x5338 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x288>
+    54d7:      	cmpl	$0x7, -0x8234(%rbp)
+    54de:      	jle	0x6aea <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1a3a>
+    54e4:      	movq	-0x82b0(%rbp), %rcx
+    54eb:      	vbroadcastss	%xmm1, %ymm6
+    54f0:      	movq	%r13, %r12
+    54f3:      	vxorps	%xmm3, %xmm3, %xmm3
+    54f7:      	vmovaps	%ymm6, -0x8190(%rbp)
+    54ff:      	leaq	(%r13,%rcx), %rbx
+    5504:      	subq	$0x20, %rcx
+    5508:      	shrq	$0x5, %rcx
+    550c:      	addq	$0x1, %rcx
+    5510:      	andl	$0x7, %ecx
+    5513:      	je	0x5713 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x663>
+    5519:      	cmpq	$0x1, %rcx
+    551d:      	je	0x56c8 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x618>
+    5523:      	cmpq	$0x2, %rcx
+    5527:      	je	0x5686 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x5d6>
+    552d:      	cmpq	$0x3, %rcx
+    5531:      	je	0x5644 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x594>
+    5537:      	cmpq	$0x4, %rcx
+    553b:      	je	0x5602 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x552>
+    5541:      	cmpq	$0x5, %rcx
+    5545:      	je	0x55c0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x510>
+    5547:      	cmpq	$0x6, %rcx
+    554b:      	je	0x557e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x4ce>
+    554d:      	vmovss	%xmm1, -0x81f0(%rbp)
+    5555:      	vmovups	(%r13), %ymm1
+    555b:      	leaq	0x20(%r13), %r12
+    555f:      	vsubps	-0x8190(%rbp), %ymm1, %ymm0
+    5567:      	callq	0x556c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x4bc>
+    556c:      	vmovss	-0x81f0(%rbp), %xmm1
+    5574:      	vmovaps	%ymm0, %ymm3
+    5578:      	vmovups	%ymm0, (%r13)
+    557e:      	vmovups	(%r12), %ymm7
+    5584:      	vsubps	-0x8190(%rbp), %ymm7, %ymm0
+    558c:      	vmovaps	%ymm3, -0x8210(%rbp)
+    5594:      	addq	$0x20, %r12
+    5598:      	vmovss	%xmm1, -0x81f0(%rbp)
+    55a0:      	callq	0x55a5 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x4f5>
+    55a5:      	vmovaps	-0x8210(%rbp), %ymm14
+    55ad:      	vmovss	-0x81f0(%rbp), %xmm1
+    55b5:      	vmovups	%ymm0, -0x20(%r12)
+    55bc:      	vaddps	%ymm0, %ymm14, %ymm3
+    55c0:      	vmovups	(%r12), %ymm13
+    55c6:      	vsubps	-0x8190(%rbp), %ymm13, %ymm0
+    55ce:      	vmovaps	%ymm3, -0x8210(%rbp)
+    55d6:      	addq	$0x20, %r12
+    55da:      	vmovss	%xmm1, -0x81f0(%rbp)
+    55e2:      	callq	0x55e7 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x537>
+    55e7:      	vmovaps	-0x8210(%rbp), %ymm12
+    55ef:      	vmovss	-0x81f0(%rbp), %xmm1
+    55f7:      	vmovups	%ymm0, -0x20(%r12)
+    55fe:      	vaddps	%ymm0, %ymm12, %ymm3
+    5602:      	vmovups	(%r12), %ymm11
+    5608:      	vsubps	-0x8190(%rbp), %ymm11, %ymm0
+    5610:      	vmovaps	%ymm3, -0x8210(%rbp)
+    5618:      	addq	$0x20, %r12
+    561c:      	vmovss	%xmm1, -0x81f0(%rbp)
+    5624:      	callq	0x5629 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x579>
+    5629:      	vmovaps	-0x8210(%rbp), %ymm10
+    5631:      	vmovss	-0x81f0(%rbp), %xmm1
+    5639:      	vmovups	%ymm0, -0x20(%r12)
+    5640:      	vaddps	%ymm0, %ymm10, %ymm3
+    5644:      	vmovups	(%r12), %ymm0
+    564a:      	vsubps	-0x8190(%rbp), %ymm0, %ymm0
+    5652:      	vmovaps	%ymm3, -0x8210(%rbp)
+    565a:      	addq	$0x20, %r12
+    565e:      	vmovss	%xmm1, -0x81f0(%rbp)
+    5666:      	callq	0x566b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x5bb>
+    566b:      	vmovaps	-0x8210(%rbp), %ymm9
+    5673:      	vmovss	-0x81f0(%rbp), %xmm1
+    567b:      	vmovups	%ymm0, -0x20(%r12)
+    5682:      	vaddps	%ymm0, %ymm9, %ymm3
+    5686:      	vmovups	(%r12), %ymm5
+    568c:      	vsubps	-0x8190(%rbp), %ymm5, %ymm0
+    5694:      	vmovaps	%ymm3, -0x8210(%rbp)
+    569c:      	addq	$0x20, %r12
+    56a0:      	vmovss	%xmm1, -0x81f0(%rbp)
+    56a8:      	callq	0x56ad <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x5fd>
+    56ad:      	vmovaps	-0x8210(%rbp), %ymm15
+    56b5:      	vmovss	-0x81f0(%rbp), %xmm1
+    56bd:      	vmovups	%ymm0, -0x20(%r12)
+    56c4:      	vaddps	%ymm0, %ymm15, %ymm3
+    56c8:      	vmovups	(%r12), %ymm8
+    56ce:      	vsubps	-0x8190(%rbp), %ymm8, %ymm0
+    56d6:      	vmovaps	%ymm3, -0x8210(%rbp)
+    56de:      	addq	$0x20, %r12
+    56e2:      	vmovss	%xmm1, -0x81f0(%rbp)
+    56ea:      	callq	0x56ef <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x63f>
+    56ef:      	vmovaps	-0x8210(%rbp), %ymm2
+    56f7:      	vmovss	-0x81f0(%rbp), %xmm1
+    56ff:      	vmovups	%ymm0, -0x20(%r12)
+    5706:      	cmpq	%r12, %rbx
+    5709:      	vaddps	%ymm0, %ymm2, %ymm3
+    570d:      	je	0x58a3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x7f3>
+    5713:      	vmovss	%xmm1, -0x8210(%rbp)
+    571b:      	vmovups	(%r12), %ymm4
+    5721:      	vsubps	-0x8190(%rbp), %ymm4, %ymm0
+    5729:      	vmovaps	%ymm3, -0x81f0(%rbp)
+    5731:      	addq	$0x100, %r12            # imm = 0x100
+    5738:      	callq	0x573d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x68d>
+    573d:      	vmovaps	-0x81f0(%rbp), %ymm6
+    5745:      	vmovups	-0xe0(%r12), %ymm7
+    574f:      	vmovups	%ymm0, -0x100(%r12)
+    5759:      	vaddps	%ymm0, %ymm6, %ymm1
+    575d:      	vsubps	-0x8190(%rbp), %ymm7, %ymm0
+    5765:      	vmovaps	%ymm1, -0x81f0(%rbp)
+    576d:      	callq	0x5772 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x6c2>
+    5772:      	vaddps	-0x81f0(%rbp), %ymm0, %ymm14
+    577a:      	vmovups	-0xc0(%r12), %ymm13
+    5784:      	vmovups	%ymm0, -0xe0(%r12)
+    578e:      	vsubps	-0x8190(%rbp), %ymm13, %ymm0
+    5796:      	vmovaps	%ymm14, -0x81f0(%rbp)
+    579e:      	callq	0x57a3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x6f3>
+    57a3:      	vaddps	-0x81f0(%rbp), %ymm0, %ymm12
+    57ab:      	vmovups	-0xa0(%r12), %ymm11
+    57b5:      	vmovups	%ymm0, -0xc0(%r12)
+    57bf:      	vsubps	-0x8190(%rbp), %ymm11, %ymm0
+    57c7:      	vmovaps	%ymm12, -0x81f0(%rbp)
+    57cf:      	callq	0x57d4 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x724>
+    57d4:      	vaddps	-0x81f0(%rbp), %ymm0, %ymm10
+    57dc:      	vmovups	%ymm0, -0xa0(%r12)
+    57e6:      	vmovups	-0x80(%r12), %ymm0
+    57ed:      	vsubps	-0x8190(%rbp), %ymm0, %ymm0
+    57f5:      	vmovaps	%ymm10, -0x81f0(%rbp)
+    57fd:      	callq	0x5802 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x752>
+    5802:      	vmovups	-0x60(%r12), %ymm5
+    5809:      	vaddps	-0x81f0(%rbp), %ymm0, %ymm9
+    5811:      	vmovups	%ymm0, -0x80(%r12)
+    5818:      	vsubps	-0x8190(%rbp), %ymm5, %ymm0
+    5820:      	vmovaps	%ymm9, -0x81f0(%rbp)
+    5828:      	callq	0x582d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x77d>
+    582d:      	vmovups	-0x40(%r12), %ymm8
+    5834:      	vaddps	-0x81f0(%rbp), %ymm0, %ymm15
+    583c:      	vmovups	%ymm0, -0x60(%r12)
+    5843:      	vsubps	-0x8190(%rbp), %ymm8, %ymm0
+    584b:      	vmovaps	%ymm15, -0x81f0(%rbp)
+    5853:      	callq	0x5858 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x7a8>
+    5858:      	vmovups	-0x20(%r12), %ymm3
+    585f:      	vaddps	-0x81f0(%rbp), %ymm0, %ymm2
+    5867:      	vmovups	%ymm0, -0x40(%r12)
+    586e:      	vsubps	-0x8190(%rbp), %ymm3, %ymm0
+    5876:      	vmovaps	%ymm2, -0x81f0(%rbp)
+    587e:      	callq	0x5883 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x7d3>
+    5883:      	vaddps	-0x81f0(%rbp), %ymm0, %ymm3
+    588b:      	vmovups	%ymm0, -0x20(%r12)
+    5892:      	cmpq	%r12, %rbx
+    5895:      	jne	0x571b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x66b>
+    589b:      	vmovss	-0x8210(%rbp), %xmm1
+    58a3:      	vextractf128	$0x1, %ymm3, %xmm4
+    58a9:      	movl	-0x82a8(%rbp), %ebx
+    58af:      	vaddps	%xmm3, %xmm4, %xmm6
+    58b3:      	vaddps	%xmm3, %xmm4, %xmm11
+    58b7:      	movl	%ebx, %esi
+    58b9:      	vmovhlps	%xmm6, %xmm6, %xmm7     # xmm7 = xmm6[1,1]
+    58bd:      	vmovaps	%xmm11, -0x81f0(%rbp)
+    58c5:      	vaddps	%xmm6, %xmm7, %xmm14
+    58c9:      	vshufps	$0x55, %xmm14, %xmm14, %xmm13 # xmm13 = xmm14[1,1,1,1]
+    58cf:      	vaddps	%xmm14, %xmm13, %xmm12
+    58d4:      	testb	$0x7, -0x8264(%rbp)
+    58db:      	je	0x6ac7 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1a17>
+    58e1:      	movl	-0x8264(%rbp), %r11d
+    58e8:      	subl	%esi, %r11d
+    58eb:      	leal	-0x1(%r11), %r10d
+    58ef:      	movl	%r11d, -0x8210(%rbp)
+    58f6:      	cmpl	$0x2, %r10d
+    58fa:      	jbe	0x7603 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2553>
+    5900:      	leaq	(%r13,%rsi,4), %r12
+    5905:      	vshufps	$0x0, %xmm1, %xmm1, %xmm0 # xmm0 = xmm1[0,0,0,0]
+    590a:      	vmovss	%xmm1, -0x8190(%rbp)
+    5912:      	vmovups	(%r12), %xmm9
+    5918:      	vsubps	%xmm0, %xmm9, %xmm0
+    591c:      	vzeroupper
+    591f:      	callq	0x5924 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x874>
+    5924:      	vaddps	-0x81f0(%rbp), %xmm0, %xmm5
+    592c:      	movl	-0x8210(%rbp), %edx
+    5932:      	vmovss	-0x8190(%rbp), %xmm1
+    593a:      	vmovups	%xmm0, (%r12)
+    5940:      	movl	%edx, %eax
+    5942:      	vmovhlps	%xmm5, %xmm5, %xmm15    # xmm15 = xmm5[1,1]
+    5946:      	andl	$-0x4, %eax
+    5949:      	vaddps	%xmm5, %xmm15, %xmm8
+    594d:      	addl	%eax, %ebx
+    594f:      	andl	$0x3, %edx
+    5952:      	vshufps	$0x55, %xmm8, %xmm8, %xmm2 # xmm2 = xmm8[1,1,1,1]
+    5958:      	vaddps	%xmm8, %xmm2, %xmm12
+    595d:      	je	0x5a39 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x989>
+    5963:      	movslq	%ebx, %r12
+    5966:      	vmovss	%xmm12, -0x81f0(%rbp)
+    596e:      	shlq	$0x2, %r12
+    5972:      	vmovss	%xmm1, -0x8210(%rbp)
+    597a:      	leaq	(%r13,%r12), %rdi
+    597f:      	vmovss	(%rdi), %xmm3
+    5983:      	movq	%rdi, -0x8190(%rbp)
+    598a:      	vsubss	%xmm1, %xmm3, %xmm0
+    598e:      	callq	0x5993 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x8e3>
+    5993:      	movq	-0x8190(%rbp), %r8
+    599a:      	movl	-0x8234(%rbp), %ecx
+    59a0:      	leal	0x1(%rbx), %r9d
+    59a4:      	vmovss	-0x81f0(%rbp), %xmm4
+    59ac:      	vmovss	%xmm0, (%r8)
+    59b1:      	vaddss	%xmm0, %xmm4, %xmm12
+    59b5:      	cmpl	%ecx, %r9d
+    59b8:      	jge	0x5a39 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x989>
+    59ba:      	leaq	0x4(%r13,%r12), %rsi
+    59bf:      	vmovss	-0x8210(%rbp), %xmm7
+    59c7:      	vmovss	%xmm12, -0x81f0(%rbp)
+    59cf:      	addl	$0x2, %ebx
+    59d2:      	vmovss	(%rsi), %xmm6
+    59d6:      	movq	%rsi, -0x8190(%rbp)
+    59dd:      	vsubss	%xmm7, %xmm6, %xmm0
+    59e1:      	callq	0x59e6 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x936>
+    59e6:      	movq	-0x8190(%rbp), %r11
+    59ed:      	vmovss	-0x81f0(%rbp), %xmm14
+    59f5:      	vmovss	%xmm0, (%r11)
+    59fa:      	vaddss	%xmm0, %xmm14, %xmm12
+    59fe:      	cmpl	%ebx, -0x8234(%rbp)
+    5a04:      	jle	0x5a39 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x989>
+    5a06:      	leaq	0x8(%r13,%r12), %rbx
+    5a0b:      	vmovss	%xmm12, -0x8190(%rbp)
+    5a13:      	vmovss	-0x8210(%rbp), %xmm12
+    5a1b:      	vmovss	(%rbx), %xmm13
+    5a1f:      	vsubss	%xmm12, %xmm13, %xmm0
+    5a24:      	callq	0x5a29 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x979>
+    5a29:      	vmovss	-0x8190(%rbp), %xmm11
+    5a31:      	vmovss	%xmm0, (%rbx)
+    5a35:      	vaddss	%xmm0, %xmm11, %xmm12
+    5a39:      	vmovss	(%rip), %xmm1           # 0x5a41 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x991>
+    5a41:      	cmpl	$0x6, -0x82bc(%rbp)
+    5a48:      	vdivss	%xmm12, %xmm1, %xmm10
+    5a4d:      	jbe	0x6ad9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1a29>
+    5a53:      	movq	-0x82b8(%rbp), %rdx
+    5a5a:      	vbroadcastss	%xmm10, %ymm0
+    5a5f:      	movq	%r13, %r9
+    5a62:      	leaq	-0x20(%rdx), %r8
+    5a66:      	leaq	(%rdx,%r13), %rdi
+    5a6a:      	shrq	$0x5, %r8
+    5a6e:      	addq	$0x1, %r8
+    5a72:      	andl	$0x7, %r8d
+    5a76:      	je	0x5b13 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa63>
+    5a7c:      	cmpq	$0x1, %r8
+    5a80:      	je	0x5afb <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa4b>
+    5a82:      	cmpq	$0x2, %r8
+    5a86:      	je	0x5aec <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa3c>
+    5a88:      	cmpq	$0x3, %r8
+    5a8c:      	je	0x5add <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa2d>
+    5a8e:      	cmpq	$0x4, %r8
+    5a92:      	je	0x5ace <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa1e>
+    5a94:      	cmpq	$0x5, %r8
+    5a98:      	je	0x5abf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa0f>
+    5a9a:      	cmpq	$0x6, %r8
+    5a9e:      	je	0x5ab0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa00>
+    5aa0:      	vmulps	(%r13), %ymm0, %ymm9
+    5aa6:      	leaq	0x20(%r13), %r9
+    5aaa:      	vmovups	%ymm9, (%r13)
+    5ab0:      	vmulps	(%r9), %ymm0, %ymm5
+    5ab5:      	addq	$0x20, %r9
+    5ab9:      	vmovups	%ymm5, -0x20(%r9)
+    5abf:      	vmulps	(%r9), %ymm0, %ymm15
+    5ac4:      	addq	$0x20, %r9
+    5ac8:      	vmovups	%ymm15, -0x20(%r9)
+    5ace:      	vmulps	(%r9), %ymm0, %ymm8
+    5ad3:      	addq	$0x20, %r9
+    5ad7:      	vmovups	%ymm8, -0x20(%r9)
+    5add:      	vmulps	(%r9), %ymm0, %ymm2
+    5ae2:      	addq	$0x20, %r9
+    5ae6:      	vmovups	%ymm2, -0x20(%r9)
+    5aec:      	vmulps	(%r9), %ymm0, %ymm3
+    5af1:      	addq	$0x20, %r9
+    5af5:      	vmovups	%ymm3, -0x20(%r9)
+    5afb:      	vmulps	(%r9), %ymm0, %ymm4
+    5b00:      	addq	$0x20, %r9
+    5b04:      	vmovups	%ymm4, -0x20(%r9)
+    5b0a:      	cmpq	%rdi, %r9
+    5b0d:      	je	0x5b93 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xae3>
+    5b13:      	vmulps	(%r9), %ymm0, %ymm6
+    5b18:      	addq	$0x100, %r9             # imm = 0x100
+    5b1f:      	vmulps	-0xe0(%r9), %ymm0, %ymm7
+    5b28:      	vmulps	-0xc0(%r9), %ymm0, %ymm14
+    5b31:      	vmulps	-0xa0(%r9), %ymm0, %ymm13
+    5b3a:      	vmulps	-0x80(%r9), %ymm0, %ymm12
+    5b40:      	vmovups	%ymm6, -0x100(%r9)
+    5b49:      	vmulps	-0x60(%r9), %ymm0, %ymm11
+    5b4f:      	vmovups	%ymm7, -0xe0(%r9)
+    5b58:      	vmulps	-0x40(%r9), %ymm0, %ymm1
+    5b5e:      	vmovups	%ymm14, -0xc0(%r9)
+    5b67:      	vmulps	-0x20(%r9), %ymm0, %ymm9
+    5b6d:      	vmovups	%ymm13, -0xa0(%r9)
+    5b76:      	vmovups	%ymm12, -0x80(%r9)
+    5b7c:      	vmovups	%ymm11, -0x60(%r9)
+    5b82:      	vmovups	%ymm1, -0x40(%r9)
+    5b88:      	vmovups	%ymm9, -0x20(%r9)
+    5b8e:      	cmpq	%rdi, %r9
+    5b91:      	jne	0x5b13 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xa63>
+    5b93:      	movl	-0x8234(%rbp), %ecx
+    5b99:      	cmpl	%ecx, -0x8268(%rbp)
+    5b9f:      	je	0x5c29 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xb79>
+    5ba5:      	movl	-0x8268(%rbp), %eax
+    5bab:      	movl	%ecx, %r12d
+    5bae:      	movl	%eax, %r10d
+    5bb1:      	subl	%r10d, %r12d
+    5bb4:      	leal	-0x1(%r12), %esi
+    5bb9:      	cmpl	$0x2, %esi
+    5bbc:      	jbe	0x5be1 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xb31>
+    5bbe:      	leaq	(%r13,%r10,4), %r11
+    5bc3:      	vshufps	$0x0, %xmm10, %xmm10, %xmm0 # xmm0 = xmm10[0,0,0,0]
+    5bc9:      	movl	%r12d, %ebx
+    5bcc:      	vmulps	(%r11), %xmm0, %xmm5
+    5bd1:      	andl	$-0x4, %ebx
+    5bd4:      	addl	%ebx, %eax
+    5bd6:      	andl	$0x3, %r12d
+    5bda:      	vmovups	%xmm5, (%r11)
+    5bdf:      	je	0x5c29 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xb79>
+    5be1:      	movslq	%eax, %r10
+    5be4:      	movl	-0x8234(%rbp), %edi
+    5bea:      	leal	0x1(%rax), %edx
+    5bed:      	shlq	$0x2, %r10
+    5bf1:      	leaq	(%r13,%r10), %r12
+    5bf6:      	vmulss	(%r12), %xmm10, %xmm15
+    5bfc:      	vmovss	%xmm15, (%r12)
+    5c02:      	cmpl	%edx, %edi
+    5c04:      	jle	0x5c29 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xb79>
+    5c06:      	leaq	0x4(%r13,%r10), %r8
+    5c0b:      	addl	$0x2, %eax
+    5c0e:      	vmulss	(%r8), %xmm10, %xmm8
+    5c13:      	vmovss	%xmm8, (%r8)
+    5c18:      	cmpl	%eax, %edi
+    5c1a:      	jle	0x5c29 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xb79>
+    5c1c:      	leaq	0x8(%r13,%r10), %rax
+    5c21:      	vmulss	(%rax), %xmm10, %xmm10
+    5c25:      	vmovss	%xmm10, (%rax)
+    5c29:      	cmpq	$0xa, -0x81b0(%rbp)
+    5c31:      	je	0x668b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x15db>
+    5c37:      	cmpq	$0x9, -0x81b0(%rbp)
+    5c3f:      	jne	0x66de <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x162e>
+    5c45:      	movq	-0x8240(%rbp), %rdi
+    5c4c:      	movq	0x18(%rdi), %r9
+    5c50:      	movabsq	$0x657375665f316c74, %rax # imm = 0x657375665F316C74
+    5c5a:      	cmpq	%rax, (%r9)
+    5c5d:      	je	0x6b04 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1a54>
+    5c63:      	movslq	%r14d, %rdi
+    5c66:      	movq	-0x8170(%rbp), %r14
+    5c6d:      	movq	-0x81d0(%rbp), %r9
+    5c74:      	movq	-0x8240(%rbp), %rax
+    5c7b:      	movl	-0x8234(%rbp), %ecx
+    5c81:      	imulq	%r9, %r14
+    5c85:      	movq	0x58(%rax), %rsi
+    5c89:      	testl	%ecx, %ecx
+    5c8b:      	jle	0x6b5e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1aae>
+    5c91:      	imulq	%rdi, %r14
+    5c95:      	leaq	(,%rdi,4), %r10
+    5c9d:      	movq	-0x8248(%rbp), %rdi
+    5ca4:      	movq	%r13, %r11
+    5ca7:      	vxorps	%xmm12, %xmm12, %xmm12
+    5cac:      	leaq	(%rdi,%r13), %r12
+    5cb0:      	vmovaps	%ymm12, %ymm1
+    5cb4:      	vmovaps	%ymm12, %ymm2
+    5cb8:      	andl	$0x4, %edi
+    5cbb:      	leaq	(%rsi,%r14,4), %rbx
+    5cbf:      	vmovaps	%ymm12, %ymm3
+    5cc3:      	vmovaps	%ymm12, %ymm4
+    5cc7:      	vmovaps	%ymm12, -0x81d0(%rbp)
+    5ccf:      	vmovaps	%ymm12, %ymm5
+    5cd3:      	vmovaps	%ymm12, %ymm6
+    5cd7:      	vmovaps	%ymm12, %ymm7
+    5cdb:      	vmovaps	%ymm12, %ymm15
+    5ce0:      	vmovaps	%ymm12, %ymm13
+    5ce5:      	vmovaps	%ymm12, %ymm9
+    5cea:      	vmovaps	%ymm12, %ymm10
+    5cef:      	vmovaps	%ymm12, %ymm11
+    5cf4:      	vmovaps	%ymm12, %ymm14
+    5cf9:      	jne	0x6987 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x18d7>
+    5cff:      	vmovaps	%ymm12, -0x8190(%rbp)
+    5d07:      	nopw	(%rax,%rax)
+    5d10:      	vbroadcastss	(%r11), %ymm0
+    5d15:      	vmovaps	-0x8190(%rbp), %ymm8
+    5d1d:      	addq	$0x8, %r11
+    5d21:      	vfmadd231ps	0xa0(%rbx), %ymm0, %ymm8 # ymm8 = (ymm0 * mem) + ymm8
+    5d2a:      	vfmadd231ps	(%rbx), %ymm0, %ymm15 # ymm15 = (ymm0 * mem) + ymm15
+    5d2f:      	vfmadd231ps	0x20(%rbx), %ymm0, %ymm14 # ymm14 = (ymm0 * mem) + ymm14
+    5d35:      	vfmadd231ps	0x40(%rbx), %ymm0, %ymm11 # ymm11 = (ymm0 * mem) + ymm11
+    5d3b:      	vfmadd231ps	0x80(%rbx), %ymm0, %ymm9 # ymm9 = (ymm0 * mem) + ymm9
+    5d44:      	vfmadd231ps	0x60(%rbx), %ymm0, %ymm10 # ymm10 = (ymm0 * mem) + ymm10
+    5d4a:      	vfmadd231ps	0xc0(%rbx), %ymm0, %ymm13 # ymm13 = (ymm0 * mem) + ymm13
+    5d53:      	vfmadd231ps	0x100(%rbx), %ymm0, %ymm7 # ymm7 = (ymm0 * mem) + ymm7
+    5d5c:      	vfmadd231ps	0x120(%rbx), %ymm0, %ymm6 # ymm6 = (ymm0 * mem) + ymm6
+    5d65:      	vfmadd231ps	0x140(%rbx), %ymm0, %ymm5 # ymm5 = (ymm0 * mem) + ymm5
+    5d6e:      	vfmadd231ps	0x160(%rbx), %ymm0, %ymm4 # ymm4 = (ymm0 * mem) + ymm4
+    5d77:      	vfmadd231ps	0x180(%rbx), %ymm0, %ymm3 # ymm3 = (ymm0 * mem) + ymm3
+    5d80:      	vmovaps	%ymm8, -0x8190(%rbp)
+    5d88:      	vfmadd231ps	0x1a0(%rbx), %ymm0, %ymm2 # ymm2 = (ymm0 * mem) + ymm2
+    5d91:      	vmovaps	-0x81d0(%rbp), %ymm8
+    5d99:      	vfmadd231ps	0x1c0(%rbx), %ymm0, %ymm1 # ymm1 = (ymm0 * mem) + ymm1
+    5da2:      	vfmadd231ps	0xe0(%rbx), %ymm0, %ymm8 # ymm8 = (ymm0 * mem) + ymm8
+    5dab:      	vfmadd132ps	0x1e0(%rbx), %ymm12, %ymm0 # ymm0 = (ymm0 * mem) + ymm12
+    5db4:      	addq	%r10, %rbx
+    5db7:      	vbroadcastss	-0x4(%r11), %ymm12
+    5dbd:      	vfmadd231ps	0xe0(%rbx), %ymm12, %ymm8 # ymm8 = (ymm12 * mem) + ymm8
+    5dc6:      	vfmadd231ps	(%rbx), %ymm12, %ymm15 # ymm15 = (ymm12 * mem) + ymm15
+    5dcb:      	vfmadd231ps	0x20(%rbx), %ymm12, %ymm14 # ymm14 = (ymm12 * mem) + ymm14
+    5dd1:      	vfmadd231ps	0x40(%rbx), %ymm12, %ymm11 # ymm11 = (ymm12 * mem) + ymm11
+    5dd7:      	vfmadd231ps	0x80(%rbx), %ymm12, %ymm9 # ymm9 = (ymm12 * mem) + ymm9
+    5de0:      	vfmadd231ps	0x60(%rbx), %ymm12, %ymm10 # ymm10 = (ymm12 * mem) + ymm10
+    5de6:      	vfmadd231ps	0xc0(%rbx), %ymm12, %ymm13 # ymm13 = (ymm12 * mem) + ymm13
+    5def:      	vmovaps	%ymm0, -0x81b0(%rbp)
+    5df7:      	vmovaps	-0x8190(%rbp), %ymm0
+    5dff:      	vfmadd231ps	0xa0(%rbx), %ymm12, %ymm0 # ymm0 = (ymm12 * mem) + ymm0
+    5e08:      	vmovaps	%ymm0, -0x8190(%rbp)
+    5e10:      	vmovaps	%ymm8, -0x81d0(%rbp)
+    5e18:      	vmovaps	-0x81b0(%rbp), %ymm8
+    5e20:      	vfmadd231ps	0x100(%rbx), %ymm12, %ymm7 # ymm7 = (ymm12 * mem) + ymm7
+    5e29:      	vfmadd231ps	0x120(%rbx), %ymm12, %ymm6 # ymm6 = (ymm12 * mem) + ymm6
+    5e32:      	vfmadd231ps	0x140(%rbx), %ymm12, %ymm5 # ymm5 = (ymm12 * mem) + ymm5
+    5e3b:      	vfmadd231ps	0x160(%rbx), %ymm12, %ymm4 # ymm4 = (ymm12 * mem) + ymm4
+    5e44:      	vfmadd231ps	0x180(%rbx), %ymm12, %ymm3 # ymm3 = (ymm12 * mem) + ymm3
+    5e4d:      	vfmadd231ps	0x1a0(%rbx), %ymm12, %ymm2 # ymm2 = (ymm12 * mem) + ymm2
+    5e56:      	vfmadd231ps	0x1c0(%rbx), %ymm12, %ymm1 # ymm1 = (ymm12 * mem) + ymm1
+    5e5f:      	vfmadd132ps	0x1e0(%rbx), %ymm8, %ymm12 # ymm12 = (ymm12 * mem) + ymm8
+    5e68:      	addq	%r10, %rbx
+    5e6b:      	cmpq	%r12, %r11
+    5e6e:      	jne	0x5d10 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xc60>
+    5e74:      	vmovaps	%ymm13, -0x81b0(%rbp)
+    5e7c:      	vmovaps	%ymm11, -0x81f0(%rbp)
+    5e84:      	vmovaps	%ymm10, -0x8210(%rbp)
+    5e8c:      	vmovaps	%ymm9, -0x8230(%rbp)
+    5e94:      	nopl	(%rax)
+    5e98:      	movq	-0x8298(%rbp), %rdx
+    5e9f:      	movq	-0x8250(%rbp), %r8
+    5ea6:      	vmovaps	-0x8230(%rbp), %ymm13
+    5eae:      	vmovaps	-0x8190(%rbp), %ymm11
+    5eb6:      	vmovups	%ymm15, (%rdx,%r8,4)
+    5ebc:      	vmovaps	-0x81b0(%rbp), %ymm10
+    5ec4:      	vmovaps	-0x81f0(%rbp), %ymm15
+    5ecc:      	vmovups	%ymm14, 0x20(%rdx,%r15)
+    5ed3:      	vmovaps	-0x81d0(%rbp), %ymm9
+    5edb:      	vmovaps	-0x8210(%rbp), %ymm14
+    5ee3:      	vmovups	%ymm15, 0x40(%rdx,%r15)
+    5eea:      	vmovups	%ymm14, 0x60(%rdx,%r15)
+    5ef1:      	vmovups	%ymm13, 0x80(%rdx,%r15)
+    5efb:      	vmovups	%ymm11, 0xa0(%rdx,%r15)
+    5f05:      	vmovups	%ymm10, 0xc0(%rdx,%r15)
+    5f0f:      	vmovups	%ymm9, 0xe0(%rdx,%r15)
+    5f19:      	vmovups	%ymm7, 0x100(%rdx,%r15)
+    5f23:      	vmovups	%ymm6, 0x120(%rdx,%r15)
+    5f2d:      	vmovups	%ymm5, 0x140(%rdx,%r15)
+    5f37:      	vmovups	%ymm4, 0x160(%rdx,%r15)
+    5f41:      	vmovups	%ymm3, 0x180(%rdx,%r15)
+    5f4b:      	vmovups	%ymm2, 0x1a0(%rdx,%r15)
+    5f55:      	vmovups	%ymm1, 0x1c0(%rdx,%r15)
+    5f5f:      	vmovups	%ymm12, 0x1e0(%rdx,%r15)
+    5f69:      	movq	-0x8260(%rbp), %r15
+    5f70:      	cmpq	%r15, %r13
+    5f73:      	je	0x5ff0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xf40>
+    5f75:      	movq	%r13, %rdi
+    5f78:      	vzeroupper
+    5f7b:      	callq	0x5f80 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xed0>
+    5f80:      	addl	$0x1, -0x8238(%rbp)
+    5f87:      	movl	-0x8238(%rbp), %r14d
+    5f8e:      	cmpl	%r14d, -0x826c(%rbp)
+    5f95:      	jg	0x5220 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x170>
+    5f9b:      	movq	-0x82d0(%rbp), %rsi
+    5fa2:      	movq	-0x82c8(%rbp), %rdi
+    5fa9:      	callq	0x5fae <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xefe>
+    5fae:      	testb	%al, %al
+    5fb0:      	jne	0x5205 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x155>
+    5fb6:      	callq	0x5fbb <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xf0b>
+    5fbb:      	movq	-0x38(%rbp), %rax
+    5fbf:      	subq	%fs:0x28, %rax
+    5fc8:      	jne	0x8396 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x32e6>
+    5fce:      	addq	$0x82a0, %rsp           # imm = 0x82A0
+    5fd5:      	popq	%rbx
+    5fd6:      	popq	%r9
+    5fd8:      	popq	%r12
+    5fda:      	popq	%r13
+    5fdc:      	popq	%r14
+    5fde:      	popq	%r15
+    5fe0:      	popq	%rbp
+    5fe1:      	leaq	-0x8(%r9), %rsp
+    5fe5:      	retq
+    5fe6:      	nopw	%cs:(%rax,%rax)
+    5ff0:      	addl	$0x1, -0x8238(%rbp)
+    5ff7:      	movl	-0x8238(%rbp), %r13d
+    5ffe:      	cmpl	%r13d, -0x826c(%rbp)
+    6005:      	jg	0x5220 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x170>
+    600b:      	vzeroupper
+    600e:      	jmp	0x5f9b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xeeb>
+    6010:      	movabsq	$0x7375665f38746e69, %r8 # imm = 0x7375665F38746E69
+    601a:      	movq	0x18(%rsi), %r11
+    601e:      	cmpq	%r8, (%r11)
+    6021:      	je	0x6ab3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1a03>
+    6027:      	movl	$0x1, %ecx
+    602c:      	movslq	%r14d, %rdi
+    602f:      	testl	%ecx, %ecx
+    6031:      	je	0x670f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x165f>
+    6037:      	movq	-0x8170(%rbp), %rdx
+    603e:      	movq	-0x81d0(%rbp), %r12
+    6045:      	movq	%rdi, %r8
+    6048:      	movq	-0x8240(%rbp), %r9
+    604f:      	movl	-0x8234(%rbp), %eax
+    6055:      	imulq	%r12, %rdx
+    6059:      	movq	0x40(%r9), %r10
+    605d:      	imulq	%rdi, %rdx
+    6061:      	testl	%eax, %eax
+    6063:      	jg	0x530b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x25b>
+    6069:      	movabsq	$0x7375665f38746e69, %r14 # imm = 0x7375665F38746E69
+    6073:      	cmpq	%r14, (%r11)
+    6076:      	jne	0x5c66 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb6>
+    607c:      	cmpw	$0x6465, 0x8(%r11)      # imm = 0x6465
+    6083:      	jne	0x5c66 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb6>
+    6089:      	movq	-0x8170(%rbp), %r9
+    6090:      	movq	-0x81d0(%rbp), %rax
+    6097:      	movq	-0x8240(%rbp), %rcx
+    609e:      	movl	-0x8234(%rbp), %r10d
+    60a5:      	imulq	%rax, %r9
+    60a9:      	movq	0x88(%rcx), %r11
+    60b0:      	movq	0xb8(%rcx), %rbx
+    60b7:      	movq	%r9, %rsi
+    60ba:      	imulq	%rdi, %rsi
+    60be:      	testl	%r10d, %r10d
+    60c1:      	jle	0x6b5e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1aae>
+    60c7:      	vxorps	%xmm12, %xmm12, %xmm12
+    60cc:      	movq	-0x8248(%rbp), %r8
+    60d3:      	addq	%rsi, %r11
+    60d6:      	xorl	%edx, %edx
+    60d8:      	leaq	(%rbx,%r9,4), %r12
+    60dc:      	vmovaps	%ymm12, %ymm1
+    60e0:      	vmovaps	%ymm12, %ymm2
+    60e4:      	vmovaps	%ymm12, -0x81b0(%rbp)
+    60ec:      	vmovaps	%ymm12, %ymm3
+    60f0:      	vmovaps	%ymm12, %ymm4
+    60f4:      	vmovaps	%ymm12, %ymm5
+    60f8:      	vmovaps	%ymm12, -0x8190(%rbp)
+    6100:      	vmovaps	%ymm12, %ymm6
+    6104:      	vmovaps	%ymm12, %ymm7
+    6108:      	vmovaps	%ymm12, %ymm9
+    610d:      	vmovaps	%ymm12, %ymm15
+    6112:      	vmovaps	%ymm12, %ymm13
+    6117:      	vmovaps	%ymm12, %ymm11
+    611c:      	vmovaps	%ymm12, %ymm10
+    6121:      	vmovaps	%ymm12, %ymm14
+    6126:      	nopw	%cs:(%rax,%rax)
+    6130:      	vmovss	(%r13,%rdx), %xmm0
+    6137:      	vmulss	(%r12,%rdx), %xmm0, %xmm8
+    613d:      	addq	$0x4, %rdx
+    6141:      	vbroadcastss	%xmm8, %ymm0
+    6146:      	vpmovsxbd	(%r11), %ymm8
+    614b:      	vcvtdq2ps	%ymm8, %ymm8
+    6150:      	vfmadd231ps	%ymm0, %ymm8, %ymm15 # ymm15 = (ymm8 * ymm0) + ymm15
+    6155:      	vpmovsxbd	0x8(%r11), %ymm8
+    615b:      	vcvtdq2ps	%ymm8, %ymm8
+    6160:      	vfmadd231ps	%ymm0, %ymm8, %ymm14 # ymm14 = (ymm8 * ymm0) + ymm14
+    6165:      	vpmovsxbd	0x10(%r11), %ymm8
+    616b:      	vcvtdq2ps	%ymm8, %ymm8
+    6170:      	vfmadd231ps	%ymm0, %ymm8, %ymm10 # ymm10 = (ymm8 * ymm0) + ymm10
+    6175:      	vpmovsxbd	0x18(%r11), %ymm8
+    617b:      	vcvtdq2ps	%ymm8, %ymm8
+    6180:      	vfmadd231ps	%ymm0, %ymm8, %ymm11 # ymm11 = (ymm8 * ymm0) + ymm11
+    6185:      	vpmovsxbd	0x20(%r11), %ymm8
+    618b:      	vcvtdq2ps	%ymm8, %ymm8
+    6190:      	vfmadd231ps	%ymm0, %ymm8, %ymm13 # ymm13 = (ymm8 * ymm0) + ymm13
+    6195:      	vpmovsxbd	0x28(%r11), %ymm8
+    619b:      	vcvtdq2ps	%ymm8, %ymm8
+    61a0:      	vfmadd213ps	-0x8190(%rbp), %ymm0, %ymm8 # ymm8 = (ymm0 * ymm8) + mem
+    61a9:      	vmovaps	%ymm8, -0x8190(%rbp)
+    61b1:      	vpmovsxbd	0x30(%r11), %ymm8
+    61b7:      	vcvtdq2ps	%ymm8, %ymm8
+    61bc:      	vfmadd213ps	-0x81b0(%rbp), %ymm0, %ymm8 # ymm8 = (ymm0 * ymm8) + mem
+    61c5:      	vmovaps	%ymm8, -0x81b0(%rbp)
+    61cd:      	vpmovsxbd	0x38(%r11), %ymm8
+    61d3:      	vcvtdq2ps	%ymm8, %ymm8
+    61d8:      	vfmadd231ps	%ymm0, %ymm8, %ymm9 # ymm9 = (ymm8 * ymm0) + ymm9
+    61dd:      	vpmovsxbd	0x40(%r11), %ymm8
+    61e3:      	vcvtdq2ps	%ymm8, %ymm8
+    61e8:      	vfmadd231ps	%ymm0, %ymm8, %ymm7 # ymm7 = (ymm8 * ymm0) + ymm7
+    61ed:      	vpmovsxbd	0x48(%r11), %ymm8
+    61f3:      	vcvtdq2ps	%ymm8, %ymm8
+    61f8:      	vfmadd231ps	%ymm0, %ymm8, %ymm6 # ymm6 = (ymm8 * ymm0) + ymm6
+    61fd:      	vpmovsxbd	0x50(%r11), %ymm8
+    6203:      	vcvtdq2ps	%ymm8, %ymm8
+    6208:      	vfmadd231ps	%ymm0, %ymm8, %ymm5 # ymm5 = (ymm8 * ymm0) + ymm5
+    620d:      	vpmovsxbd	0x58(%r11), %ymm8
+    6213:      	vcvtdq2ps	%ymm8, %ymm8
+    6218:      	vfmadd231ps	%ymm0, %ymm8, %ymm4 # ymm4 = (ymm8 * ymm0) + ymm4
+    621d:      	vpmovsxbd	0x60(%r11), %ymm8
+    6223:      	vcvtdq2ps	%ymm8, %ymm8
+    6228:      	vfmadd231ps	%ymm0, %ymm8, %ymm3 # ymm3 = (ymm8 * ymm0) + ymm3
+    622d:      	vpmovsxbd	0x68(%r11), %ymm8
+    6233:      	vcvtdq2ps	%ymm8, %ymm8
+    6238:      	vfmadd231ps	%ymm0, %ymm8, %ymm2 # ymm2 = (ymm8 * ymm0) + ymm2
+    623d:      	vpmovsxbd	0x70(%r11), %ymm8
+    6243:      	vcvtdq2ps	%ymm8, %ymm8
+    6248:      	vfmadd231ps	%ymm0, %ymm8, %ymm1 # ymm1 = (ymm8 * ymm0) + ymm1
+    624d:      	vpmovsxbd	0x78(%r11), %ymm8
+    6253:      	addq	%rdi, %r11
+    6256:      	vcvtdq2ps	%ymm8, %ymm8
+    625b:      	vfmadd231ps	%ymm0, %ymm8, %ymm12 # ymm12 = (ymm8 * ymm0) + ymm12
+    6260:      	cmpq	%rdx, %r8
+    6263:      	jne	0x6130 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1080>
+    6269:      	vmovaps	%ymm9, -0x81d0(%rbp)
+    6271:      	vmovaps	%ymm10, -0x81f0(%rbp)
+    6279:      	vmovaps	%ymm11, -0x8210(%rbp)
+    6281:      	vmovaps	%ymm13, -0x8230(%rbp)
+    6289:      	jmp	0x5e98 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xde8>
+    628e:      	movq	-0x8248(%rbp), %rdi
+    6295:      	vzeroupper
+    6298:      	callq	0x629d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x11ed>
+    629d:      	movq	-0x8240(%rbp), %rsi
+    62a4:      	movq	%rax, %r13
+    62a7:      	movl	0xc(%rsi), %r14d
+    62ab:      	jmp	0x527b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1cb>
+    62b0:      	cmpq	$0xe, -0x81b0(%rbp)
+    62b8:      	jne	0x66b1 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1601>
+    62be:      	movabsq	$0x746e756f63706f70, %rdx # imm = 0x746E756F63706F70
+    62c8:      	movq	0x18(%rsi), %r11
+    62cc:      	cmpq	%rdx, (%r11)
+    62cf:      	je	0x762c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x257c>
+    62d5:      	movq	-0x8170(%rbp), %rdx
+    62dc:      	movq	-0x81d0(%rbp), %rsi
+    62e3:      	movslq	%r14d, %r8
+    62e6:      	movq	-0x8240(%rbp), %rdi
+    62ed:      	movl	-0x8234(%rbp), %eax
+    62f3:      	imulq	%rsi, %rdx
+    62f7:      	movq	0x40(%rdi), %r10
+    62fb:      	imulq	%r8, %rdx
+    62ff:      	testl	%eax, %eax
+    6301:      	jg	0x530b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x25b>
+    6307:      	movabsq	$0x746e756f63706f70, %rcx # imm = 0x746E756F63706F70
+    6311:      	cmpq	%rcx, (%r11)
+    6314:      	jne	0x5c63 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb3>
+    631a:      	movabsq	$0x64657375665f746e, %rsi # imm = 0x64657375665F746E
+    6324:      	cmpq	%rsi, 0x6(%r11)
+    6328:      	jne	0x5c63 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb3>
+    632e:      	movq	-0x81d0(%rbp), %rbx
+    6335:      	movq	-0x8170(%rbp), %r11
+    633c:      	leal	0x3(%r14), %r10d
+    6340:      	movq	-0x8240(%rbp), %r12
+    6347:      	imulq	%rbx, %r11
+    634b:      	testl	%r14d, %r14d
+    634e:      	movl	-0x8234(%rbp), %ebx
+    6354:      	cmovnsl	%r14d, %r10d
+    6358:      	movq	0x178(%r12), %rdx
+    6360:      	sarl	$0x2, %r10d
+    6364:      	leaq	(%rdx,%r11,4), %r8
+    6368:      	movslq	%r10d, %r14
+    636b:      	imulq	%r11, %r14
+    636f:      	addq	0x160(%r12), %r14
+    6377:      	testl	%ebx, %ebx
+    6379:      	jle	0x6b5e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1aae>
+    637f:      	movabsq	$0xf0f0f0f0f0f0f0f, %rdx # imm = 0xF0F0F0F0F0F0F0F
+    6389:      	vxorps	%xmm12, %xmm12, %xmm12
+    638e:      	movslq	%r10d, %r10
+    6391:      	xorl	%r12d, %r12d
+    6394:      	vmovq	%rdx, %xmm13
+    6399:      	movq	-0x8248(%rbp), %rdi
+    63a0:      	vmovaps	%ymm12, %ymm1
+    63a4:      	vmovaps	%ymm12, %ymm2
+    63a8:      	vpunpcklqdq	%xmm13, %xmm13, %xmm11 # xmm11 = xmm13[0,0]
+    63ad:      	vmovaps	%ymm12, %ymm3
+    63b1:      	vmovaps	%ymm12, %ymm4
+    63b5:      	vmovaps	%ymm12, -0x81d0(%rbp)
+    63bd:      	vmovaps	%ymm12, %ymm5
+    63c1:      	vmovaps	%ymm12, %ymm6
+    63c5:      	vmovaps	%ymm12, %ymm7
+    63c9:      	vmovaps	%ymm12, -0x81b0(%rbp)
+    63d1:      	vmovaps	%ymm12, %ymm15
+    63d6:      	vmovaps	%ymm12, -0x8190(%rbp)
+    63de:      	vmovaps	%ymm12, %ymm14
+    63e3:      	vmovaps	%ymm12, -0x8230(%rbp)
+    63eb:      	vmovaps	%ymm12, -0x8210(%rbp)
+    63f3:      	vmovaps	%ymm12, -0x81f0(%rbp)
+    63fb:      	vmovdqa	%xmm11, -0x8170(%rbp)
+    6403:      	nopl	(%rax,%rax)
+    6408:      	vmovdqu	(%r14), %xmm8
+    640d:      	vmovss	(%r13,%r12), %xmm9
+    6414:      	vmulss	(%r8,%r12), %xmm9, %xmm0
+    641a:      	vmovdqa	-0x8170(%rbp), %xmm9
+    6422:      	addq	$0x4, %r12
+    6426:      	vpsrlw	$0x4, %xmm8, %xmm11
+    642c:      	vpand	(%r14), %xmm9, %xmm10
+    6431:      	vmovdqa	(%rip), %xmm8           # 0x6439 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1389>
+    6439:      	vpand	%xmm9, %xmm11, %xmm11
+    643e:      	vmovdqa	(%rip), %xmm13          # 0x6446 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1396>
+    6446:      	vmovdqa	(%rip), %xmm9           # 0x644e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x139e>
+    644e:      	vpshufb	%xmm10, %xmm13, %xmm13
+    6453:      	vpshufb	%xmm10, %xmm8, %xmm10
+    6458:      	vpshufb	%xmm11, %xmm9, %xmm8
+    645d:      	vmovdqa	(%rip), %xmm9           # 0x6465 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x13b5>
+    6465:      	vbroadcastss	%xmm0, %ymm0
+    646a:      	vpshufb	%xmm11, %xmm9, %xmm11
+    646f:      	vpunpcklbw	%xmm10, %xmm13, %xmm9 # xmm9 = xmm13[0],xmm10[0],xmm13[1],xmm10[1],xmm13[2],xmm10[2],xmm13[3],xmm10[3],xmm13[4],xmm10[4],xmm13[5],xmm10[5],xmm13[6],xmm10[6],xmm13[7],xmm10[7]
+    6474:      	vpunpckhbw	%xmm10, %xmm13, %xmm13 # xmm13 = xmm13[8],xmm10[8],xmm13[9],xmm10[9],xmm13[10],xmm10[10],xmm13[11],xmm10[11],xmm13[12],xmm10[12],xmm13[13],xmm10[13],xmm13[14],xmm10[14],xmm13[15],xmm10[15]
+    6479:      	vpunpcklbw	%xmm11, %xmm8, %xmm10 # xmm10 = xmm8[0],xmm11[0],xmm8[1],xmm11[1],xmm8[2],xmm11[2],xmm8[3],xmm11[3],xmm8[4],xmm11[4],xmm8[5],xmm11[5],xmm8[6],xmm11[6],xmm8[7],xmm11[7]
+    647e:      	vpunpckhbw	%xmm11, %xmm8, %xmm8 # xmm8 = xmm8[8],xmm11[8],xmm8[9],xmm11[9],xmm8[10],xmm11[10],xmm8[11],xmm11[11],xmm8[12],xmm11[12],xmm8[13],xmm11[13],xmm8[14],xmm11[14],xmm8[15],xmm11[15]
+    6483:      	vpunpcklwd	%xmm10, %xmm9, %xmm11 # xmm11 = xmm9[0],xmm10[0],xmm9[1],xmm10[1],xmm9[2],xmm10[2],xmm9[3],xmm10[3]
+    6488:      	vpunpckhwd	%xmm10, %xmm9, %xmm9 # xmm9 = xmm9[4],xmm10[4],xmm9[5],xmm10[5],xmm9[6],xmm10[6],xmm9[7],xmm10[7]
+    648d:      	vpunpcklwd	%xmm8, %xmm13, %xmm10 # xmm10 = xmm13[0],xmm8[0],xmm13[1],xmm8[1],xmm13[2],xmm8[2],xmm13[3],xmm8[3]
+    6492:      	vpunpckhwd	%xmm8, %xmm13, %xmm8 # xmm8 = xmm13[4],xmm8[4],xmm13[5],xmm8[5],xmm13[6],xmm8[6],xmm13[7],xmm8[7]
+    6497:      	vpmovsxbd	%xmm11, %ymm13
+    649c:      	vpsrldq	$0x8, %xmm11, %xmm11    # xmm11 = xmm11[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    64a2:      	vcvtdq2ps	%ymm13, %ymm13
+    64a7:      	vfmadd231ps	%ymm0, %ymm13, %ymm15 # ymm15 = (ymm13 * ymm0) + ymm15
+    64ac:      	vpmovsxbd	%xmm11, %ymm13
+    64b1:      	vcvtdq2ps	%ymm13, %ymm11
+    64b6:      	vpmovsxbd	%xmm9, %ymm13
+    64bb:      	vpsrldq	$0x8, %xmm9, %xmm9      # xmm9 = xmm9[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    64c1:      	vfmadd231ps	%ymm0, %ymm11, %ymm14 # ymm14 = (ymm11 * ymm0) + ymm14
+    64c6:      	vcvtdq2ps	%ymm13, %ymm11
+    64cb:      	vpmovsxbd	%xmm9, %ymm13
+    64d0:      	vfmadd213ps	-0x81f0(%rbp), %ymm0, %ymm11 # ymm11 = (ymm0 * ymm11) + mem
+    64d9:      	vcvtdq2ps	%ymm13, %ymm13
+    64de:      	vfmadd213ps	-0x8210(%rbp), %ymm0, %ymm13 # ymm13 = (ymm0 * ymm13) + mem
+    64e7:      	vmovaps	%ymm11, -0x81f0(%rbp)
+    64ef:      	vpmovsxbd	%xmm10, %ymm11
+    64f4:      	vpsrldq	$0x8, %xmm10, %xmm10    # xmm10 = xmm10[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    64fa:      	vmovaps	%ymm13, -0x8210(%rbp)
+    6502:      	vcvtdq2ps	%ymm11, %ymm13
+    6507:      	vfmadd213ps	-0x8230(%rbp), %ymm0, %ymm13 # ymm13 = (ymm0 * ymm13) + mem
+    6510:      	vpmovsxbd	%xmm10, %ymm9
+    6515:      	vcvtdq2ps	%ymm9, %ymm11
+    651a:      	vfmadd213ps	-0x8190(%rbp), %ymm0, %ymm11 # ymm11 = (ymm0 * ymm11) + mem
+    6523:      	vmovaps	%ymm13, -0x8230(%rbp)
+    652b:      	vpmovsxbd	%xmm8, %ymm13
+    6530:      	vpsrldq	$0x8, %xmm8, %xmm8      # xmm8 = xmm8[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    6536:      	vpmovsxbd	%xmm8, %ymm10
+    653b:      	vcvtdq2ps	%ymm13, %ymm13
+    6540:      	vfmadd213ps	-0x81b0(%rbp), %ymm0, %ymm13 # ymm13 = (ymm0 * ymm13) + mem
+    6549:      	vmovaps	%ymm11, -0x8190(%rbp)
+    6551:      	vcvtdq2ps	%ymm10, %ymm9
+    6556:      	vmovdqu	0x10(%r14), %xmm11
+    655c:      	vfmadd213ps	-0x81d0(%rbp), %ymm0, %ymm9 # ymm9 = (ymm0 * ymm9) + mem
+    6565:      	vmovdqa	(%rip), %xmm8           # 0x656d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x14bd>
+    656d:      	vpsrlw	$0x4, %xmm11, %xmm11
+    6573:      	vmovaps	%ymm13, -0x81b0(%rbp)
+    657b:      	vmovdqa	(%rip), %xmm13          # 0x6583 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x14d3>
+    6583:      	vmovaps	%ymm9, -0x81d0(%rbp)
+    658b:      	vmovdqa	-0x8170(%rbp), %xmm9
+    6593:      	vpand	0x10(%r14), %xmm9, %xmm10
+    6599:      	addq	%r10, %r14
+    659c:      	vpand	%xmm9, %xmm11, %xmm11
+    65a1:      	vmovdqa	(%rip), %xmm9           # 0x65a9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x14f9>
+    65a9:      	vpshufb	%xmm10, %xmm13, %xmm13
+    65ae:      	vpshufb	%xmm10, %xmm8, %xmm10
+    65b3:      	vpshufb	%xmm11, %xmm9, %xmm8
+    65b8:      	vmovdqa	(%rip), %xmm9           # 0x65c0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1510>
+    65c0:      	vpshufb	%xmm11, %xmm9, %xmm11
+    65c5:      	vpunpcklbw	%xmm10, %xmm13, %xmm9 # xmm9 = xmm13[0],xmm10[0],xmm13[1],xmm10[1],xmm13[2],xmm10[2],xmm13[3],xmm10[3],xmm13[4],xmm10[4],xmm13[5],xmm10[5],xmm13[6],xmm10[6],xmm13[7],xmm10[7]
+    65ca:      	vpunpckhbw	%xmm10, %xmm13, %xmm13 # xmm13 = xmm13[8],xmm10[8],xmm13[9],xmm10[9],xmm13[10],xmm10[10],xmm13[11],xmm10[11],xmm13[12],xmm10[12],xmm13[13],xmm10[13],xmm13[14],xmm10[14],xmm13[15],xmm10[15]
+    65cf:      	vpunpcklbw	%xmm11, %xmm8, %xmm10 # xmm10 = xmm8[0],xmm11[0],xmm8[1],xmm11[1],xmm8[2],xmm11[2],xmm8[3],xmm11[3],xmm8[4],xmm11[4],xmm8[5],xmm11[5],xmm8[6],xmm11[6],xmm8[7],xmm11[7]
+    65d4:      	vpunpckhbw	%xmm11, %xmm8, %xmm8 # xmm8 = xmm8[8],xmm11[8],xmm8[9],xmm11[9],xmm8[10],xmm11[10],xmm8[11],xmm11[11],xmm8[12],xmm11[12],xmm8[13],xmm11[13],xmm8[14],xmm11[14],xmm8[15],xmm11[15]
+    65d9:      	vpunpcklwd	%xmm10, %xmm9, %xmm11 # xmm11 = xmm9[0],xmm10[0],xmm9[1],xmm10[1],xmm9[2],xmm10[2],xmm9[3],xmm10[3]
+    65de:      	vpunpckhwd	%xmm10, %xmm9, %xmm9 # xmm9 = xmm9[4],xmm10[4],xmm9[5],xmm10[5],xmm9[6],xmm10[6],xmm9[7],xmm10[7]
+    65e3:      	vpunpcklwd	%xmm8, %xmm13, %xmm10 # xmm10 = xmm13[0],xmm8[0],xmm13[1],xmm8[1],xmm13[2],xmm8[2],xmm13[3],xmm8[3]
+    65e8:      	vpunpckhwd	%xmm8, %xmm13, %xmm8 # xmm8 = xmm13[4],xmm8[4],xmm13[5],xmm8[5],xmm13[6],xmm8[6],xmm13[7],xmm8[7]
+    65ed:      	vpmovsxbd	%xmm11, %ymm13
+    65f2:      	vpsrldq	$0x8, %xmm11, %xmm11    # xmm11 = xmm11[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    65f8:      	vcvtdq2ps	%ymm13, %ymm13
+    65fd:      	vfmadd231ps	%ymm0, %ymm13, %ymm7 # ymm7 = (ymm13 * ymm0) + ymm7
+    6602:      	vpmovsxbd	%xmm11, %ymm13
+    6607:      	vcvtdq2ps	%ymm13, %ymm11
+    660c:      	vpmovsxbd	%xmm9, %ymm13
+    6611:      	vpsrldq	$0x8, %xmm9, %xmm9      # xmm9 = xmm9[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    6617:      	vfmadd231ps	%ymm0, %ymm11, %ymm6 # ymm6 = (ymm11 * ymm0) + ymm6
+    661c:      	vcvtdq2ps	%ymm13, %ymm11
+    6621:      	vpmovsxbd	%xmm9, %ymm13
+    6626:      	vpmovsxbd	%xmm10, %ymm9
+    662b:      	vpsrldq	$0x8, %xmm10, %xmm10    # xmm10 = xmm10[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    6631:      	vfmadd231ps	%ymm0, %ymm11, %ymm5 # ymm5 = (ymm11 * ymm0) + ymm5
+    6636:      	vcvtdq2ps	%ymm13, %ymm11
+    663b:      	vcvtdq2ps	%ymm9, %ymm13
+    6640:      	vfmadd231ps	%ymm0, %ymm11, %ymm4 # ymm4 = (ymm11 * ymm0) + ymm4
+    6645:      	vfmadd231ps	%ymm0, %ymm13, %ymm3 # ymm3 = (ymm13 * ymm0) + ymm3
+    664a:      	vpmovsxbd	%xmm10, %ymm11
+    664f:      	vpmovsxbd	%xmm8, %ymm13
+    6654:      	vpsrldq	$0x8, %xmm8, %xmm8      # xmm8 = xmm8[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    665a:      	vcvtdq2ps	%ymm11, %ymm9
+    665f:      	vpmovsxbd	%xmm8, %ymm11
+    6664:      	vfmadd231ps	%ymm0, %ymm9, %ymm2 # ymm2 = (ymm9 * ymm0) + ymm2
+    6669:      	vcvtdq2ps	%ymm13, %ymm10
+    666e:      	vcvtdq2ps	%ymm11, %ymm9
+    6673:      	vfmadd231ps	%ymm0, %ymm10, %ymm1 # ymm1 = (ymm10 * ymm0) + ymm1
+    6678:      	vfmadd231ps	%ymm0, %ymm9, %ymm12 # ymm12 = (ymm9 * ymm0) + ymm12
+    667d:      	cmpq	%r12, %rdi
+    6680:      	jne	0x6408 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1358>
+    6686:      	jmp	0x5e98 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xde8>
+    668b:      	movq	-0x8240(%rbp), %r8
+    6692:      	movslq	%r14d, %rdi
+    6695:      	movabsq	$0x7375665f38746e69, %r14 # imm = 0x7375665F38746E69
+    669f:      	movq	0x18(%r8), %r11
+    66a3:      	cmpq	%r14, (%r11)
+    66a6:      	jne	0x5c66 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb6>
+    66ac:      	jmp	0x607c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xfcc>
+    66b1:      	movq	-0x8170(%rbp), %rdx
+    66b8:      	movq	-0x8240(%rbp), %rcx
+    66bf:      	movslq	%r14d, %r8
+    66c2:      	movl	-0x8234(%rbp), %r12d
+    66c9:      	imulq	%rdi, %rdx
+    66cd:      	movq	0x40(%rcx), %r10
+    66d1:      	imulq	%r8, %rdx
+    66d5:      	testl	%r12d, %r12d
+    66d8:      	jg	0x530b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x25b>
+    66de:      	cmpq	$0xe, -0x81b0(%rbp)
+    66e6:      	jne	0x5c63 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb3>
+    66ec:      	movq	-0x8240(%rbp), %r9
+    66f3:      	movabsq	$0x746e756f63706f70, %rcx # imm = 0x746E756F63706F70
+    66fd:      	movq	0x18(%r9), %r11
+    6701:      	cmpq	%rcx, (%r11)
+    6704:      	jne	0x5c63 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb3>
+    670a:      	jmp	0x631a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x126a>
+    670f:      	movq	-0x8170(%rbp), %r10
+    6716:      	movq	-0x81d0(%rbp), %r9
+    671d:      	movq	-0x8240(%rbp), %rcx
+    6724:      	movl	-0x8234(%rbp), %esi
+    672a:      	imulq	%r9, %r10
+    672e:      	movq	0x70(%rcx), %rdx
+    6732:      	movq	0xa0(%rcx), %r12
+    6739:      	movq	%r10, %rax
+    673c:      	imulq	%rdi, %rax
+    6740:      	testl	%esi, %esi
+    6742:      	jle	0x6069 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xfb9>
+    6748:      	addq	%rax, %rdx
+    674b:      	leaq	(%r12,%r10,4), %r8
+    674f:      	xorl	%eax, %eax
+    6751:      	vmovss	-0x82a4(%rbp), %xmm3
+    6759:      	vmovss	(%rip), %xmm1           # 0x6761 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x16b1>
+    6761:      	vmulss	(%r8,%rax), %xmm3, %xmm4
+    6767:      	movq	-0x8248(%rbp), %r9
+    676e:      	testl	%r14d, %r14d
+    6771:      	jle	0x6978 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x18c8>
+    6777:      	nopw	(%rax,%rax)
+    6780:      	vpmovsxbd	(%rdx), %ymm6
+    6785:      	leal	-0x1(%r14), %r11d
+    6789:      	vxorps	%xmm7, %xmm7, %xmm7
+    678d:      	movl	$0x8, %r10d
+    6793:      	shrl	$0x3, %r11d
+    6797:      	vcvtdq2ps	%ymm6, %ymm0
+    679b:      	andl	$0x7, %r11d
+    679f:      	vfmadd132ps	(%rbx), %ymm7, %ymm0 # ymm0 = (ymm0 * mem) + ymm7
+    67a4:      	cmpl	$0x8, %r14d
+    67a8:      	jle	0x692b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x187b>
+    67ae:      	testl	%r11d, %r11d
+    67b1:      	je	0x687f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x17cf>
+    67b7:      	cmpl	$0x1, %r11d
+    67bb:      	je	0x6861 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x17b1>
+    67c1:      	cmpl	$0x2, %r11d
+    67c5:      	je	0x684d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x179d>
+    67cb:      	cmpl	$0x3, %r11d
+    67cf:      	je	0x6838 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1788>
+    67d1:      	cmpl	$0x4, %r11d
+    67d5:      	je	0x6824 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1774>
+    67d7:      	cmpl	$0x5, %r11d
+    67db:      	je	0x680f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x175f>
+    67dd:      	cmpl	$0x6, %r11d
+    67e1:      	je	0x67fa <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x174a>
+    67e3:      	vpmovsxbd	0x8(%rdx), %ymm14
+    67e9:      	movl	$0x10, %r10d
+    67ef:      	vcvtdq2ps	%ymm14, %ymm13
+    67f4:      	vfmadd231ps	0x20(%rbx), %ymm13, %ymm0 # ymm0 = (ymm13 * mem) + ymm0
+    67fa:      	vpmovsxbd	(%rdx,%r10), %ymm12
+    6800:      	vcvtdq2ps	%ymm12, %ymm11
+    6805:      	vfmadd231ps	(%rbx,%r10,4), %ymm11, %ymm0 # ymm0 = (ymm11 * mem) + ymm0
+    680b:      	addq	$0x8, %r10
+    680f:      	vpmovsxbd	(%rdx,%r10), %ymm10
+    6815:      	vcvtdq2ps	%ymm10, %ymm9
+    681a:      	vfmadd231ps	(%rbx,%r10,4), %ymm9, %ymm0 # ymm0 = (ymm9 * mem) + ymm0
+    6820:      	addq	$0x8, %r10
+    6824:      	vpmovsxbd	(%rdx,%r10), %ymm5
+    682a:      	vcvtdq2ps	%ymm5, %ymm15
+    682e:      	vfmadd231ps	(%rbx,%r10,4), %ymm15, %ymm0 # ymm0 = (ymm15 * mem) + ymm0
+    6834:      	addq	$0x8, %r10
+    6838:      	vpmovsxbd	(%rdx,%r10), %ymm8
+    683e:      	vcvtdq2ps	%ymm8, %ymm2
+    6843:      	vfmadd231ps	(%rbx,%r10,4), %ymm2, %ymm0 # ymm0 = (ymm2 * mem) + ymm0
+    6849:      	addq	$0x8, %r10
+    684d:      	vpmovsxbd	(%rdx,%r10), %ymm6
+    6853:      	vcvtdq2ps	%ymm6, %ymm7
+    6857:      	vfmadd231ps	(%rbx,%r10,4), %ymm7, %ymm0 # ymm0 = (ymm7 * mem) + ymm0
+    685d:      	addq	$0x8, %r10
+    6861:      	vpmovsxbd	(%rdx,%r10), %ymm14
+    6867:      	vcvtdq2ps	%ymm14, %ymm13
+    686c:      	vfmadd231ps	(%rbx,%r10,4), %ymm13, %ymm0 # ymm0 = (ymm13 * mem) + ymm0
+    6872:      	addq	$0x8, %r10
+    6876:      	cmpl	%r10d, %r14d
+    6879:      	jle	0x692b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x187b>
+    687f:      	vpmovsxbd	(%rdx,%r10), %ymm12
+    6885:      	vpmovsxbd	0x10(%rdx,%r10), %ymm9
+    688c:      	vpmovsxbd	0x18(%rdx,%r10), %ymm15
+    6893:      	vpmovsxbd	0x20(%rdx,%r10), %ymm2
+    689a:      	vcvtdq2ps	%ymm12, %ymm11
+    689f:      	vfmadd132ps	(%rbx,%r10,4), %ymm0, %ymm11 # ymm11 = (ymm11 * mem) + ymm0
+    68a5:      	vpmovsxbd	0x8(%rdx,%r10), %ymm0
+    68ac:      	vcvtdq2ps	%ymm9, %ymm5
+    68b1:      	vpmovsxbd	0x28(%rdx,%r10), %ymm7
+    68b8:      	vcvtdq2ps	%ymm15, %ymm8
+    68bd:      	vpmovsxbd	0x30(%rdx,%r10), %ymm13
+    68c4:      	vcvtdq2ps	%ymm2, %ymm6
+    68c8:      	vcvtdq2ps	%ymm0, %ymm10
+    68cc:      	vfmadd132ps	0x20(%rbx,%r10,4), %ymm11, %ymm10 # ymm10 = (ymm10 * mem) + ymm11
+    68d3:      	vpmovsxbd	0x38(%rdx,%r10), %ymm11
+    68da:      	vfmadd132ps	0x40(%rbx,%r10,4), %ymm10, %ymm5 # ymm5 = (ymm5 * mem) + ymm10
+    68e1:      	vcvtdq2ps	%ymm7, %ymm14
+    68e5:      	vcvtdq2ps	%ymm13, %ymm12
+    68ea:      	vfmadd132ps	0x60(%rbx,%r10,4), %ymm5, %ymm8 # ymm8 = (ymm8 * mem) + ymm5
+    68f1:      	vcvtdq2ps	%ymm11, %ymm0
+    68f6:      	vfmadd132ps	0x80(%rbx,%r10,4), %ymm8, %ymm6 # ymm6 = (ymm6 * mem) + ymm8
+    6900:      	vfmadd132ps	0xa0(%rbx,%r10,4), %ymm6, %ymm14 # ymm14 = (ymm14 * mem) + ymm6
+    690a:      	vfmadd132ps	0xc0(%rbx,%r10,4), %ymm14, %ymm12 # ymm12 = (ymm12 * mem) + ymm14
+    6914:      	vfmadd132ps	0xe0(%rbx,%r10,4), %ymm12, %ymm0 # ymm0 = (ymm0 * mem) + ymm12
+    691e:      	addq	$0x40, %r10
+    6922:      	cmpl	%r10d, %r14d
+    6925:      	jg	0x687f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x17cf>
+    692b:      	vextractf128	$0x1, %ymm0, %xmm10
+    6931:      	vaddps	%xmm0, %xmm10, %xmm9
+    6935:      	vmovhlps	%xmm9, %xmm9, %xmm5     # xmm5 = xmm9[1,1]
+    693a:      	vaddps	%xmm9, %xmm5, %xmm15
+    693f:      	vshufps	$0x55, %xmm15, %xmm15, %xmm8 # xmm8 = xmm15[1,1,1,1]
+    6945:      	vaddps	%xmm15, %xmm8, %xmm2
+    694a:      	vmulss	%xmm4, %xmm2, %xmm4
+    694e:      	vmovss	%xmm4, (%r13,%rax)
+    6955:      	addq	$0x4, %rax
+    6959:      	vmaxss	%xmm4, %xmm1, %xmm1
+    695d:      	addq	%rdi, %rdx
+    6960:      	cmpq	%rax, %r9
+    6963:      	je	0x54d7 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x427>
+    6969:      	vmulss	(%r8,%rax), %xmm3, %xmm4
+    696f:      	testl	%r14d, %r14d
+    6972:      	jg	0x6780 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x16d0>
+    6978:      	vxorps	%xmm4, %xmm4, %xmm4
+    697c:      	jmp	0x694e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x189e>
+    697e:      	vxorps	%xmm2, %xmm2, %xmm2
+    6982:      	jmp	0x54bf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x40f>
+    6987:      	vbroadcastss	(%r13), %ymm9
+    698d:      	leaq	0x4(%r13), %r11
+    6991:      	vmovaps	%ymm9, %ymm2
+    6995:      	vmovaps	%ymm9, %ymm3
+    6999:      	vmovaps	%ymm9, %ymm4
+    699d:      	vfmadd132ps	0x40(%rbx), %ymm12, %ymm2 # ymm2 = (ymm2 * mem) + ymm12
+    69a3:      	vfmadd132ps	0x60(%rbx), %ymm12, %ymm3 # ymm3 = (ymm3 * mem) + ymm12
+    69a9:      	vmovaps	%ymm9, %ymm6
+    69ad:      	vmovaps	%ymm9, %ymm7
+    69b1:      	vmovaps	%ymm9, %ymm1
+    69b5:      	vmovaps	%ymm9, %ymm15
+    69ba:      	vfmadd132ps	0x80(%rbx), %ymm12, %ymm4 # ymm4 = (ymm4 * mem) + ymm12
+    69c3:      	vfmadd132ps	(%rbx), %ymm12, %ymm15 # ymm15 = (ymm15 * mem) + ymm12
+    69c8:      	vmovaps	%ymm9, %ymm14
+    69cd:      	vfmadd132ps	0xa0(%rbx), %ymm12, %ymm6 # ymm6 = (ymm6 * mem) + ymm12
+    69d6:      	vfmadd132ps	0x20(%rbx), %ymm12, %ymm14 # ymm14 = (ymm14 * mem) + ymm12
+    69dc:      	vmovaps	%ymm9, %ymm5
+    69e0:      	vfmadd132ps	0xc0(%rbx), %ymm12, %ymm7 # ymm7 = (ymm7 * mem) + ymm12
+    69e9:      	vfmadd132ps	0xe0(%rbx), %ymm12, %ymm1 # ymm1 = (ymm1 * mem) + ymm12
+    69f2:      	vfmadd132ps	0x140(%rbx), %ymm12, %ymm5 # ymm5 = (ymm5 * mem) + ymm12
+    69fb:      	vmovaps	%ymm2, -0x81f0(%rbp)
+    6a03:      	vmovaps	%ymm9, %ymm2
+    6a07:      	vmovaps	%ymm3, -0x8210(%rbp)
+    6a0f:      	vmovaps	%ymm9, %ymm3
+    6a13:      	vfmadd132ps	0x1a0(%rbx), %ymm12, %ymm2 # ymm2 = (ymm2 * mem) + ymm12
+    6a1c:      	vfmadd132ps	0x180(%rbx), %ymm12, %ymm3 # ymm3 = (ymm3 * mem) + ymm12
+    6a25:      	vmovaps	%ymm4, -0x8230(%rbp)
+    6a2d:      	vmovaps	%ymm9, %ymm4
+    6a31:      	vmovaps	%ymm6, -0x8190(%rbp)
+    6a39:      	vmovaps	%ymm9, %ymm6
+    6a3d:      	vfmadd132ps	0x160(%rbx), %ymm12, %ymm4 # ymm4 = (ymm4 * mem) + ymm12
+    6a46:      	vfmadd132ps	0x120(%rbx), %ymm12, %ymm6 # ymm6 = (ymm6 * mem) + ymm12
+    6a4f:      	vmovaps	%ymm7, -0x81b0(%rbp)
+    6a57:      	vmovaps	%ymm9, %ymm7
+    6a5b:      	vmovaps	%ymm1, -0x81d0(%rbp)
+    6a63:      	vmovaps	%ymm9, %ymm1
+    6a67:      	vfmadd132ps	0x100(%rbx), %ymm12, %ymm7 # ymm7 = (ymm7 * mem) + ymm12
+    6a70:      	vfmadd132ps	0x1c0(%rbx), %ymm12, %ymm1 # ymm1 = (ymm1 * mem) + ymm12
+    6a79:      	vfmadd231ps	0x1e0(%rbx), %ymm9, %ymm12 # ymm12 = (ymm9 * mem) + ymm12
+    6a82:      	addq	%r10, %rbx
+    6a85:      	cmpq	%r12, %r11
+    6a88:      	je	0x5e98 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xde8>
+    6a8e:      	vmovaps	-0x81b0(%rbp), %ymm13
+    6a96:      	vmovaps	-0x81f0(%rbp), %ymm11
+    6a9e:      	vmovaps	-0x8210(%rbp), %ymm10
+    6aa6:      	vmovaps	-0x8230(%rbp), %ymm9
+    6aae:      	jmp	0x5d10 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xc60>
+    6ab3:      	xorl	%ecx, %ecx
+    6ab5:      	cmpw	$0x6465, 0x8(%r11)      # imm = 0x6465
+    6abc:      	jne	0x6027 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xf77>
+    6ac2:      	jmp	0x602c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xf7c>
+    6ac7:      	vmovss	(%rip), %xmm1           # 0x6acf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1a1f>
+    6acf:      	vdivss	%xmm12, %xmm1, %xmm10
+    6ad4:      	jmp	0x5a53 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x9a3>
+    6ad9:      	movl	-0x8234(%rbp), %r12d
+    6ae0:      	xorl	%r10d, %r10d
+    6ae3:      	xorl	%eax, %eax
+    6ae5:      	jmp	0x5bb1 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xb01>
+    6aea:      	vxorps	%xmm3, %xmm3, %xmm3
+    6aee:      	xorl	%esi, %esi
+    6af0:      	vxorps	%xmm12, %xmm12, %xmm12
+    6af5:      	xorl	%ebx, %ebx
+    6af7:      	vmovaps	%xmm3, -0x81f0(%rbp)
+    6aff:      	jmp	0x58e1 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x831>
+    6b04:      	cmpb	$0x64, 0x8(%r9)
+    6b09:      	jne	0x5c63 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xbb3>
+    6b0f:      	movq	-0x8170(%rbp), %r9
+    6b16:      	movq	-0x81d0(%rbp), %rcx
+    6b1d:      	leal	0x3(%r14), %r10d
+    6b21:      	movq	-0x8240(%rbp), %rsi
+    6b28:      	movl	-0x8234(%rbp), %ebx
+    6b2e:      	imulq	%rcx, %r9
+    6b32:      	testl	%r14d, %r14d
+    6b35:      	cmovnsl	%r14d, %r10d
+    6b39:      	movq	0x118(%rsi), %r11
+    6b40:      	sarl	$0x2, %r10d
+    6b44:      	leaq	(%r11,%r9,4), %r8
+    6b48:      	movslq	%r10d, %r14
+    6b4b:      	imulq	%r9, %r14
+    6b4f:      	addq	0xe8(%rsi), %r14
+    6b56:      	testl	%ebx, %ebx
+    6b58:      	jg	0x637f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x12cf>
+    6b5e:      	vxorps	%xmm12, %xmm12, %xmm12
+    6b63:      	vmovaps	%ymm12, %ymm1
+    6b67:      	vmovaps	%ymm12, %ymm2
+    6b6b:      	vmovaps	%ymm12, %ymm3
+    6b6f:      	vmovaps	%ymm12, -0x81d0(%rbp)
+    6b77:      	vmovaps	%ymm12, %ymm4
+    6b7b:      	vmovaps	%ymm12, %ymm5
+    6b7f:      	vmovaps	%ymm12, %ymm6
+    6b83:      	vmovaps	%ymm12, -0x81b0(%rbp)
+    6b8b:      	vmovaps	%ymm12, %ymm7
+    6b8f:      	vmovaps	%ymm12, %ymm15
+    6b94:      	vmovaps	%ymm12, -0x8190(%rbp)
+    6b9c:      	vmovaps	%ymm12, %ymm14
+    6ba1:      	vmovaps	%ymm12, -0x8230(%rbp)
+    6ba9:      	vmovaps	%ymm12, -0x8210(%rbp)
+    6bb1:      	vmovaps	%ymm12, -0x81f0(%rbp)
+    6bb9:      	jmp	0x5e98 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xde8>
+    6bbe:      	cmpb	$0x64, 0x8(%r9)
+    6bc3:      	jne	0x52d9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x229>
+    6bc9:      	xorl	%r12d, %r12d
+    6bcc:      	testl	%r14d, %r14d
+    6bcf:      	jle	0x8353 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x32a3>
+    6bd5:      	leal	-0x1(%r14), %r10d
+    6bd9:      	cmpl	$0x6, %r10d
+    6bdd:      	jbe	0x835f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x32af>
+    6be3:      	movl	%r14d, %edi
+    6be6:      	movq	%rbx, %rax
+    6be9:      	vxorps	%xmm4, %xmm4, %xmm4
+    6bed:      	vbroadcastss	(%rip), %ymm7   # 0x6bf6 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1b46>
+    6bf6:      	shrl	$0x3, %edi
+    6bf9:      	shlq	$0x5, %rdi
+    6bfd:      	leaq	(%rdi,%rbx), %rcx
+    6c01:      	subq	$0x20, %rdi
+    6c05:      	shrq	$0x5, %rdi
+    6c09:      	addq	$0x1, %rdi
+    6c0d:      	andl	$0x7, %edi
+    6c10:      	je	0x6c8a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1bda>
+    6c12:      	cmpq	$0x1, %rdi
+    6c16:      	je	0x6c79 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1bc9>
+    6c18:      	cmpq	$0x2, %rdi
+    6c1c:      	je	0x6c6c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1bbc>
+    6c1e:      	cmpq	$0x3, %rdi
+    6c22:      	je	0x6c60 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1bb0>
+    6c24:      	cmpq	$0x4, %rdi
+    6c28:      	je	0x6c53 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1ba3>
+    6c2a:      	cmpq	$0x5, %rdi
+    6c2e:      	je	0x6c46 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1b96>
+    6c30:      	cmpq	$0x6, %rdi
+    6c34:      	jne	0x8335 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3285>
+    6c3a:      	vandps	(%rax), %ymm7, %ymm3
+    6c3e:      	addq	$0x20, %rax
+    6c42:      	vmaxps	%ymm3, %ymm4, %ymm4
+    6c46:      	vandps	(%rax), %ymm7, %ymm10
+    6c4a:      	addq	$0x20, %rax
+    6c4e:      	vmaxps	%ymm10, %ymm4, %ymm4
+    6c53:      	vandps	(%rax), %ymm7, %ymm11
+    6c57:      	addq	$0x20, %rax
+    6c5b:      	vmaxps	%ymm11, %ymm4, %ymm4
+    6c60:      	vandps	(%rax), %ymm7, %ymm1
+    6c64:      	addq	$0x20, %rax
+    6c68:      	vmaxps	%ymm1, %ymm4, %ymm4
+    6c6c:      	vandps	(%rax), %ymm7, %ymm12
+    6c70:      	addq	$0x20, %rax
+    6c74:      	vmaxps	%ymm12, %ymm4, %ymm4
+    6c79:      	vandps	(%rax), %ymm7, %ymm6
+    6c7d:      	addq	$0x20, %rax
+    6c81:      	vmaxps	%ymm6, %ymm4, %ymm4
+    6c85:      	cmpq	%rcx, %rax
+    6c88:      	je	0x6ce7 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1c37>
+    6c8a:      	vandps	(%rax), %ymm7, %ymm13
+    6c8e:      	vandps	0x20(%rax), %ymm7, %ymm14
+    6c93:      	addq	$0x100, %rax            # imm = 0x100
+    6c99:      	vandps	-0xc0(%rax), %ymm7, %ymm0
+    6ca1:      	vandps	-0xa0(%rax), %ymm7, %ymm8
+    6ca9:      	vmaxps	%ymm13, %ymm4, %ymm2
+    6cae:      	vandps	-0x80(%rax), %ymm7, %ymm3
+    6cb3:      	vandps	-0x60(%rax), %ymm7, %ymm11
+    6cb8:      	vandps	-0x40(%rax), %ymm7, %ymm12
+    6cbd:      	vandps	-0x20(%rax), %ymm7, %ymm4
+    6cc2:      	vmaxps	%ymm14, %ymm2, %ymm15
+    6cc7:      	vmaxps	%ymm0, %ymm15, %ymm9
+    6ccb:      	vmaxps	%ymm8, %ymm9, %ymm5
+    6cd0:      	vmaxps	%ymm3, %ymm5, %ymm10
+    6cd4:      	vmaxps	%ymm11, %ymm10, %ymm1
+    6cd9:      	vmaxps	%ymm12, %ymm1, %ymm6
+    6cde:      	vmaxps	%ymm4, %ymm6, %ymm4
+    6ce2:      	cmpq	%rcx, %rax
+    6ce5:      	jne	0x6c8a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1bda>
+    6ce7:      	vextractf128	$0x1, %ymm4, %xmm7
+    6ced:      	movl	%r14d, %r11d
+    6cf0:      	vmaxps	%xmm4, %xmm7, %xmm13
+    6cf4:      	andl	$-0x8, %r11d
+    6cf8:      	vmaxps	%xmm4, %xmm7, %xmm8
+    6cfc:      	movl	%r11d, %r8d
+    6cff:      	vmovhlps	%xmm13, %xmm13, %xmm2   # xmm2 = xmm13[1,1]
+    6d04:      	vmaxps	%xmm13, %xmm2, %xmm14
+    6d09:      	vshufps	$0x55, %xmm14, %xmm14, %xmm15 # xmm15 = xmm14[1,1,1,1]
+    6d0f:      	vmaxps	%xmm14, %xmm15, %xmm14
+    6d14:      	cmpl	%r14d, %r11d
+    6d17:      	je	0x6dc3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d13>
+    6d1d:      	movl	%r14d, %edx
+    6d20:      	subl	%r8d, %edx
+    6d23:      	leal	-0x1(%rdx), %esi
+    6d26:      	cmpl	$0x2, %esi
+    6d29:      	jbe	0x6d72 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1cc2>
+    6d2b:      	movq	-0x8250(%rbp), %rdi
+    6d32:      	movq	-0x8258(%rbp), %rcx
+    6d39:      	vbroadcastss	(%rip), %xmm0   # 0x6d42 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1c92>
+    6d42:      	addq	%rdi, %r8
+    6d45:      	vandps	(%rcx,%r8,4), %xmm0, %xmm9
+    6d4b:      	movl	%edx, %r8d
+    6d4e:      	andl	$-0x4, %r8d
+    6d52:      	vmaxps	%xmm8, %xmm9, %xmm8
+    6d57:      	addl	%r8d, %r11d
+    6d5a:      	andl	$0x3, %edx
+    6d5d:      	vmovhlps	%xmm8, %xmm8, %xmm5     # xmm5 = xmm8[1,1]
+    6d62:      	vmaxps	%xmm8, %xmm5, %xmm3
+    6d67:      	vshufps	$0x55, %xmm3, %xmm3, %xmm10 # xmm10 = xmm3[1,1,1,1]
+    6d6c:      	vmaxps	%xmm3, %xmm10, %xmm14
+    6d70:      	je	0x6dc3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d13>
+    6d72:      	movslq	%r11d, %rax
+    6d75:      	vmovss	(%rip), %xmm12          # 0x6d7d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1ccd>
+    6d7d:      	leal	0x1(%r11), %esi
+    6d81:      	vmovss	(%rbx,%rax,4), %xmm11
+    6d86:      	leaq	(,%rax,4), %rdx
+    6d8e:      	vandps	%xmm12, %xmm11, %xmm1
+    6d93:      	vmaxss	%xmm1, %xmm14, %xmm14
+    6d97:      	cmpl	%r14d, %esi
+    6d9a:      	jge	0x6dc3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d13>
+    6d9c:      	vmovss	0x4(%rbx,%rdx), %xmm6
+    6da2:      	addl	$0x2, %r11d
+    6da6:      	vandps	%xmm12, %xmm6, %xmm7
+    6dab:      	vmaxss	%xmm7, %xmm14, %xmm14
+    6daf:      	cmpl	%r14d, %r11d
+    6db2:      	jge	0x6dc3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d13>
+    6db4:      	vmovss	0x8(%rbx,%rdx), %xmm13
+    6dba:      	vandps	%xmm12, %xmm13, %xmm2
+    6dbf:      	vmaxss	%xmm2, %xmm14, %xmm14
+    6dc3:      	vxorps	%xmm15, %xmm15, %xmm15
+    6dc8:      	vcomiss	%xmm15, %xmm14
+    6dcd:      	jbe	0x760b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x255b>
+    6dd3:      	vmulss	(%rip), %xmm14, %xmm0   # 0x6ddb <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d2b>
+    6ddb:      	vmovss	(%rip), %xmm4           # 0x6de3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d33>
+    6de3:      	vmulss	-0x82a4(%rbp), %xmm0, %xmm8
+    6deb:      	vdivss	%xmm14, %xmm4, %xmm9
+    6df0:      	vmovd	%xmm8, %r11d
+    6df5:      	cmpl	$0xe, %r10d
+    6df9:      	jbe	0x7624 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2574>
+    6dff:      	vbroadcastss	%xmm9, %ymm10
+    6e04:      	movl	$0xffff, %edi           # imm = 0xFFFF
+    6e09:      	movl	%r14d, %r12d
+    6e0c:      	vbroadcastss	(%rip), %ymm12  # 0x6e15 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d65>
+    6e15:      	vmulps	0x20(%rbx), %ymm10, %ymm5
+    6e1a:      	shrl	$0x4, %r12d
+    6e1e:      	vbroadcastss	(%rip), %ymm3   # 0x6e27 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d77>
+    6e27:      	vmulps	(%rbx), %ymm10, %ymm11
+    6e2b:      	vandps	%ymm5, %ymm12, %ymm2
+    6e2f:      	vandps	%ymm11, %ymm12, %ymm1
+    6e34:      	vorps	%ymm2, %ymm3, %ymm14
+    6e38:      	vorps	%ymm1, %ymm3, %ymm6
+    6e3c:      	vaddps	%ymm14, %ymm5, %ymm15
+    6e41:      	vmovd	%edi, %xmm5
+    6e45:      	vaddps	%ymm6, %ymm11, %ymm7
+    6e49:      	vpbroadcastd	%xmm5, %ymm11
+    6e4e:      	vroundps	$0x3, %ymm15, %ymm4
+    6e54:      	vcvttps2dq	%ymm4, %ymm8
+    6e58:      	vpand	%ymm8, %ymm11, %ymm6
+    6e5d:      	vroundps	$0x3, %ymm7, %ymm13
+    6e63:      	vcvttps2dq	%ymm13, %ymm0
+    6e68:      	vpand	%ymm0, %ymm11, %ymm1
+    6e6c:      	vpackusdw	%ymm6, %ymm1, %ymm7
+    6e71:      	vpermq	$0xd8, %ymm7, %ymm13    # ymm13 = ymm7[0,2,1,3]
+    6e77:      	vmovdqa	%ymm13, -0x8150(%rbp)
+    6e7f:      	cmpl	$0x1, %r12d
+    6e83:      	je	0x713a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x208a>
+    6e89:      	vmulps	0x60(%rbx), %ymm10, %ymm2
+    6e8e:      	vmulps	0x40(%rbx), %ymm10, %ymm14
+    6e93:      	vandps	%ymm2, %ymm12, %ymm5
+    6e97:      	vandps	%ymm14, %ymm12, %ymm15
+    6e9c:      	vorps	%ymm5, %ymm3, %ymm1
+    6ea0:      	vorps	%ymm15, %ymm3, %ymm4
+    6ea5:      	vaddps	%ymm1, %ymm2, %ymm6
+    6ea9:      	vaddps	%ymm4, %ymm14, %ymm0
+    6ead:      	vroundps	$0x3, %ymm6, %ymm7
+    6eb3:      	vcvttps2dq	%ymm7, %ymm2
+    6eb7:      	vpand	%ymm2, %ymm11, %ymm15
+    6ebb:      	vroundps	$0x3, %ymm0, %ymm8
+    6ec1:      	vcvttps2dq	%ymm8, %ymm13
+    6ec6:      	vpand	%ymm13, %ymm11, %ymm14
+    6ecb:      	vpackusdw	%ymm15, %ymm14, %ymm4
+    6ed0:      	vpermq	$0xd8, %ymm4, %ymm0     # ymm0 = ymm4[0,2,1,3]
+    6ed6:      	vmovdqa	%ymm0, -0x8130(%rbp)
+    6ede:      	cmpl	$0x2, %r12d
+    6ee2:      	je	0x713a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x208a>
+    6ee8:      	vmulps	0xa0(%rbx), %ymm10, %ymm8
+    6ef0:      	vmulps	0x80(%rbx), %ymm10, %ymm5
+    6ef8:      	vandps	%ymm8, %ymm12, %ymm2
+    6efd:      	vandps	%ymm5, %ymm12, %ymm1
+    6f01:      	vorps	%ymm2, %ymm3, %ymm14
+    6f05:      	vorps	%ymm1, %ymm3, %ymm6
+    6f09:      	vaddps	%ymm14, %ymm8, %ymm15
+    6f0e:      	vaddps	%ymm6, %ymm5, %ymm7
+    6f12:      	vroundps	$0x3, %ymm15, %ymm4
+    6f18:      	vcvttps2dq	%ymm4, %ymm8
+    6f1c:      	vpand	%ymm8, %ymm11, %ymm1
+    6f21:      	vroundps	$0x3, %ymm7, %ymm13
+    6f27:      	vcvttps2dq	%ymm13, %ymm0
+    6f2c:      	vpand	%ymm0, %ymm11, %ymm5
+    6f30:      	vpackusdw	%ymm1, %ymm5, %ymm6
+    6f35:      	vpermq	$0xd8, %ymm6, %ymm7     # ymm7 = ymm6[0,2,1,3]
+    6f3b:      	vmovdqa	%ymm7, -0x8110(%rbp)
+    6f43:      	cmpl	$0x3, %r12d
+    6f47:      	je	0x713a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x208a>
+    6f4d:      	vmulps	0xe0(%rbx), %ymm10, %ymm13
+    6f55:      	vmulps	0xc0(%rbx), %ymm10, %ymm2
+    6f5d:      	vandps	%ymm13, %ymm12, %ymm8
+    6f62:      	vandps	%ymm2, %ymm12, %ymm14
+    6f66:      	vorps	%ymm8, %ymm3, %ymm5
+    6f6b:      	vorps	%ymm14, %ymm3, %ymm15
+    6f70:      	vaddps	%ymm5, %ymm13, %ymm1
+    6f74:      	vaddps	%ymm15, %ymm2, %ymm4
+    6f79:      	vroundps	$0x3, %ymm1, %ymm6
+    6f7f:      	vcvttps2dq	%ymm6, %ymm13
+    6f83:      	vpand	%ymm13, %ymm11, %ymm14
+    6f88:      	vroundps	$0x3, %ymm4, %ymm0
+    6f8e:      	vcvttps2dq	%ymm0, %ymm7
+    6f92:      	vpand	%ymm7, %ymm11, %ymm2
+    6f96:      	vpackusdw	%ymm14, %ymm2, %ymm15
+    6f9b:      	vpermq	$0xd8, %ymm15, %ymm4    # ymm4 = ymm15[0,2,1,3]
+    6fa1:      	vmovdqa	%ymm4, -0x80f0(%rbp)
+    6fa9:      	cmpl	$0x4, %r12d
+    6fad:      	je	0x713a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x208a>
+    6fb3:      	vmulps	0x120(%rbx), %ymm10, %ymm8
+    6fbb:      	vmulps	0x100(%rbx), %ymm10, %ymm0
+    6fc3:      	vandps	%ymm8, %ymm12, %ymm7
+    6fc8:      	vandps	%ymm0, %ymm12, %ymm5
+    6fcc:      	vorps	%ymm7, %ymm3, %ymm2
+    6fd0:      	vorps	%ymm5, %ymm3, %ymm1
+    6fd4:      	vaddps	%ymm2, %ymm8, %ymm14
+    6fd8:      	vaddps	%ymm1, %ymm0, %ymm6
+    6fdc:      	vroundps	$0x3, %ymm14, %ymm15
+    6fe2:      	vcvttps2dq	%ymm15, %ymm8
+    6fe7:      	vpand	%ymm8, %ymm11, %ymm5
+    6fec:      	vroundps	$0x3, %ymm6, %ymm13
+    6ff2:      	vcvttps2dq	%ymm13, %ymm4
+    6ff7:      	vpand	%ymm4, %ymm11, %ymm0
+    6ffb:      	vpackusdw	%ymm5, %ymm0, %ymm1
+    7000:      	vpermq	$0xd8, %ymm1, %ymm6     # ymm6 = ymm1[0,2,1,3]
+    7006:      	vmovdqa	%ymm6, -0x80d0(%rbp)
+    700e:      	cmpl	$0x5, %r12d
+    7012:      	je	0x713a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x208a>
+    7018:      	vmulps	0x160(%rbx), %ymm10, %ymm13
+    7020:      	vmulps	0x140(%rbx), %ymm10, %ymm2
+    7028:      	vandps	%ymm13, %ymm12, %ymm8
+    702d:      	vandps	%ymm2, %ymm12, %ymm7
+    7031:      	vorps	%ymm8, %ymm3, %ymm0
+    7036:      	vorps	%ymm7, %ymm3, %ymm14
+    703a:      	vaddps	%ymm0, %ymm13, %ymm5
+    703e:      	vaddps	%ymm14, %ymm2, %ymm15
+    7043:      	vroundps	$0x3, %ymm5, %ymm1
+    7049:      	vcvttps2dq	%ymm1, %ymm6
+    704d:      	vpand	%ymm6, %ymm11, %ymm7
+    7051:      	vroundps	$0x3, %ymm15, %ymm4
+    7057:      	vcvttps2dq	%ymm4, %ymm13
+    705b:      	vpand	%ymm13, %ymm11, %ymm2
+    7060:      	vpackusdw	%ymm7, %ymm2, %ymm14
+    7065:      	vpermq	$0xd8, %ymm14, %ymm15   # ymm15 = ymm14[0,2,1,3]
+    706b:      	vmovdqa	%ymm15, -0x80b0(%rbp)
+    7073:      	cmpl	$0x6, %r12d
+    7077:      	je	0x713a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x208a>
+    707d:      	vmulps	0x1a0(%rbx), %ymm10, %ymm4
+    7085:      	vmulps	0x180(%rbx), %ymm10, %ymm8
+    708d:      	vandps	%ymm4, %ymm12, %ymm6
+    7091:      	vandps	%ymm8, %ymm12, %ymm0
+    7096:      	vorps	%ymm6, %ymm3, %ymm2
+    709a:      	vorps	%ymm0, %ymm3, %ymm5
+    709e:      	vaddps	%ymm2, %ymm4, %ymm7
+    70a2:      	vaddps	%ymm5, %ymm8, %ymm1
+    70a6:      	vroundps	$0x3, %ymm7, %ymm14
+    70ac:      	vcvttps2dq	%ymm14, %ymm4
+    70b1:      	vpand	%ymm4, %ymm11, %ymm0
+    70b5:      	vroundps	$0x3, %ymm1, %ymm13
+    70bb:      	vcvttps2dq	%ymm13, %ymm15
+    70c0:      	vpand	%ymm15, %ymm11, %ymm8
+    70c5:      	vpackusdw	%ymm0, %ymm8, %ymm5
+    70ca:      	vpermq	$0xd8, %ymm5, %ymm1     # ymm1 = ymm5[0,2,1,3]
+    70d0:      	vmovdqa	%ymm1, -0x8090(%rbp)
+    70d8:      	cmpl	$0x7, %r12d
+    70dc:      	je	0x713a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x208a>
+    70de:      	vmulps	0x1e0(%rbx), %ymm10, %ymm13
+    70e6:      	vmulps	0x1c0(%rbx), %ymm10, %ymm10
+    70ee:      	vandps	%ymm10, %ymm12, %ymm6
+    70f3:      	vandps	%ymm13, %ymm12, %ymm12
+    70f8:      	vorps	%ymm6, %ymm3, %ymm2
+    70fc:      	vorps	%ymm12, %ymm3, %ymm3
+    7101:      	vaddps	%ymm3, %ymm13, %ymm15
+    7105:      	vaddps	%ymm2, %ymm10, %ymm7
+    7109:      	vroundps	$0x3, %ymm15, %ymm4
+    710f:      	vroundps	$0x3, %ymm7, %ymm14
+    7115:      	vcvttps2dq	%ymm4, %ymm5
+    7119:      	vcvttps2dq	%ymm14, %ymm8
+    711e:      	vpand	%ymm8, %ymm11, %ymm0
+    7123:      	vpand	%ymm5, %ymm11, %ymm11
+    7127:      	vpackusdw	%ymm11, %ymm0, %ymm1
+    712c:      	vpermq	$0xd8, %ymm1, %ymm13    # ymm13 = ymm1[0,2,1,3]
+    7132:      	vmovdqa	%ymm13, -0x8070(%rbp)
+    713a:      	movl	%r14d, %r12d
+    713d:      	andl	$-0x10, %r12d
+    7141:      	movl	%r12d, %r10d
+    7144:      	cmpl	%r12d, %r14d
+    7147:      	je	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    714d:      	movl	%r14d, %r8d
+    7150:      	subl	%r10d, %r8d
+    7153:      	leal	-0x1(%r8), %ecx
+    7157:      	cmpl	$0x6, %ecx
+    715a:      	jbe	0x7201 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2151>
+    7160:      	movq	-0x8250(%rbp), %rax
+    7167:      	movq	-0x8258(%rbp), %rsi
+    716e:      	vshufps	$0x0, %xmm9, %xmm9, %xmm10 # xmm10 = xmm9[0,0,0,0]
+    7174:      	movl	$0xffff, %ecx           # imm = 0xFFFF
+    7179:      	vbroadcastss	(%rip), %xmm14  # 0x7182 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x20d2>
+    7182:      	vbroadcastss	(%rip), %xmm7   # 0x718b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x20db>
+    718b:      	leaq	(%rax,%r10), %rdx
+    718f:      	leaq	(%rsi,%rdx,4), %rdi
+    7193:      	vmulps	0x10(%rdi), %xmm10, %xmm6
+    7198:      	vmulps	(%rdi), %xmm10, %xmm2
+    719c:      	vmovd	%ecx, %xmm10
+    71a0:      	vandps	%xmm6, %xmm14, %xmm4
+    71a4:      	vandps	%xmm2, %xmm14, %xmm12
+    71a8:      	vorps	%xmm4, %xmm7, %xmm5
+    71ac:      	vorps	%xmm12, %xmm7, %xmm3
+    71b1:      	vaddps	%xmm5, %xmm6, %xmm0
+    71b5:      	vpshufd	$0x0, %xmm10, %xmm6     # xmm6 = xmm10[0,0,0,0]
+    71bb:      	vaddps	%xmm3, %xmm2, %xmm15
+    71bf:      	vroundps	$0x3, %xmm0, %xmm11
+    71c5:      	vcvttps2dq	%xmm11, %xmm1
+    71ca:      	vpand	%xmm1, %xmm6, %xmm7
+    71ce:      	vroundps	$0x3, %xmm15, %xmm8
+    71d4:      	vcvttps2dq	%xmm8, %xmm13
+    71d9:      	vpand	%xmm13, %xmm6, %xmm2
+    71de:      	vpackusdw	%xmm7, %xmm2, %xmm14
+    71e3:      	vmovdqa	%xmm14, -0x8150(%rbp,%r10,2)
+    71ed:      	movl	%r8d, %r10d
+    71f0:      	andl	$-0x8, %r10d
+    71f4:      	addl	%r10d, %r12d
+    71f7:      	andl	$0x7, %r8d
+    71fb:      	je	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    7201:      	movslq	%r12d, %r8
+    7204:      	vmovss	(%rip), %xmm15          # 0x720c <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x215c>
+    720c:      	vmovss	(%rip), %xmm8           # 0x7214 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2164>
+    7214:      	vmulss	(%rbx,%r8,4), %xmm9, %xmm12
+    721a:      	leaq	(,%r8,4), %rsi
+    7222:      	vandps	%xmm12, %xmm15, %xmm3
+    7227:      	vorps	%xmm3, %xmm8, %xmm4
+    722b:      	vaddss	%xmm4, %xmm12, %xmm5
+    722f:      	vroundss	$0x3, %xmm5, %xmm5, %xmm5
+    7235:      	vcvttss2si	%xmm5, %eax
+    7239:      	movw	%ax, -0x8150(%rbp,%r8,2)
+    7242:      	leal	0x1(%r12), %eax
+    7247:      	cmpl	%r14d, %eax
+    724a:      	jge	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    7250:      	vmulss	0x4(%rbx,%rsi), %xmm9, %xmm11
+    7256:      	cltq
+    7258:      	vandps	%xmm11, %xmm15, %xmm0
+    725d:      	vorps	%xmm0, %xmm8, %xmm13
+    7261:      	vaddss	%xmm13, %xmm11, %xmm1
+    7266:      	vroundss	$0x3, %xmm1, %xmm1, %xmm1
+    726c:      	vcvttss2si	%xmm1, %edx
+    7270:      	movw	%dx, -0x8150(%rbp,%rax,2)
+    7278:      	leal	0x2(%r12), %eax
+    727d:      	cmpl	%r14d, %eax
+    7280:      	jge	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    7286:      	vmulss	0x8(%rbx,%rsi), %xmm9, %xmm10
+    728c:      	cltq
+    728e:      	vandps	%xmm10, %xmm15, %xmm6
+    7293:      	vorps	%xmm6, %xmm8, %xmm2
+    7297:      	vaddss	%xmm2, %xmm10, %xmm7
+    729b:      	vroundss	$0x3, %xmm7, %xmm7, %xmm7
+    72a1:      	vcvttss2si	%xmm7, %edi
+    72a5:      	movw	%di, -0x8150(%rbp,%rax,2)
+    72ad:      	leal	0x3(%r12), %eax
+    72b2:      	cmpl	%r14d, %eax
+    72b5:      	jge	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    72bb:      	vmulss	0xc(%rbx,%rsi), %xmm9, %xmm14
+    72c1:      	cltq
+    72c3:      	vandps	%xmm14, %xmm15, %xmm12
+    72c8:      	vorps	%xmm12, %xmm8, %xmm3
+    72cd:      	vaddss	%xmm3, %xmm14, %xmm4
+    72d1:      	vroundss	$0x3, %xmm4, %xmm4, %xmm4
+    72d7:      	vcvttss2si	%xmm4, %ecx
+    72db:      	movw	%cx, -0x8150(%rbp,%rax,2)
+    72e3:      	leal	0x4(%r12), %eax
+    72e8:      	cmpl	%eax, %r14d
+    72eb:      	jle	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    72f1:      	vmulss	0x10(%rbx,%rsi), %xmm9, %xmm5
+    72f7:      	cltq
+    72f9:      	vandps	%xmm5, %xmm15, %xmm11
+    72fd:      	vorps	%xmm11, %xmm8, %xmm0
+    7302:      	vaddss	%xmm0, %xmm5, %xmm13
+    7306:      	vroundss	$0x3, %xmm13, %xmm13, %xmm13
+    730c:      	vcvttss2si	%xmm13, %r10d
+    7311:      	movw	%r10w, -0x8150(%rbp,%rax,2)
+    731a:      	leal	0x5(%r12), %eax
+    731f:      	cmpl	%r14d, %eax
+    7322:      	jge	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    7324:      	vmulss	0x14(%rbx,%rsi), %xmm9, %xmm1
+    732a:      	cltq
+    732c:      	vandps	%xmm1, %xmm15, %xmm10
+    7330:      	vorps	%xmm10, %xmm8, %xmm6
+    7335:      	vaddss	%xmm6, %xmm1, %xmm2
+    7339:      	vroundss	$0x3, %xmm2, %xmm2, %xmm2
+    733f:      	vcvttss2si	%xmm2, %r8d
+    7343:      	movw	%r8w, -0x8150(%rbp,%rax,2)
+    734c:      	leal	0x6(%r12), %eax
+    7351:      	cmpl	%r14d, %eax
+    7354:      	jge	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    7356:      	vmulss	0x18(%rbx,%rsi), %xmm9, %xmm9
+    735c:      	cltq
+    735e:      	vandps	%xmm9, %xmm15, %xmm15
+    7363:      	vorps	%xmm15, %xmm8, %xmm8
+    7368:      	vaddss	%xmm8, %xmm9, %xmm7
+    736d:      	vroundss	$0x3, %xmm7, %xmm7, %xmm7
+    7373:      	vcvttss2si	%xmm7, %ebx
+    7377:      	movw	%bx, -0x8150(%rbp,%rax,2)
+    737f:      	movq	-0x8170(%rbp), %r12
+    7386:      	movq	-0x81d0(%rbp), %rsi
+    738d:      	leal	0x3(%r14), %edx
+    7391:      	movq	-0x8240(%rbp), %r10
+    7398:      	movl	-0x8234(%rbp), %ebx
+    739e:      	imulq	%rsi, %r12
+    73a2:      	testl	%r14d, %r14d
+    73a5:      	cmovnsl	%r14d, %edx
+    73a9:      	movq	0xd0(%r10), %rcx
+    73b0:      	movq	0x100(%r10), %rax
+    73b7:      	sarl	$0x2, %edx
+    73ba:      	movq	%r12, %rdi
+    73bd:      	movslq	%edx, %r8
+    73c0:      	imulq	%r8, %rdi
+    73c4:      	testl	%ebx, %ebx
+    73c6:      	jle	0x5c50 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0xba0>
+    73cc:      	vmovdqa	-0x8090(%rbp), %ymm11
+    73d4:      	vmovdqa	-0x80f0(%rbp), %ymm3
+    73dc:      	movabsq	$0xf0f0f0f0f0f0f0f, %r9 # imm = 0xF0F0F0F0F0F0F0F
+    73e6:      	addq	%rdi, %rcx
+    73e9:      	vmovdqa	-0x80d0(%rbp), %ymm4
+    73f1:      	vmovq	%r9, %xmm6
+    73f6:      	leaq	(%rax,%r12,4), %r12
+    73fa:      	xorl	%esi, %esi
+    73fc:      	vmovdqa	-0x80b0(%rbp), %ymm5
+    7404:      	vmovdqa	-0x8070(%rbp), %ymm0
+    740c:      	vmovdqa	%ymm11, -0x8230(%rbp)
+    7414:      	vpunpcklqdq	%xmm6, %xmm6, %xmm9 # xmm9 = xmm6[0,0]
+    7418:      	vmovdqa	-0x8150(%rbp), %ymm14
+    7420:      	vmovdqa	-0x8130(%rbp), %ymm13
+    7428:      	vmovdqa	%ymm3, -0x8190(%rbp)
+    7430:      	vmovdqa	-0x8110(%rbp), %ymm12
+    7438:      	vmovss	(%rip), %xmm1           # 0x7440 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2390>
+    7440:      	vmovdqa	%ymm4, -0x81f0(%rbp)
+    7448:      	vmovdqa	(%rip), %xmm11          # 0x7450 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x23a0>
+    7450:      	vmovdqa	(%rip), %xmm10          # 0x7458 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x23a8>
+    7458:      	vmovdqa	%ymm5, -0x8210(%rbp)
+    7460:      	movq	-0x8248(%rbp), %rdx
+    7467:      	vmovdqa	%ymm0, -0x8290(%rbp)
+    746f:      	nop
+    7470:      	vmovdqu	(%rcx), %xmm2
+    7474:      	vpand	(%rcx), %xmm9, %xmm8
+    7478:      	vpsrlw	$0x4, %xmm2, %xmm15
+    747d:      	vpshufb	%xmm8, %xmm11, %xmm7
+    7482:      	vpshufb	%xmm8, %xmm10, %xmm3
+    7487:      	vpand	%xmm9, %xmm15, %xmm4
+    748c:      	vpunpckhbw	%xmm3, %xmm7, %xmm2 # xmm2 = xmm7[8],xmm3[8],xmm7[9],xmm3[9],xmm7[10],xmm3[10],xmm7[11],xmm3[11],xmm7[12],xmm3[12],xmm7[13],xmm3[13],xmm7[14],xmm3[14],xmm7[15],xmm3[15]
+    7490:      	vpunpcklbw	%xmm3, %xmm7, %xmm5 # xmm5 = xmm7[0],xmm3[0],xmm7[1],xmm3[1],xmm7[2],xmm3[2],xmm7[3],xmm3[3],xmm7[4],xmm3[4],xmm7[5],xmm3[5],xmm7[6],xmm3[6],xmm7[7],xmm3[7]
+    7494:      	vpshufb	%xmm4, %xmm11, %xmm0
+    7499:      	vpshufb	%xmm4, %xmm10, %xmm6
+    749e:      	vpunpckhbw	%xmm6, %xmm0, %xmm8 # xmm8 = xmm0[8],xmm6[8],xmm0[9],xmm6[9],xmm0[10],xmm6[10],xmm0[11],xmm6[11],xmm0[12],xmm6[12],xmm0[13],xmm6[13],xmm0[14],xmm6[14],xmm0[15],xmm6[15]
+    74a2:      	vpunpcklbw	%xmm6, %xmm0, %xmm15 # xmm15 = xmm0[0],xmm6[0],xmm0[1],xmm6[1],xmm0[2],xmm6[2],xmm0[3],xmm6[3],xmm0[4],xmm6[4],xmm0[5],xmm6[5],xmm0[6],xmm6[6],xmm0[7],xmm6[7]
+    74a6:      	vpunpcklwd	%xmm8, %xmm2, %xmm3 # xmm3 = xmm2[0],xmm8[0],xmm2[1],xmm8[1],xmm2[2],xmm8[2],xmm2[3],xmm8[3]
+    74ab:      	vpunpckhwd	%xmm8, %xmm2, %xmm0 # xmm0 = xmm2[4],xmm8[4],xmm2[5],xmm8[5],xmm2[6],xmm8[6],xmm2[7],xmm8[7]
+    74b0:      	vmovdqu	0x10(%rcx), %xmm8
+    74b5:      	vpunpcklwd	%xmm15, %xmm5, %xmm7 # xmm7 = xmm5[0],xmm15[0],xmm5[1],xmm15[1],xmm5[2],xmm15[2],xmm5[3],xmm15[3]
+    74ba:      	vpunpckhwd	%xmm15, %xmm5, %xmm4 # xmm4 = xmm5[4],xmm15[4],xmm5[5],xmm15[5],xmm5[6],xmm15[6],xmm5[7],xmm15[7]
+    74bf:      	vpmovsxbw	%xmm7, %ymm6
+    74c4:      	vpmovsxbw	%xmm0, %ymm15
+    74c9:      	vpmovsxbw	%xmm4, %ymm5
+    74ce:      	vpand	0x10(%rcx), %xmm9, %xmm0
+    74d3:      	vpmaddwd	%ymm6, %ymm14, %ymm7
+    74d7:      	addq	%r8, %rcx
+    74da:      	vpsrlw	$0x4, %xmm8, %xmm4
+    74e0:      	vpmovsxbw	%xmm3, %ymm2
+    74e5:      	vpmaddwd	%ymm5, %ymm13, %ymm5
+    74e9:      	vpand	%xmm9, %xmm4, %xmm6
+    74ee:      	vpshufb	%xmm0, %xmm11, %xmm8
+    74f3:      	vpmaddwd	%ymm2, %ymm12, %ymm3
+    74f7:      	vpmaddwd	-0x8190(%rbp), %ymm15, %ymm2
+    74ff:      	vpshufb	%xmm0, %xmm10, %xmm15
+    7504:      	vpaddd	%ymm5, %ymm7, %ymm7
+    7508:      	vpshufb	%xmm6, %xmm11, %xmm0
+    750d:      	vpshufb	%xmm6, %xmm10, %xmm6
+    7512:      	vpunpcklbw	%xmm15, %xmm8, %xmm4 # xmm4 = xmm8[0],xmm15[0],xmm8[1],xmm15[1],xmm8[2],xmm15[2],xmm8[3],xmm15[3],xmm8[4],xmm15[4],xmm8[5],xmm15[5],xmm8[6],xmm15[6],xmm8[7],xmm15[7]
+    7517:      	vpunpckhbw	%xmm15, %xmm8, %xmm8 # xmm8 = xmm8[8],xmm15[8],xmm8[9],xmm15[9],xmm8[10],xmm15[10],xmm8[11],xmm15[11],xmm8[12],xmm15[12],xmm8[13],xmm15[13],xmm8[14],xmm15[14],xmm8[15],xmm15[15]
+    751c:      	vpunpcklbw	%xmm6, %xmm0, %xmm15 # xmm15 = xmm0[0],xmm6[0],xmm0[1],xmm6[1],xmm0[2],xmm6[2],xmm0[3],xmm6[3],xmm0[4],xmm6[4],xmm0[5],xmm6[5],xmm0[6],xmm6[6],xmm0[7],xmm6[7]
+    7520:      	vpunpckhbw	%xmm6, %xmm0, %xmm0 # xmm0 = xmm0[8],xmm6[8],xmm0[9],xmm6[9],xmm0[10],xmm6[10],xmm0[11],xmm6[11],xmm0[12],xmm6[12],xmm0[13],xmm6[13],xmm0[14],xmm6[14],xmm0[15],xmm6[15]
+    7524:      	vpunpcklwd	%xmm15, %xmm4, %xmm6 # xmm6 = xmm4[0],xmm15[0],xmm4[1],xmm15[1],xmm4[2],xmm15[2],xmm4[3],xmm15[3]
+    7529:      	vpunpckhwd	%xmm15, %xmm4, %xmm4 # xmm4 = xmm4[4],xmm15[4],xmm4[5],xmm15[5],xmm4[6],xmm15[6],xmm4[7],xmm15[7]
+    752e:      	vpunpcklwd	%xmm0, %xmm8, %xmm15 # xmm15 = xmm8[0],xmm0[0],xmm8[1],xmm0[1],xmm8[2],xmm0[2],xmm8[3],xmm0[3]
+    7532:      	vpunpckhwd	%xmm0, %xmm8, %xmm8 # xmm8 = xmm8[4],xmm0[4],xmm8[5],xmm0[5],xmm8[6],xmm0[6],xmm8[7],xmm0[7]
+    7536:      	vpmovsxbw	%xmm15, %ymm15
+    753b:      	vpmovsxbw	%xmm6, %ymm0
+    7540:      	vpmovsxbw	%xmm8, %ymm8
+    7545:      	vpmaddwd	-0x81f0(%rbp), %ymm0, %ymm6
+    754d:      	vpaddd	%ymm2, %ymm3, %ymm3
+    7551:      	vpmaddwd	-0x8290(%rbp), %ymm8, %ymm0
+    7559:      	vpmovsxbw	%xmm4, %ymm4
+    755e:      	vpmaddwd	-0x8230(%rbp), %ymm15, %ymm15
+    7566:      	vpmaddwd	-0x8210(%rbp), %ymm4, %ymm4
+    756e:      	vpaddd	%ymm7, %ymm3, %ymm5
+    7572:      	vpaddd	%ymm0, %ymm15, %ymm2
+    7576:      	vpaddd	%ymm2, %ymm5, %ymm15
+    757a:      	vpaddd	%ymm4, %ymm6, %ymm6
+    757e:      	vpaddd	%ymm6, %ymm15, %ymm8
+    7582:      	vpshufd	$0x55, %xmm8, %xmm4     # xmm4 = xmm8[1,1,1,1]
+    7588:      	vpshufd	$0xaa, %xmm8, %xmm5     # xmm5 = xmm8[2,2,2,2]
+    758e:      	vpshufd	$0xff, %xmm8, %xmm15    # xmm15 = xmm8[3,3,3,3]
+    7594:      	vpaddd	%xmm4, %xmm8, %xmm7
+    7598:      	vextracti128	$0x1, %ymm8, %xmm8
+    759e:      	vpaddd	%xmm5, %xmm7, %xmm2
+    75a2:      	vpshufd	$0x55, %xmm8, %xmm3     # xmm3 = xmm8[1,1,1,1]
+    75a8:      	vpshufd	$0xaa, %xmm8, %xmm5     # xmm5 = xmm8[2,2,2,2]
+    75ae:      	vpaddd	%xmm15, %xmm2, %xmm6
+    75b3:      	vpshufd	$0xff, %xmm8, %xmm2     # xmm2 = xmm8[3,3,3,3]
+    75b9:      	vpaddd	%xmm8, %xmm6, %xmm4
+    75be:      	vxorps	%xmm8, %xmm8, %xmm8
+    75c3:      	vpaddd	%xmm3, %xmm4, %xmm7
+    75c7:      	vmovd	%r11d, %xmm4
+    75cc:      	vpaddd	%xmm5, %xmm7, %xmm15
+    75d0:      	vmulss	(%r12,%rsi), %xmm4, %xmm3
+    75d6:      	vpaddd	%xmm2, %xmm15, %xmm6
+    75da:      	vmovd	%xmm6, %edi
+    75de:      	vcvtsi2ss	%edi, %xmm8, %xmm0
+    75e2:      	vmulss	%xmm3, %xmm0, %xmm7
+    75e6:      	vmovss	%xmm7, (%r13,%rsi)
+    75ed:      	addq	$0x4, %rsi
+    75f1:      	vmaxss	%xmm7, %xmm1, %xmm1
+    75f5:      	cmpq	%rsi, %rdx
+    75f8:      	jne	0x7470 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x23c0>
+    75fe:      	jmp	0x54d7 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x427>
+    7603:      	vzeroupper
+    7606:      	jmp	0x5963 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x8b3>
+    760b:      	movl	-0x82a4(%rbp), %r11d
+    7612:      	vmovss	(%rip), %xmm9           # 0x761a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x256a>
+    761a:      	cmpl	$0xe, %r10d
+    761e:      	ja	0x6dff <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1d4f>
+    7624:      	xorl	%r10d, %r10d
+    7627:      	jmp	0x714d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x209d>
+    762c:      	movabsq	$0x64657375665f746e, %r8 # imm = 0x64657375665F746E
+    7636:      	cmpq	%r8, 0x6(%r11)
+    763a:      	jne	0x62d5 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1225>
+    7640:      	vxorps	%xmm7, %xmm7, %xmm7
+    7644:      	xorl	%r9d, %r9d
+    7647:      	vcvtsi2ss	%r14d, %xmm7, %xmm3
+    764c:      	testl	%r14d, %r14d
+    764f:      	jle	0x8309 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3259>
+    7655:      	leal	-0x1(%r14), %r10d
+    7659:      	cmpl	$0x6, %r10d
+    765d:      	jbe	0x8374 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x32c4>
+    7663:      	movl	%r14d, %r12d
+    7666:      	movq	%rbx, %rsi
+    7669:      	vxorps	%xmm0, %xmm0, %xmm0
+    766d:      	vbroadcastss	(%rip), %ymm5   # 0x7676 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x25c6>
+    7676:      	shrl	$0x3, %r12d
+    767a:      	shlq	$0x5, %r12
+    767e:      	leaq	(%r12,%rbx), %rcx
+    7682:      	subq	$0x20, %r12
+    7686:      	shrq	$0x5, %r12
+    768a:      	addq	$0x1, %r12
+    768e:      	andl	$0x7, %r12d
+    7692:      	je	0x770d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x265d>
+    7694:      	cmpq	$0x1, %r12
+    7698:      	je	0x76fb <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x264b>
+    769a:      	cmpq	$0x2, %r12
+    769e:      	je	0x76ee <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x263e>
+    76a0:      	cmpq	$0x3, %r12
+    76a4:      	je	0x76e1 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2631>
+    76a6:      	cmpq	$0x4, %r12
+    76aa:      	je	0x76d4 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2624>
+    76ac:      	cmpq	$0x5, %r12
+    76b0:      	je	0x76c8 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2618>
+    76b2:      	cmpq	$0x6, %r12
+    76b6:      	jne	0x8346 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3296>
+    76bc:      	vandps	(%rsi), %ymm5, %ymm2
+    76c0:      	addq	$0x20, %rsi
+    76c4:      	vaddps	%ymm2, %ymm0, %ymm0
+    76c8:      	vandps	(%rsi), %ymm5, %ymm6
+    76cc:      	addq	$0x20, %rsi
+    76d0:      	vaddps	%ymm6, %ymm0, %ymm0
+    76d4:      	vandps	(%rsi), %ymm5, %ymm8
+    76d8:      	addq	$0x20, %rsi
+    76dc:      	vaddps	%ymm8, %ymm0, %ymm0
+    76e1:      	vandps	(%rsi), %ymm5, %ymm9
+    76e5:      	addq	$0x20, %rsi
+    76e9:      	vaddps	%ymm9, %ymm0, %ymm0
+    76ee:      	vandps	(%rsi), %ymm5, %ymm10
+    76f2:      	addq	$0x20, %rsi
+    76f6:      	vaddps	%ymm10, %ymm0, %ymm0
+    76fb:      	vandps	(%rsi), %ymm5, %ymm11
+    76ff:      	addq	$0x20, %rsi
+    7703:      	vaddps	%ymm11, %ymm0, %ymm0
+    7708:      	cmpq	%rsi, %rcx
+    770b:      	je	0x776b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x26bb>
+    770d:      	vandps	(%rsi), %ymm5, %ymm12
+    7711:      	vandps	0x20(%rsi), %ymm5, %ymm14
+    7716:      	addq	$0x100, %rsi            # imm = 0x100
+    771d:      	vandps	-0xc0(%rsi), %ymm5, %ymm4
+    7725:      	vandps	-0xa0(%rsi), %ymm5, %ymm1
+    772d:      	vaddps	%ymm12, %ymm0, %ymm13
+    7732:      	vandps	-0x80(%rsi), %ymm5, %ymm6
+    7737:      	vandps	-0x60(%rsi), %ymm5, %ymm9
+    773c:      	vandps	-0x40(%rsi), %ymm5, %ymm11
+    7741:      	vandps	-0x20(%rsi), %ymm5, %ymm12
+    7746:      	vaddps	%ymm14, %ymm13, %ymm15
+    774b:      	vaddps	%ymm4, %ymm15, %ymm7
+    774f:      	vaddps	%ymm1, %ymm7, %ymm2
+    7753:      	vaddps	%ymm6, %ymm2, %ymm8
+    7757:      	vaddps	%ymm9, %ymm8, %ymm10
+    775c:      	vaddps	%ymm11, %ymm10, %ymm0
+    7761:      	vaddps	%ymm12, %ymm0, %ymm0
+    7766:      	cmpq	%rsi, %rcx
+    7769:      	jne	0x770d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x265d>
+    776b:      	vextractf128	$0x1, %ymm0, %xmm13
+    7771:      	movl	%r14d, %edi
+    7774:      	vaddps	%xmm0, %xmm13, %xmm14
+    7778:      	andl	$-0x8, %edi
+    777b:      	vaddps	%xmm0, %xmm13, %xmm1
+    777f:      	movl	%edi, %eax
+    7781:      	vmovhlps	%xmm14, %xmm14, %xmm15  # xmm15 = xmm14[1,1]
+    7786:      	vaddps	%xmm14, %xmm15, %xmm4
+    778b:      	vshufps	$0x55, %xmm4, %xmm4, %xmm7 # xmm7 = xmm4[1,1,1,1]
+    7790:      	vaddps	%xmm4, %xmm7, %xmm2
+    7794:      	cmpl	%r14d, %edi
+    7797:      	je	0x8385 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x32d5>
+    779d:      	movl	%r14d, %r8d
+    77a0:      	subl	%eax, %r8d
+    77a3:      	leal	-0x1(%r8), %edx
+    77a7:      	cmpl	$0x2, %edx
+    77aa:      	jbe	0x77f2 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2742>
+    77ac:      	movq	-0x8250(%rbp), %r12
+    77b3:      	movq	-0x8258(%rbp), %rcx
+    77ba:      	vbroadcastss	(%rip), %xmm5   # 0x77c3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2713>
+    77c3:      	addq	%r12, %rax
+    77c6:      	vandps	(%rcx,%rax,4), %xmm5, %xmm6
+    77cb:      	movl	%r8d, %eax
+    77ce:      	andl	$-0x4, %eax
+    77d1:      	vaddps	%xmm1, %xmm6, %xmm8
+    77d5:      	addl	%eax, %edi
+    77d7:      	andl	$0x3, %r8d
+    77db:      	vmovhlps	%xmm8, %xmm8, %xmm9     # xmm9 = xmm8[1,1]
+    77e0:      	vaddps	%xmm8, %xmm9, %xmm10
+    77e5:      	vshufps	$0x55, %xmm10, %xmm10, %xmm11 # xmm11 = xmm10[1,1,1,1]
+    77eb:      	vaddps	%xmm10, %xmm11, %xmm2
+    77f0:      	je	0x7845 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2795>
+    77f2:      	movslq	%edi, %rsi
+    77f5:      	vmovss	(%rip), %xmm12          # 0x77fd <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x274d>
+    77fd:      	leal	0x1(%rdi), %edx
+    7800:      	vmovss	(%rbx,%rsi,4), %xmm0
+    7805:      	leaq	(,%rsi,4), %r8
+    780d:      	vandps	%xmm12, %xmm0, %xmm13
+    7812:      	vaddss	%xmm13, %xmm2, %xmm2
+    7817:      	cmpl	%r14d, %edx
+    781a:      	jge	0x7845 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2795>
+    781c:      	vmovss	0x4(%rbx,%r8), %xmm14
+    7823:      	addl	$0x2, %edi
+    7826:      	vandps	%xmm12, %xmm14, %xmm15
+    782b:      	vaddss	%xmm15, %xmm2, %xmm2
+    7830:      	cmpl	%r14d, %edi
+    7833:      	jge	0x7845 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2795>
+    7835:      	vmovss	0x8(%rbx,%r8), %xmm4
+    783c:      	vandps	%xmm12, %xmm4, %xmm7
+    7841:      	vaddss	%xmm7, %xmm2, %xmm2
+    7845:      	vdivss	%xmm3, %xmm2, %xmm2
+    7849:      	vmulss	(%rip), %xmm2, %xmm1    # 0x7851 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x27a1>
+    7851:      	cmpl	$0x6, %r10d
+    7855:      	jbe	0x831e <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x326e>
+    785b:      	vbroadcastss	(%rip), %ymm5   # 0x7864 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x27b4>
+    7864:      	movl	%r14d, %r9d
+    7867:      	vbroadcastss	%xmm1, %ymm6
+    786c:      	vpxor	%xmm0, %xmm0, %xmm0
+    7870:      	movq	%rbx, %rdi
+    7873:      	shrl	$0x3, %r9d
+    7877:      	vxorps	%xmm7, %xmm7, %xmm7
+    787b:      	shlq	$0x5, %r9
+    787f:      	leaq	(%r9,%rbx), %r10
+    7883:      	subq	$0x20, %r9
+    7887:      	shrq	$0x5, %r9
+    788b:      	addq	$0x1, %r9
+    788f:      	andl	$0x7, %r9d
+    7893:      	je	0x798f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x28df>
+    7899:      	cmpq	$0x1, %r9
+    789d:      	je	0x796a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x28ba>
+    78a3:      	cmpq	$0x2, %r9
+    78a7:      	je	0x794d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x289d>
+    78ad:      	cmpq	$0x3, %r9
+    78b1:      	je	0x7930 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2880>
+    78b3:      	cmpq	$0x4, %r9
+    78b7:      	je	0x7916 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2866>
+    78b9:      	cmpq	$0x5, %r9
+    78bd:      	je	0x78f9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2849>
+    78bf:      	cmpq	$0x6, %r9
+    78c3:      	je	0x78dc <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x282c>
+    78c5:      	vandps	(%rbx), %ymm5, %ymm3
+    78c9:      	leaq	0x20(%rbx), %rdi
+    78cd:      	vcmpltps	%ymm3, %ymm6, %ymm8
+    78d2:      	vandps	%ymm8, %ymm3, %ymm7
+    78d7:      	vpsubd	%ymm8, %ymm0, %ymm0
+    78dc:      	vandps	(%rdi), %ymm5, %ymm9
+    78e0:      	addq	$0x20, %rdi
+    78e4:      	vcmpltps	%ymm9, %ymm6, %ymm10
+    78ea:      	vandps	%ymm10, %ymm9, %ymm11
+    78ef:      	vpsubd	%ymm10, %ymm0, %ymm0
+    78f4:      	vaddps	%ymm11, %ymm7, %ymm7
+    78f9:      	vandps	(%rdi), %ymm5, %ymm12
+    78fd:      	addq	$0x20, %rdi
+    7901:      	vcmpltps	%ymm12, %ymm6, %ymm13
+    7907:      	vandps	%ymm13, %ymm12, %ymm14
+    790c:      	vpsubd	%ymm13, %ymm0, %ymm0
+    7911:      	vaddps	%ymm14, %ymm7, %ymm7
+    7916:      	vandps	(%rdi), %ymm5, %ymm15
+    791a:      	addq	$0x20, %rdi
+    791e:      	vcmpltps	%ymm15, %ymm6, %ymm4
+    7924:      	vandps	%ymm4, %ymm15, %ymm3
+    7928:      	vpsubd	%ymm4, %ymm0, %ymm0
+    792c:      	vaddps	%ymm3, %ymm7, %ymm7
+    7930:      	vandps	(%rdi), %ymm5, %ymm8
+    7934:      	addq	$0x20, %rdi
+    7938:      	vcmpltps	%ymm8, %ymm6, %ymm9
+    793e:      	vandps	%ymm9, %ymm8, %ymm10
+    7943:      	vpsubd	%ymm9, %ymm0, %ymm0
+    7948:      	vaddps	%ymm10, %ymm7, %ymm7
+    794d:      	vandps	(%rdi), %ymm5, %ymm11
+    7951:      	addq	$0x20, %rdi
+    7955:      	vcmpltps	%ymm11, %ymm6, %ymm12
+    795b:      	vandps	%ymm12, %ymm11, %ymm13
+    7960:      	vpsubd	%ymm12, %ymm0, %ymm0
+    7965:      	vaddps	%ymm13, %ymm7, %ymm7
+    796a:      	vandps	(%rdi), %ymm5, %ymm14
+    796e:      	addq	$0x20, %rdi
+    7972:      	vcmpltps	%ymm14, %ymm6, %ymm15
+    7978:      	vandps	%ymm15, %ymm14, %ymm4
+    797d:      	vpsubd	%ymm15, %ymm0, %ymm0
+    7982:      	vaddps	%ymm4, %ymm7, %ymm7
+    7986:      	cmpq	%rdi, %r10
+    7989:      	je	0x7a68 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x29b8>
+    798f:      	vandps	(%rdi), %ymm5, %ymm3
+    7993:      	vandps	0x20(%rdi), %ymm5, %ymm12
+    7998:      	addq	$0x100, %rdi            # imm = 0x100
+    799f:      	vcmpltps	%ymm3, %ymm6, %ymm8
+    79a4:      	vcmpltps	%ymm12, %ymm6, %ymm13
+    79aa:      	vandps	%ymm8, %ymm3, %ymm9
+    79af:      	vandps	%ymm13, %ymm12, %ymm14
+    79b4:      	vpsubd	%ymm8, %ymm0, %ymm11
+    79b9:      	vaddps	%ymm9, %ymm7, %ymm10
+    79be:      	vandps	-0xc0(%rdi), %ymm5, %ymm7
+    79c6:      	vpsubd	%ymm13, %ymm11, %ymm0
+    79cb:      	vcmpltps	%ymm7, %ymm6, %ymm4
+    79d0:      	vaddps	%ymm14, %ymm10, %ymm15
+    79d5:      	vandps	-0xa0(%rdi), %ymm5, %ymm10
+    79dd:      	vandps	%ymm4, %ymm7, %ymm3
+    79e1:      	vcmpltps	%ymm10, %ymm6, %ymm11
+    79e7:      	vpsubd	%ymm4, %ymm0, %ymm9
+    79eb:      	vaddps	%ymm3, %ymm15, %ymm8
+    79ef:      	vandps	-0x80(%rdi), %ymm5, %ymm15
+    79f4:      	vandps	-0x60(%rdi), %ymm5, %ymm3
+    79f9:      	vcmpltps	%ymm15, %ymm6, %ymm0
+    79ff:      	vandps	%ymm11, %ymm10, %ymm12
+    7a04:      	vpsubd	%ymm11, %ymm9, %ymm14
+    7a09:      	vaddps	%ymm12, %ymm8, %ymm13
+    7a0e:      	vcmpltps	%ymm3, %ymm6, %ymm4
+    7a13:      	vandps	%ymm0, %ymm15, %ymm7
+    7a17:      	vpsubd	%ymm0, %ymm14, %ymm9
+    7a1b:      	vaddps	%ymm7, %ymm13, %ymm8
+    7a1f:      	vandps	-0x40(%rdi), %ymm5, %ymm13
+    7a24:      	vandps	%ymm4, %ymm3, %ymm10
+    7a28:      	vpsubd	%ymm4, %ymm9, %ymm12
+    7a2c:      	vcmpltps	%ymm13, %ymm6, %ymm14
+    7a32:      	vaddps	%ymm10, %ymm8, %ymm11
+    7a37:      	vandps	-0x20(%rdi), %ymm5, %ymm8
+    7a3c:      	vandps	%ymm14, %ymm13, %ymm15
+    7a41:      	vcmpltps	%ymm8, %ymm6, %ymm9
+    7a47:      	vpsubd	%ymm14, %ymm12, %ymm0
+    7a4c:      	vaddps	%ymm15, %ymm11, %ymm7
+    7a51:      	vandps	%ymm9, %ymm8, %ymm3
+    7a56:      	vpsubd	%ymm9, %ymm0, %ymm0
+    7a5b:      	vaddps	%ymm3, %ymm7, %ymm7
+    7a5f:      	cmpq	%rdi, %r10
+    7a62:      	jne	0x798f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x28df>
+    7a68:      	vextractf128	$0x1, %ymm7, %xmm13
+    7a6e:      	vextracti128	$0x1, %ymm0, %xmm5
+    7a74:      	movl	%r14d, %r12d
+    7a77:      	vaddps	%xmm7, %xmm13, %xmm14
+    7a7b:      	vpaddd	%xmm0, %xmm5, %xmm6
+    7a7f:      	andl	$-0x8, %r12d
+    7a83:      	vpsrldq	$0x8, %xmm6, %xmm4      # xmm4 = xmm6[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    7a88:      	vaddps	%xmm7, %xmm13, %xmm5
+    7a8c:      	movl	%r12d, %eax
+    7a8f:      	vpaddd	%xmm4, %xmm6, %xmm10
+    7a93:      	vmovhlps	%xmm14, %xmm14, %xmm15  # xmm15 = xmm14[1,1]
+    7a98:      	vpsrldq	$0x4, %xmm10, %xmm11    # xmm11 = xmm10[4,5,6,7,8,9,10,11,12,13,14,15],zero,zero,zero,zero
+    7a9e:      	vaddps	%xmm14, %xmm15, %xmm0
+    7aa3:      	vpaddd	%xmm11, %xmm10, %xmm12
+    7aa8:      	vmovd	%xmm12, %r9d
+    7aad:      	vshufps	$0x55, %xmm0, %xmm0, %xmm8 # xmm8 = xmm0[1,1,1,1]
+    7ab2:      	vaddps	%xmm0, %xmm8, %xmm9
+    7ab6:      	cmpl	%r12d, %r14d
+    7ab9:      	je	0x7baf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2aff>
+    7abf:      	movl	%r14d, %ecx
+    7ac2:      	subl	%eax, %ecx
+    7ac4:      	leal	-0x1(%rcx), %esi
+    7ac7:      	cmpl	$0x2, %esi
+    7aca:      	jbe	0x7b3f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2a8f>
+    7acc:      	movq	-0x8250(%rbp), %r8
+    7ad3:      	movq	-0x8258(%rbp), %rdx
+    7ada:      	vshufps	$0x0, %xmm1, %xmm1, %xmm10 # xmm10 = xmm1[0,0,0,0]
+    7adf:      	movl	%ecx, %r10d
+    7ae2:      	vbroadcastss	(%rip), %xmm3   # 0x7aeb <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2a3b>
+    7aeb:      	andl	$-0x4, %r10d
+    7aef:      	addq	%r8, %rax
+    7af2:      	addl	%r10d, %r12d
+    7af5:      	andl	$0x3, %ecx
+    7af8:      	vandps	(%rdx,%rax,4), %xmm3, %xmm4
+    7afd:      	vcmpltps	%xmm4, %xmm10, %xmm11
+    7b02:      	vandps	%xmm11, %xmm4, %xmm12
+    7b07:      	vpsubd	%xmm11, %xmm6, %xmm6
+    7b0c:      	vaddps	%xmm5, %xmm12, %xmm8
+    7b10:      	vpsrldq	$0x8, %xmm6, %xmm13     # xmm13 = xmm6[8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero,zero,zero
+    7b15:      	vpaddd	%xmm13, %xmm6, %xmm14
+    7b1a:      	vpsrldq	$0x4, %xmm14, %xmm15    # xmm15 = xmm14[4,5,6,7,8,9,10,11,12,13,14,15],zero,zero,zero,zero
+    7b20:      	vmovhlps	%xmm8, %xmm8, %xmm9     # xmm9 = xmm8[1,1]
+    7b25:      	vpaddd	%xmm15, %xmm14, %xmm0
+    7b2a:      	vaddps	%xmm8, %xmm9, %xmm7
+    7b2f:      	vmovd	%xmm0, %r9d
+    7b34:      	vshufps	$0x55, %xmm7, %xmm7, %xmm5 # xmm5 = xmm7[1,1,1,1]
+    7b39:      	vaddps	%xmm7, %xmm5, %xmm9
+    7b3d:      	je	0x7baf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2aff>
+    7b3f:      	movslq	%r12d, %rdi
+    7b42:      	vmovss	(%rip), %xmm4           # 0x7b4a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2a9a>
+    7b4a:      	vmovss	(%rbx,%rdi,4), %xmm3
+    7b4f:      	leaq	(,%rdi,4), %rcx
+    7b57:      	vandps	%xmm4, %xmm3, %xmm10
+    7b5b:      	vcomiss	%xmm1, %xmm10
+    7b5f:      	jbe	0x7b6a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2aba>
+    7b61:      	vaddss	%xmm10, %xmm9, %xmm9
+    7b66:      	addl	$0x1, %r9d
+    7b6a:      	leal	0x1(%r12), %eax
+    7b6f:      	cmpl	%r14d, %eax
+    7b72:      	jge	0x7baf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2aff>
+    7b74:      	vmovss	0x4(%rbx,%rcx), %xmm11
+    7b7a:      	vandps	%xmm4, %xmm11, %xmm12
+    7b7e:      	vcomiss	%xmm1, %xmm12
+    7b82:      	jbe	0x7b8d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2add>
+    7b84:      	vaddss	%xmm12, %xmm9, %xmm9
+    7b89:      	addl	$0x1, %r9d
+    7b8d:      	addl	$0x2, %r12d
+    7b91:      	cmpl	%r14d, %r12d
+    7b94:      	jge	0x7baf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2aff>
+    7b96:      	vmovss	0x8(%rbx,%rcx), %xmm6
+    7b9c:      	vandps	%xmm4, %xmm6, %xmm13
+    7ba0:      	vcomiss	%xmm1, %xmm13
+    7ba4:      	jbe	0x7baf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2aff>
+    7ba6:      	vaddss	%xmm13, %xmm9, %xmm9
+    7bab:      	addl	$0x1, %r9d
+    7baf:      	testl	%r9d, %r9d
+    7bb2:      	jle	0x8311 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3261>
+    7bb8:      	vxorps	%xmm2, %xmm2, %xmm2
+    7bbc:      	vcvtsi2ss	%r9d, %xmm2, %xmm14
+    7bc1:      	vdivss	%xmm14, %xmm9, %xmm15
+    7bc6:      	vmulss	-0x82a4(%rbp), %xmm15, %xmm8
+    7bce:      	xorl	%r8d, %r8d
+    7bd1:      	xorl	%r12d, %r12d
+    7bd4:      	xorl	%esi, %esi
+    7bd6:      	vxorps	(%rip), %xmm1, %xmm0    # 0x7bde <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2b2e>
+    7bde:      	movl	$0x1, %edi
+    7be3:      	jmp	0x7ce9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2c39>
+    7be8:      	nopl	(%rax,%rax)
+    7bf0:      	movq	%rdi, %rdx
+    7bf3:      	movq	%r12, %r9
+    7bf6:      	shlq	%cl, %rdx
+    7bf9:      	orq	%rdx, %r12
+    7bfc:      	vcomiss	%xmm9, %xmm0
+    7c01:      	cmovbeq	%r9, %r12
+    7c05:      	leaq	0x1(%r8), %rax
+    7c09:      	vmovss	(%rbx,%rax,4), %xmm7
+    7c0e:      	movl	%eax, %ecx
+    7c10:      	vcomiss	%xmm1, %xmm7
+    7c14:      	jbe	0x7f20 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2e70>
+    7c1a:      	movq	%rdi, %rdx
+    7c1d:      	shlq	%cl, %rdx
+    7c20:      	orq	%rdx, %rsi
+    7c23:      	leaq	0x1(%rax), %r8
+    7c27:      	vmovss	(%rbx,%r8,4), %xmm5
+    7c2d:      	movl	%r8d, %ecx
+    7c30:      	vcomiss	%xmm1, %xmm5
+    7c34:      	jbe	0x7f00 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2e50>
+    7c3a:      	movq	%rdi, %r10
+    7c3d:      	shlq	%cl, %r10
+    7c40:      	orq	%r10, %rsi
+    7c43:      	leaq	0x2(%rax), %r8
+    7c47:      	vmovss	(%rbx,%r8,4), %xmm3
+    7c4d:      	movl	%r8d, %ecx
+    7c50:      	vcomiss	%xmm1, %xmm3
+    7c54:      	jbe	0x7ee0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2e30>
+    7c5a:      	movq	%rdi, %r10
+    7c5d:      	shlq	%cl, %r10
+    7c60:      	orq	%r10, %rsi
+    7c63:      	leaq	0x3(%rax), %r8
+    7c67:      	vmovss	(%rbx,%r8,4), %xmm4
+    7c6d:      	movl	%r8d, %ecx
+    7c70:      	vcomiss	%xmm1, %xmm4
+    7c74:      	jbe	0x7ec0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2e10>
+    7c7a:      	movq	%rdi, %r10
+    7c7d:      	shlq	%cl, %r10
+    7c80:      	orq	%r10, %rsi
+    7c83:      	leaq	0x4(%rax), %r8
+    7c87:      	vmovss	(%rbx,%r8,4), %xmm10
+    7c8d:      	movl	%r8d, %ecx
+    7c90:      	vcomiss	%xmm1, %xmm10
+    7c94:      	jbe	0x7ea0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2df0>
+    7c9a:      	movq	%rdi, %r10
+    7c9d:      	shlq	%cl, %r10
+    7ca0:      	orq	%r10, %rsi
+    7ca3:      	leaq	0x5(%rax), %r8
+    7ca7:      	vmovss	(%rbx,%r8,4), %xmm11
+    7cad:      	movl	%r8d, %ecx
+    7cb0:      	vcomiss	%xmm1, %xmm11
+    7cb4:      	jbe	0x7e80 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2dd0>
+    7cba:      	movq	%rdi, %r10
+    7cbd:      	shlq	%cl, %r10
+    7cc0:      	orq	%r10, %rsi
+    7cc3:      	leaq	0x6(%rax), %r8
+    7cc7:      	vmovss	(%rbx,%r8,4), %xmm12
+    7ccd:      	movl	%r8d, %ecx
+    7cd0:      	vcomiss	%xmm1, %xmm12
+    7cd4:      	jbe	0x7d10 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2c60>
+    7cd6:      	movq	%rdi, %r10
+    7cd9:      	leaq	0x7(%rax), %r8
+    7cdd:      	shlq	%cl, %r10
+    7ce0:      	orq	%r10, %rsi
+    7ce3:      	cmpq	$0x39, %rax
+    7ce7:      	je	0x7d2f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2c7f>
+    7ce9:      	vmovss	(%rbx,%r8,4), %xmm9
+    7cef:      	movl	%r8d, %ecx
+    7cf2:      	vcomiss	%xmm1, %xmm9
+    7cf6:      	jbe	0x7bf0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2b40>
+    7cfc:      	movq	%rdi, %r10
+    7cff:      	shlq	%cl, %r10
+    7d02:      	orq	%r10, %rsi
+    7d05:      	jmp	0x7c05 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2b55>
+    7d0a:      	nopw	(%rax,%rax)
+    7d10:      	movq	%rdi, %r9
+    7d13:      	movq	%r12, %rdx
+    7d16:      	leaq	0x7(%rax), %r8
+    7d1a:      	shlq	%cl, %r9
+    7d1d:      	orq	%r9, %r12
+    7d20:      	vcomiss	%xmm12, %xmm0
+    7d25:      	cmovbeq	%rdx, %r12
+    7d29:      	cmpq	$0x39, %rax
+    7d2d:      	jne	0x7ce9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2c39>
+    7d2f:      	movq	%r12, -0x8190(%rbp)
+    7d36:      	xorl	%r10d, %r10d
+    7d39:      	xorl	%edx, %edx
+    7d3b:      	xorl	%edi, %edi
+    7d3d:      	vxorps	(%rip), %xmm1, %xmm6    # 0x7d45 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2c95>
+    7d45:      	movl	$0x1, %r9d
+    7d4b:      	jmp	0x7e57 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2da7>
+    7d50:      	movq	%r9, %r12
+    7d53:      	movq	%rdx, %rax
+    7d56:      	shlq	%cl, %r12
+    7d59:      	orq	%r12, %rdx
+    7d5c:      	vcomiss	%xmm13, %xmm6
+    7d61:      	cmovbeq	%rax, %rdx
+    7d65:      	leaq	0x1(%r10), %r8
+    7d69:      	vmovss	0x100(%rbx,%r8,4), %xmm2
+    7d73:      	movl	%r8d, %ecx
+    7d76:      	vcomiss	%xmm1, %xmm2
+    7d7a:      	jbe	0x82f0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3240>
+    7d80:      	movq	%r9, %r10
+    7d83:      	shlq	%cl, %r10
+    7d86:      	orq	%r10, %rdi
+    7d89:      	leaq	0x1(%r8), %rcx
+    7d8d:      	vmovss	0x100(%rbx,%rcx,4), %xmm14
+    7d96:      	vcomiss	%xmm1, %xmm14
+    7d9a:      	jbe	0x82d0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3220>
+    7da0:      	movq	%r9, %r12
+    7da3:      	shlq	%cl, %r12
+    7da6:      	orq	%r12, %rdi
+    7da9:      	leaq	0x2(%r8), %rcx
+    7dad:      	vmovss	0x100(%rbx,%rcx,4), %xmm15
+    7db6:      	vcomiss	%xmm1, %xmm15
+    7dba:      	jbe	0x82b0 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3200>
+    7dc0:      	movq	%r9, %r12
+    7dc3:      	shlq	%cl, %r12
+    7dc6:      	orq	%r12, %rdi
+    7dc9:      	leaq	0x3(%r8), %rcx
+    7dcd:      	vmovss	0x100(%rbx,%rcx,4), %xmm0
+    7dd6:      	vcomiss	%xmm1, %xmm0
+    7dda:      	jbe	0x8290 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x31e0>
+    7de0:      	movq	%r9, %r12
+    7de3:      	shlq	%cl, %r12
+    7de6:      	orq	%r12, %rdi
+    7de9:      	leaq	0x4(%r8), %rcx
+    7ded:      	vmovss	0x100(%rbx,%rcx,4), %xmm9
+    7df6:      	vcomiss	%xmm1, %xmm9
+    7dfa:      	jbe	0x8270 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x31c0>
+    7e00:      	movq	%r9, %r12
+    7e03:      	shlq	%cl, %r12
+    7e06:      	orq	%r12, %rdi
+    7e09:      	leaq	0x5(%r8), %rcx
+    7e0d:      	vmovss	0x100(%rbx,%rcx,4), %xmm7
+    7e16:      	vcomiss	%xmm1, %xmm7
+    7e1a:      	jbe	0x8250 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x31a0>
+    7e20:      	movq	%r9, %r12
+    7e23:      	shlq	%cl, %r12
+    7e26:      	orq	%r12, %rdi
+    7e29:      	leaq	0x6(%r8), %rcx
+    7e2d:      	vmovss	0x100(%rbx,%rcx,4), %xmm5
+    7e36:      	vcomiss	%xmm1, %xmm5
+    7e3a:      	jbe	0x7f40 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2e90>
+    7e40:      	movq	%r9, %r12
+    7e43:      	leaq	0x7(%r8), %r10
+    7e47:      	shlq	%cl, %r12
+    7e4a:      	orq	%r12, %rdi
+    7e4d:      	cmpq	$0x39, %r8
+    7e51:      	je	0x7f62 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2eb2>
+    7e57:      	vmovss	0x100(%rbx,%r10,4), %xmm13
+    7e61:      	movl	%r10d, %ecx
+    7e64:      	vcomiss	%xmm1, %xmm13
+    7e68:      	jbe	0x7d50 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2ca0>
+    7e6e:      	movq	%r9, %r8
+    7e71:      	shlq	%cl, %r8
+    7e74:      	orq	%r8, %rdi
+    7e77:      	jmp	0x7d65 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2cb5>
+    7e7c:      	nopl	(%rax)
+    7e80:      	movq	%rdi, %r9
+    7e83:      	movq	%r12, %rdx
+    7e86:      	shlq	%cl, %r9
+    7e89:      	orq	%r9, %r12
+    7e8c:      	vcomiss	%xmm11, %xmm0
+    7e91:      	cmovbeq	%rdx, %r12
+    7e95:      	jmp	0x7cc3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2c13>
+    7e9a:      	nopw	(%rax,%rax)
+    7ea0:      	movq	%rdi, %r9
+    7ea3:      	movq	%r12, %rdx
+    7ea6:      	shlq	%cl, %r9
+    7ea9:      	orq	%r9, %r12
+    7eac:      	vcomiss	%xmm10, %xmm0
+    7eb1:      	cmovbeq	%rdx, %r12
+    7eb5:      	jmp	0x7ca3 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2bf3>
+    7eba:      	nopw	(%rax,%rax)
+    7ec0:      	movq	%rdi, %r9
+    7ec3:      	movq	%r12, %rdx
+    7ec6:      	shlq	%cl, %r9
+    7ec9:      	orq	%r9, %r12
+    7ecc:      	vcomiss	%xmm4, %xmm0
+    7ed0:      	cmovbeq	%rdx, %r12
+    7ed4:      	jmp	0x7c83 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2bd3>
+    7ed9:      	nopl	(%rax)
+    7ee0:      	movq	%rdi, %r9
+    7ee3:      	movq	%r12, %rdx
+    7ee6:      	shlq	%cl, %r9
+    7ee9:      	orq	%r9, %r12
+    7eec:      	vcomiss	%xmm3, %xmm0
+    7ef0:      	cmovbeq	%rdx, %r12
+    7ef4:      	jmp	0x7c63 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2bb3>
+    7ef9:      	nopl	(%rax)
+    7f00:      	movq	%rdi, %r9
+    7f03:      	movq	%r12, %rdx
+    7f06:      	shlq	%cl, %r9
+    7f09:      	orq	%r9, %r12
+    7f0c:      	vcomiss	%xmm5, %xmm0
+    7f10:      	cmovbeq	%rdx, %r12
+    7f14:      	jmp	0x7c43 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2b93>
+    7f19:      	nopl	(%rax)
+    7f20:      	movq	%rdi, %r9
+    7f23:      	movq	%r12, %r8
+    7f26:      	shlq	%cl, %r9
+    7f29:      	orq	%r9, %r12
+    7f2c:      	vcomiss	%xmm7, %xmm0
+    7f30:      	cmovbeq	%r8, %r12
+    7f34:      	jmp	0x7c23 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2b73>
+    7f39:      	nopl	(%rax)
+    7f40:      	movq	%r9, %rax
+    7f43:      	movq	%rdx, %r10
+    7f46:      	shlq	%cl, %rax
+    7f49:      	orq	%rax, %rdx
+    7f4c:      	vcomiss	%xmm5, %xmm6
+    7f50:      	cmovbeq	%r10, %rdx
+    7f54:      	leaq	0x7(%r8), %r10
+    7f58:      	cmpq	$0x39, %r8
+    7f5c:      	jne	0x7e57 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2da7>
+    7f62:      	movq	-0x8240(%rbp), %r8
+    7f69:      	movq	-0x8170(%rbp), %rcx
+    7f70:      	movq	-0x81d0(%rbp), %rbx
+    7f77:      	movl	-0x8234(%rbp), %r10d
+    7f7e:      	movq	-0x8190(%rbp), %rax
+    7f85:      	movq	0x130(%r8), %r9
+    7f8c:      	imulq	%rbx, %rcx
+    7f90:      	movq	0x148(%r8), %r12
+    7f97:      	testl	%r10d, %r10d
+    7f9a:      	jle	0x6307 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1257>
+    7fa0:      	movq	%rcx, %r11
+    7fa3:      	leaq	(%r12,%rcx,4), %rcx
+    7fa7:      	vmovss	(%rip), %xmm1           # 0x7faf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2eff>
+    7faf:      	xorl	%r10d, %r10d
+    7fb2:      	shlq	$0x5, %r11
+    7fb6:      	movq	%rcx, -0x8190(%rbp)
+    7fbd:      	addq	%r11, %r9
+    7fc0:      	testb	$0x4, -0x8248(%rbp)
+    7fc7:      	je	0x80b5 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3005>
+    7fcd:      	movq	(%r9), %rbx
+    7fd0:      	movq	0x10(%r9), %r10
+    7fd4:      	xorl	%r8d, %r8d
+    7fd7:      	xorl	%r11d, %r11d
+    7fda:      	movq	0x8(%r9), %r12
+    7fde:      	movq	0x18(%r9), %rcx
+    7fe2:      	vxorps	%xmm3, %xmm3, %xmm3
+    7fe6:      	addq	$0x20, %r9
+    7fea:      	andq	%rsi, %rbx
+    7fed:      	andq	%rax, %r10
+    7ff0:      	popcntq	%rbx, %r8
+    7ff5:      	popcntq	%r10, %r11
+    7ffa:      	andq	%rdi, %r12
+    7ffd:      	movq	-0x8(%r9), %r10
+    8001:      	movq	%r8, -0x81f0(%rbp)
+    8008:      	xorl	%r8d, %r8d
+    800b:      	andq	%rdx, %rcx
+    800e:      	movq	-0x10(%r9), %rbx
+    8012:      	popcntq	%r12, %r8
+    8017:      	xorl	%r12d, %r12d
+    801a:      	andq	%rdi, %r10
+    801d:      	movq	%r11, -0x8210(%rbp)
+    8024:      	popcntq	%rcx, %r12
+    8029:      	xorl	%ecx, %ecx
+    802b:      	movq	-0x20(%r9), %r11
+    802f:      	andq	%rsi, %rbx
+    8032:      	popcntq	%r10, %rcx
+    8037:      	movq	-0x18(%r9), %r10
+    803b:      	popcntq	%rbx, %rbx
+    8040:      	addl	%ebx, %ecx
+    8042:      	andq	%rax, %r11
+    8045:      	andq	%rdx, %r10
+    8048:      	popcntq	%r11, %r11
+    804d:      	addl	%r11d, %ecx
+    8050:      	popcntq	%r10, %r10
+    8055:      	movq	%r10, -0x8230(%rbp)
+    805c:      	movl	-0x81f0(%rbp), %r10d
+    8063:      	addl	%r10d, %r8d
+    8066:      	movl	-0x8210(%rbp), %r10d
+    806d:      	addl	%r10d, %r8d
+    8070:      	movl	$0x4, %r10d
+    8076:      	addl	%r12d, %r8d
+    8079:      	movl	-0x8230(%rbp), %r12d
+    8080:      	addl	%r12d, %ecx
+    8083:      	subl	%ecx, %r8d
+    8086:      	cmpq	$0x4, -0x8248(%rbp)
+    808e:      	vcvtsi2ss	%r8d, %xmm3, %xmm4
+    8093:      	movq	-0x8190(%rbp), %r8
+    809a:      	vmulss	(%r8), %xmm8, %xmm10
+    809f:      	vmulss	%xmm10, %xmm4, %xmm11
+    80a4:      	vmaxss	%xmm11, %xmm1, %xmm1
+    80a9:      	vmovss	%xmm11, (%r13)
+    80af:      	je	0x54d7 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x427>
+    80b5:      	movq	%r13, -0x81f0(%rbp)
+    80bc:      	movl	%r14d, -0x8210(%rbp)
+    80c3:      	movq	%r15, -0x8230(%rbp)
+    80ca:      	movq	0x8(%r9), %r14
+    80ce:      	movq	0x10(%r9), %rbx
+    80d2:      	xorl	%r8d, %r8d
+    80d5:      	xorl	%r15d, %r15d
+    80d8:      	movq	(%r9), %r13
+    80db:      	movq	0x10(%r9), %r11
+    80df:      	xorl	%r12d, %r12d
+    80e2:      	vxorps	%xmm12, %xmm12, %xmm12
+    80e7:      	andq	%rdi, %r14
+    80ea:      	andq	%rax, %rbx
+    80ed:      	movq	0x18(%r9), %rcx
+    80f1:      	popcntq	%r14, %r8
+    80f6:      	xorl	%r14d, %r14d
+    80f9:      	andq	%rsi, %r13
+    80fc:      	andq	%rsi, %r11
+    80ff:      	popcntq	%rbx, %r14
+    8104:      	movq	0x18(%r9), %rbx
+    8108:      	popcntq	%r13, %r15
+    810d:      	andq	%rdx, %rcx
+    8110:      	popcntq	%r11, %r12
+    8115:      	xorl	%r13d, %r13d
+    8118:      	movq	(%r9), %r11
+    811b:      	addl	%r15d, %r8d
+    811e:      	popcntq	%rcx, %r13
+    8123:      	andq	%rdi, %rbx
+    8126:      	xorl	%ecx, %ecx
+    8128:      	addl	%r14d, %r8d
+    812b:      	andq	%rax, %r11
+    812e:      	popcntq	%rbx, %rcx
+    8133:      	xorl	%ebx, %ebx
+    8135:      	addl	%r12d, %ecx
+    8138:      	popcntq	%r11, %rbx
+    813d:      	movq	0x8(%r9), %r11
+    8141:      	addl	%ebx, %ecx
+    8143:      	addl	%r13d, %r8d
+    8146:      	movq	-0x8190(%rbp), %r15
+    814d:      	movq	0x30(%r9), %r12
+    8151:      	andq	%rdx, %r11
+    8154:      	movq	0x20(%r9), %r14
+    8158:      	movq	0x38(%r9), %rbx
+    815c:      	popcntq	%r11, %r11
+    8161:      	vmulss	(%r15,%r10), %xmm8, %xmm13
+    8167:      	addl	%r11d, %ecx
+    816a:      	movq	0x28(%r9), %r11
+    816e:      	subl	%ecx, %r8d
+    8171:      	andq	%rsi, %r14
+    8174:      	movq	%r12, %rcx
+    8177:      	xorl	%r15d, %r15d
+    817a:      	vcvtsi2ss	%r8d, %xmm12, %xmm6
+    817f:      	movq	-0x81f0(%rbp), %r8
+    8186:      	movq	%r11, %r13
+    8189:      	popcntq	%r14, %r15
+    818e:      	andq	%rdi, %r13
+    8191:      	andq	%rax, %rcx
+    8194:      	xorl	%r14d, %r14d
+    8197:      	andq	%rsi, %r12
+    819a:      	popcntq	%rcx, %r14
+    819f:      	xorl	%ecx, %ecx
+    81a1:      	popcntq	%r12, %r12
+    81a6:      	andq	%rdx, %r11
+    81a9:      	popcntq	%r11, %r11
+    81ae:      	addq	$0x40, %r9
+    81b2:      	vmulss	%xmm13, %xmm6, %xmm2
+    81b7:      	vmovss	%xmm2, (%r8,%r10)
+    81bd:      	xorl	%r8d, %r8d
+    81c0:      	vmaxss	%xmm2, %xmm1, %xmm14
+    81c4:      	popcntq	%r13, %r8
+    81c9:      	movq	%rbx, %r13
+    81cc:      	andq	%rdi, %rbx
+    81cf:      	addl	%r15d, %r8d
+    81d2:      	popcntq	%rbx, %rcx
+    81d7:      	addl	%r12d, %ecx
+    81da:      	andq	%rdx, %r13
+    81dd:      	addl	%r14d, %r8d
+    81e0:      	movq	-0x20(%r9), %rbx
+    81e4:      	movq	-0x8190(%rbp), %r15
+    81eb:      	popcntq	%r13, %r13
+    81f0:      	addl	%r13d, %r8d
+    81f3:      	vmulss	0x4(%r15,%r10), %xmm8, %xmm0
+    81fa:      	andq	%rax, %rbx
+    81fd:      	popcntq	%rbx, %rbx
+    8202:      	addl	%ebx, %ecx
+    8204:      	addl	%r11d, %ecx
+    8207:      	subl	%ecx, %r8d
+    820a:      	vcvtsi2ss	%r8d, %xmm12, %xmm15
+    820f:      	movq	-0x81f0(%rbp), %r8
+    8216:      	vmulss	%xmm0, %xmm15, %xmm9
+    821a:      	vmovss	%xmm9, 0x4(%r8,%r10)
+    8221:      	vmaxss	%xmm9, %xmm14, %xmm1
+    8226:      	addq	$0x8, %r10
+    822a:      	cmpq	%r10, -0x8248(%rbp)
+    8231:      	jne	0x80ca <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x301a>
+    8237:      	movl	-0x8210(%rbp), %r14d
+    823e:      	movq	-0x8230(%rbp), %r15
+    8245:      	movq	%r8, %r13
+    8248:      	jmp	0x54d7 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x427>
+    824d:      	nopl	(%rax)
+    8250:      	movq	%r9, %rax
+    8253:      	movq	%rdx, %r10
+    8256:      	shlq	%cl, %rax
+    8259:      	orq	%rax, %rdx
+    825c:      	vcomiss	%xmm7, %xmm6
+    8260:      	cmovbeq	%r10, %rdx
+    8264:      	jmp	0x7e29 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2d79>
+    8269:      	nopl	(%rax)
+    8270:      	movq	%r9, %rax
+    8273:      	movq	%rdx, %r10
+    8276:      	shlq	%cl, %rax
+    8279:      	orq	%rax, %rdx
+    827c:      	vcomiss	%xmm9, %xmm6
+    8281:      	cmovbeq	%r10, %rdx
+    8285:      	jmp	0x7e09 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2d59>
+    828a:      	nopw	(%rax,%rax)
+    8290:      	movq	%r9, %rax
+    8293:      	movq	%rdx, %r10
+    8296:      	shlq	%cl, %rax
+    8299:      	orq	%rax, %rdx
+    829c:      	vcomiss	%xmm0, %xmm6
+    82a0:      	cmovbeq	%r10, %rdx
+    82a4:      	jmp	0x7de9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2d39>
+    82a9:      	nopl	(%rax)
+    82b0:      	movq	%r9, %rax
+    82b3:      	movq	%rdx, %r10
+    82b6:      	shlq	%cl, %rax
+    82b9:      	orq	%rax, %rdx
+    82bc:      	vcomiss	%xmm15, %xmm6
+    82c1:      	cmovbeq	%r10, %rdx
+    82c5:      	jmp	0x7dc9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2d19>
+    82ca:      	nopw	(%rax,%rax)
+    82d0:      	movq	%r9, %rax
+    82d3:      	movq	%rdx, %r10
+    82d6:      	shlq	%cl, %rax
+    82d9:      	orq	%rax, %rdx
+    82dc:      	vcomiss	%xmm14, %xmm6
+    82e1:      	cmovbeq	%r10, %rdx
+    82e5:      	jmp	0x7da9 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2cf9>
+    82ea:      	nopw	(%rax,%rax)
+    82f0:      	movq	%r9, %rax
+    82f3:      	movq	%rdx, %r10
+    82f6:      	shlq	%cl, %rax
+    82f9:      	orq	%rax, %rdx
+    82fc:      	vcomiss	%xmm2, %xmm6
+    8300:      	cmovbeq	%r10, %rdx
+    8304:      	jmp	0x7d89 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2cd9>
+    8309:      	vxorps	%xmm2, %xmm2, %xmm2
+    830d:      	vmovaps	%xmm2, %xmm1
+    8311:      	vaddss	(%rip), %xmm2, %xmm15   # 0x8319 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x3269>
+    8319:      	jmp	0x7bc6 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2b16>
+    831e:      	xorl	%r12d, %r12d
+    8321:      	vpxor	%xmm6, %xmm6, %xmm6
+    8325:      	vxorps	%xmm5, %xmm5, %xmm5
+    8329:      	xorl	%eax, %eax
+    832b:      	vxorps	%xmm9, %xmm9, %xmm9
+    8330:      	jmp	0x7abf <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x2a0f>
+    8335:      	vandps	(%rbx), %ymm7, %ymm5
+    8339:      	leaq	0x20(%rbx), %rax
+    833d:      	vmaxps	%ymm5, %ymm4, %ymm4
+    8341:      	jmp	0x6c3a <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1b8a>
+    8346:      	vandps	(%rbx), %ymm5, %ymm0
+    834a:      	leaq	0x20(%rbx), %rsi
+    834e:      	jmp	0x76bc <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x260c>
+    8353:      	movl	-0x82a4(%rbp), %r11d
+    835a:      	jmp	0x737f <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x22cf>
+    835f:      	xorl	%r11d, %r11d
+    8362:      	vxorps	%xmm8, %xmm8, %xmm8
+    8367:      	vxorps	%xmm14, %xmm14, %xmm14
+    836c:      	xorl	%r8d, %r8d
+    836f:      	jmp	0x6d1d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x1c6d>
+    8374:      	xorl	%edi, %edi
+    8376:      	vxorps	%xmm1, %xmm1, %xmm1
+    837a:      	vxorps	%xmm2, %xmm2, %xmm2
+    837e:      	xorl	%eax, %eax
+    8380:      	jmp	0x779d <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x26ed>
+    8385:      	vdivss	%xmm3, %xmm2, %xmm2
+    8389:      	vmulss	(%rip), %xmm2, %xmm1    # 0x8391 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x32e1>
+    8391:      	jmp	0x7864 <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x27b4>
+    8396:      	callq	0x839b <_ZN5tenzo12FusedKVCache21forward_attention_rawEiPfS1_S1_S1_._omp_fn.0+0x32eb>
+    839b:      	nop
+    839c:      	nopl	(%rax)

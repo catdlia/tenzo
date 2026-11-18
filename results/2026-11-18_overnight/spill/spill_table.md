@@ -1,0 +1,30 @@
+| file | whole-function vec spills (st/ld) | innermost loop | instrs | vec instrs | FMA/madd | spill st | reload ld | spill+reload per FMA |
+|---|---|---|---|---|---|---|---|---|
+| explicit_attention_H1_KV1_T8_D32.s | 26/24 | loop 0 [362:426] | 62 | 57 | 4 | 1 | 4 | 1.25 |
+| explicit_attention_H1_KV1_T8_D32.s | 26/24 | loop 1 [367:483] | 114 | 109 | 8 | 1 | 8 | 1.12 |
+| explicit_gqa_H20_KV5_T8_D32.s | 30/27 | loop 0 [34:443] | 406 | 371 | 0 | 16 | 10 | - |
+| explicit_gqa_H20_KV5_T8_D32.s | 30/27 | loop 1 [783:847] | 62 | 57 | 4 | 1 | 4 | 1.25 |
+| explicit_gqa_H20_KV5_T8_D32.s | 30/27 | loop 2 [788:904] | 114 | 109 | 8 | 1 | 8 | 1.12 |
+| fused_pack.s | 3/1 | loop 0 [28:96] | 68 | 56 | 32 | 0 | 0 | 0.00 |
+| standalone_pack.s | 0/1 | (no loop found) | 283 | 276 | 0 | 0 | 1 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 0 [13:16] | 4 | 0 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 1 [180:198] | 19 | 16 | 8 | 0 | 0 | 0.00 |
+| engine_forward_attention_raw.dis | 111/120 | loop 2 [308:359] | 52 | 41 | 0 | 8 | 1 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 3 [487:505] | 19 | 16 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 4 [586:632] | 47 | 42 | 32 | 4 | 4 | 0.25 |
+| engine_forward_attention_raw.dis | 111/120 | loop 5 [672:697] | 26 | 0 | 0 | 0 | 3 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 6 [753:809] | 57 | 53 | 16 | 2 | 0 | 0.12 |
+| engine_forward_attention_raw.dis | 111/120 | loop 7 [884:994] | 111 | 107 | 16 | 6 | 2 | 0.50 |
+| engine_forward_attention_raw.dis | 111/120 | loop 8 [1095:1121] | 27 | 24 | 8 | 0 | 0 | 0.00 |
+| engine_forward_attention_raw.dis | 111/120 | loop 9 [1129:1139] | 11 | 4 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 10 [1293:1311] | 19 | 16 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 11 [1688:1768] | 81 | 77 | 8 | 0 | 0 | 0.00 |
+| engine_forward_attention_raw.dis | 111/120 | loop 12 [1833:1851] | 19 | 16 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 13 [1975:2017] | 43 | 40 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 14 [2106:2174] | 69 | 17 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 15 [2112:2178] | 67 | 16 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 16 [2171:2188] | 18 | 3 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 17 [2196:2258] | 63 | 17 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 18 [2202:2262] | 61 | 16 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 19 [2255:2320] | 66 | 9 | 0 | 0 | 0 | - |
+| engine_forward_attention_raw.dis | 111/120 | loop 20 [2396:2487] | 92 | 11 | 0 | 0 | 4 | - |

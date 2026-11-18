@@ -1,0 +1,24 @@
+== engine_forward_attention_raw.dis.loop4.s
+Iterations:        200
+Instructions:      9200
+Total Cycles:      3226
+IPC:               2.85
+Block RThroughput: 16.0
+== explicit_attention_H1_KV1_T8_D32.s.loop1.s
+Iterations:        200
+Instructions:      22200
+Total Cycles:      7252
+IPC:               3.06
+Block RThroughput: 23.0
+== explicit_gqa_H20_KV5_T8_D32.s.loop2.s
+Iterations:        200
+Instructions:      22200
+Total Cycles:      7252
+IPC:               3.06
+Block RThroughput: 23.0
+== fused_pack.s.loop0.s
+Iterations:        200
+Instructions:      13400
+Total Cycles:      3215
+IPC:               4.17
+Block RThroughput: 16.0
