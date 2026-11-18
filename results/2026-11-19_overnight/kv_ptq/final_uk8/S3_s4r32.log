@@ -1,0 +1,10 @@
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+window 0 ppl 164.803 168s
+window 1 ppl 155.311 175s
+window 2 ppl 211.327 182s
+window 3 ppl 197.951 188s
+window 4 ppl 259.258 374s
+window 5 ppl 80.232 382s
+window 6 ppl 142.616 390s
+window 7 ppl 171.009 397s
+done 397s peak rss 3.06GB
