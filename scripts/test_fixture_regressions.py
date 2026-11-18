@@ -87,29 +87,26 @@ def is_unrebuilt_cli(output: str) -> bool:
 
 def check_cli_negative_test(cli_binary: str, fixture_path: str, test_num: int, case_desc: str) -> bool:
     """
-    Executes CLI against an invalid fixture.
-    Must verify [TL1-FAIL] is present and exit code is non-zero.
-    If the binary fails due to missing test_tl1.mlir or could not open input file,
-    reports SKIP (pending remote compilation) rather than a false positive PASS.
-    Returns True if pass or skipped, False if failed.
+    Executes the CLI against an invalid fixture. Passing requires ALL of:
+      * non-zero exit code,
+      * the fixture-validation tag [TL1-FIXTURE-INVALID] in the output,
+      * NO MLIR compile/legalisation failure text (a rejection caused by a broken kernel pipeline is the wrong reason
+        and previously made every negative case pass vacuously).
+    A binary that predates the fixture support is a FAILURE, not a skip.
     """
     rc, out = run_cli_tl1(cli_binary, fixture_path)
-    if "[TL1-FAIL]" in out:
-        if rc != 0:
-            print(f"✅ [PASS] Test {test_num} (CLI): tenzo-cli correctly rejected {case_desc} with [TL1-FAIL] (code {rc}).")
-            return True
-        else:
-            print(f"❌ [FAIL] Test {test_num} (CLI): tenzo-cli output [TL1-FAIL] but exited with code 0 on {case_desc}!")
-            return False
-    elif is_unrebuilt_cli(out):
-        print(f"⚠️ [SKIP] tenzo-cli TL1 test skipped (binary pending remote compilation)")
+    wrong_reason = [m for m in ("MLIR compilation failed", "failed to legalize", "Failed to load or parse") if m in out]
+    if is_unrebuilt_cli(out):
+        print(f"❌ [FAIL] Test {test_num} (CLI): tenzo-cli predates TL1 fixture support (rebuild it); output: {out.strip()[:160]}")
+        return False
+    if wrong_reason:
+        print(f"❌ [FAIL] Test {test_num} (CLI): {case_desc} was rejected for the WRONG reason ({wrong_reason[0]!r}), not by fixture validation.")
+        return False
+    if rc != 0 and "[TL1-FIXTURE-INVALID]" in out:
+        print(f"✅ [PASS] Test {test_num} (CLI): tenzo-cli rejected {case_desc} via fixture validation [TL1-FIXTURE-INVALID] (code {rc}).")
         return True
-    elif rc == 0:
-        print(f"❌ [FAIL] Test {test_num} (CLI): tenzo-cli exited with 0 on {case_desc}!")
-        return False
-    else:
-        print(f"❌ [FAIL] Test {test_num} (CLI): tenzo-cli exited with code {rc} on {case_desc} but '[TL1-FAIL]' was not found in output!")
-        return False
+    print(f"❌ [FAIL] Test {test_num} (CLI): {case_desc}: rc={rc}, [TL1-FIXTURE-INVALID] {'present' if '[TL1-FIXTURE-INVALID]' in out else 'missing'}.")
+    return False
 
 
 def check_cli_positive_test(cli_binary: str, fixture_path: str, test_num: int) -> bool:
@@ -122,9 +119,6 @@ def check_cli_positive_test(cli_binary: str, fixture_path: str, test_num: int) -
     rc, out = run_cli_tl1(cli_binary, fixture_path)
     if rc == 0 and "[PASS]" in out:
         print(f"✅ [PASS] Test {test_num} (CLI): tenzo-cli correctly accepted valid fixture.")
-        return True
-    elif is_unrebuilt_cli(out):
-        print(f"⚠️ [SKIP] (pending remote compilation)")
         return True
     else:
         print(f"❌ [FAIL] Test {test_num} (CLI): tenzo-cli failed on valid fixture (code {rc}):\n{out}")
