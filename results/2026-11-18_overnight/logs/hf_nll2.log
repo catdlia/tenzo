@@ -1,0 +1,7 @@
+Running as unit: run-p126808-i143377.scope; invocation ID: 5e619bb96213448ab9f6e304958a0e4e
+The tokenizer you are loading from 'microsoft/bitnet-b1.58-2B-4T' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+You don't have a GPU available to load the model, the inference will be slow because of weight unpacking
+model loaded 16.8s dtype=bfloat16
+resumed with 5 complete windows
+window 5 ppl 20.043
+window 6 ppl 27.411

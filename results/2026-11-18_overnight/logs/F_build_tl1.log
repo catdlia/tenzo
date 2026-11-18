@@ -1,0 +1,59 @@
+ Container untitled-dev-run-ea5ec1d160eb Creating 
+ Container untitled-dev-run-ea5ec1d160eb Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/dialect/TenzoDialect.cpp.o
+[2/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/PipelineTests.cpp.o
+/app/src/tests/PipelineTests.cpp: In function 'std::unique_ptr<mlir::ExecutionEngine> tenzo::compileWithOpenMP(mlir::MLIRContext&, bool)':
+/app/src/tests/PipelineTests.cpp:206:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  206 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /app/src/tests/PipelineTests.cpp:150:
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'std::unique_ptr<mlir::ExecutionEngine> tenzo::compileAndGetEngine(mlir::MLIRContext&, bool)':
+/app/src/tests/PipelineTests.cpp:305:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  305 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'void tenzo::runSmallMatMulTest(mlir::MLIRContext&)':
+/app/src/tests/PipelineTests.cpp:614:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  614 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'std::unique_ptr<mlir::ExecutionEngine> tenzo::compileLargeMatrix(mlir::MLIRContext&, bool)':
+/app/src/tests/PipelineTests.cpp:994:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+  994 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/app/src/tests/PipelineTests.cpp: In function 'bool tenzo::runExplicitKernelBenchmark(mlir::MLIRContext&)':
+/app/src/tests/PipelineTests.cpp:1179:45: warning: 'llvm::LogicalResult mlir::applyPatternsAndFoldGreedily(Operation*, const FrozenRewritePatternSet&, GreedyRewriteConfig, bool*)' is deprecated: Use applyPatternsGreedily() instead [-Wdeprecated-declarations]
+ 1179 |     (void)mlir::applyPatternsAndFoldGreedily(module.get(), std::move(patterns));
+      |           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/lib/llvm-21/include/mlir/Transforms/GreedyPatternRewriteDriver.h:236:1: note: declared here
+  236 | applyPatternsAndFoldGreedily(Operation *op,
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[3/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/context/TenzoContext.cpp.o
+[4/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/BLISBenchmark.cpp.o
+[5/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/passes/ExplicitMicroKernelPass.cpp.o
+[6/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o
+[7/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/passes/LinalgLowering.cpp.o
+[8/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/DynamicInferenceTest.cpp.o
+[9/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o
+[10/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/ZeroCopyBridgeTest.cpp.o
+[11/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/HeteroTests.cpp.o
+[12/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TestTL1.cpp.o
+[13/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TernaryPackTest.cpp.o
+[14/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/BitwiseAttentionTest.cpp.o
+[15/16] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/AuditJITTest.cpp.o
+[16/16] Linking CXX executable tenzo-cli
+
+real	3m9.020s
+user	0m0.120s
+sys	0m0.081s

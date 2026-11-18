@@ -337,6 +337,7 @@ def main():
     ap.add_argument("--max-diff", type=float, default=0.25, help="Maximum absolute logit difference")
     ap.add_argument("--gate-greedy", action="store_true", help="also require the full greedy sequence to match")
     ap.add_argument("--check-tokenization", action="store_true")
+    ap.add_argument("--only-tokenization", action="store_true", help="compare tokenisation only (implies --check-tokenization)")
     ap.add_argument("--negative-control", action="store_true", help="run the truncated-weights negative control")
     ap.add_argument("--out", default=None, help="write JSON results here")
     ap.add_argument("--self-test", action="store_true")
@@ -352,13 +353,18 @@ def main():
                                "tolerance_max_abs": args.max_diff}
     ok = True
 
-    if args.check_tokenization:
+    if args.check_tokenization or args.only_tokenization:
         results["tokenization"] = check_tokenization(args.model_dir, prompts, ref_dir, sources)
         for row in results["tokenization"]:
             for src in sources:
                 if src in row:
                     print(f"[tokenization] {row['prompt_id']:<14} vs {src:<5}: identical={row[src]['identical']} "
                           f"first_divergence={row[src]['first_divergence']} (tenzo {row[src]['tenzo_len']} / ref {row[src]['ref_len']} tokens)")
+
+    if args.only_tokenization:
+        if args.out:
+            Path(args.out).write_text(json.dumps(results, indent=1))
+        sys.exit(0)
 
     work = Path(tempfile.mkdtemp(prefix="parity_", dir=str(PROJECT_ROOT / "results")))
     try:

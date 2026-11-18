@@ -1,0 +1,11 @@
+The tokenizer you are loading from 'microsoft/bitnet-b1.58-2B-4T' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+You don't have a GPU available to load the model, the inference will be slow because of weight unpacking
+model loaded 13.5s dtype=bfloat16
+The following generation flags are not valid and may be ignored: ['temperature', 'top_p']. Set `TRANSFORMERS_VERBOSITY=info` for more details.
+p1_fact_en 6 ' Paris. Paris is a city that is known for its rich history, culture, and archite'
+p2_tech_en 18 ' machine code that can be executed by a computer. It is a complex process that i'
+p3_code 18 ' fibonacci(n-1) + fibonacci(n-2)\n\ndef is_prime(n):\n    if n < 2:\n        return '
+p4_ukrainian 18 ' важливих і важливих важливих важливих важливих важливих важливих важливих важли'
+p5_long_ctx 343 ' The main benefit of ternary weights is that they reduce memory traffic by stori'
+p6_weird 50 '0.00\n\n##Your task: Write an essay about the importance of the number pi in mathe'
+p7_math_en 19 ' 42\nQ: What is 17 + 25?\nA: 17 + 25 = 42\nQ: What is 17 + '
