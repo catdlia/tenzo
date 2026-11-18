@@ -1,0 +1,14 @@
+p2_tech_en 18 top1 5780 15s
+p2_tech_en greedy [5780, 2082, 430, 649, 387, 16070, 555, 264] 330s
+p3_code 18 top1 76798 336s
+p3_code greedy [76798, 1471, 12, 16, 8, 489, 76798, 1471] 605s
+p4_ukrainian 18 top1 103366 611s
+p4_ukrainian greedy [103366, 124444, 84954, 103366, 124444, 103366, 124444, 103366] 803s
+p5_long_ctx 343 top1 578 827s
+p5_long_ctx greedy [578, 1925, 8935, 315, 72717, 661, 14661, 374] 1765s
+p6_weird 50 top1 15 1773s
+p6_weird greedy [15, 13, 410, 271, 567, 7927, 3465, 25] 2130s
+p7_math_en 19 top1 220 2138s
+p7_math_en greedy [220, 2983, 198, 48, 25, 3639, 374, 220] 2422s
+done 2422s peak rss 4.37GB
+exit=0

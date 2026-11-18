@@ -1,0 +1,7 @@
+p1_fact_en golden-vs-hf greedy prefix 32 / 32
+p2_tech_en golden-vs-hf greedy prefix 32 / 32
+p3_code golden-vs-hf greedy prefix 32 / 32
+p4_ukrainian golden-vs-hf greedy prefix 26 / 32
+p5_long_ctx golden-vs-hf greedy prefix 32 / 32
+p6_weird golden-vs-hf greedy prefix 17 / 32
+p7_math_en golden-vs-hf greedy prefix 32 / 32

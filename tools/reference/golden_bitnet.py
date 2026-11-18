@@ -55,6 +55,7 @@ q_quant = None                # optional q hook (post-RoPE q [B,H,T,D]) used onl
 # DIAGNOSTIC emulation switches (default None = HF semantics). Used only to attribute the Tenzo gap; never a reference.
 EMULATE_ACT_QP = None
 EMULATE_ROPE_THETA = None
+VERBOSE = os.environ.get("GOLDEN_QUIET") is None
 
 
 class Dumper:
@@ -101,6 +102,7 @@ class Golden:
         assert c["quantization_config"]["linear_class"] == "autobitlinear"
         assert c["quantization_config"]["quantization_mode"] == "offline"
         self.embed = self.f.get_tensor("model.embed_tokens.weight")  # bf16, kept in bf16 (656 MB)
+        self.wcache = None
 
     # --- primitives -------------------------------------------------------------------------------------------
     def rmsnorm(self, x, w):
@@ -126,9 +128,15 @@ class Golden:
         return F.linear(self.act_quant(x), w) * s
 
     def load_lin(self, name):
+        # optional cache of the unpacked ternary weights as int8 (exact; ~2.4 GB) for repeated full forwards (greedy)
+        if self.wcache is not None and name in self.wcache:
+            w8, s = self.wcache[name]
+            return (w8.to(self.dt), s)
         p = self.f.get_tensor(name + ".weight")
         w = _hf_unpack(p, dtype=self.dt)
         s = self.f.get_tensor(name + ".weight_scale").to(self.dt)
+        if self.wcache is not None:
+            self.wcache[name] = (w.to(torch.int8), s)
         return (w, s)
 
     def vec(self, name):
@@ -224,7 +232,8 @@ class Golden:
         for l in range(self.L):
             t0 = time.time()
             x = self.layer(x, l, cos, sin, dump)
-            print("  layer %2d %.1fs rss=%.2fGB" % (l, time.time() - t0, rss_gb()), flush=True)
+            if VERBOSE:
+                print("  layer %2d %.1fs rss=%.2fGB" % (l, time.time() - t0, rss_gb()), flush=True)
         x = self.rmsnorm(x, self.vec("model.norm.weight")); dump("final_norm", None, x)
         return x
 
@@ -254,6 +263,7 @@ def main():
     ap.add_argument("--first-window", type=int, default=0)
     ap.add_argument("--batch", type=int, default=8, help="sequences per layer-major pass")
     ap.add_argument("--prompt-ids", nargs="*", default=[], help="files with space-separated HF ids (prompts mode)")
+    ap.add_argument("--greedy-steps", type=int, default=0, help="prompts mode: also write <name>.greedy.txt")
     ap.add_argument("--out", required=True, help="nll: output score file; prompts: output dir")
     ap.add_argument("--threads", type=int, default=4)
     ap.add_argument("--dump-dir", default=None)
@@ -277,6 +287,8 @@ def main():
     t0 = time.time()
     if a.mode == "prompts":
         os.makedirs(a.out, exist_ok=True)
+        if a.greedy_steps:
+            g.wcache = {}
         for i, pf in enumerate(a.prompt_ids):
             ids = torch.tensor([[int(x) for x in open(pf).read().split()]])
             d = dump if i == a.dump_seq else Dumper(None, 0, [], [])
@@ -287,6 +299,16 @@ def main():
             name = os.path.basename(pf).replace(".ids.txt", "")
             lg[-1].numpy().astype(np.float32).tofile(os.path.join(a.out, name + ".logits.f32"))
             print(name, ids.shape[1], "top1", int(lg[-1].argmax()), "%.0fs" % (time.time() - t0), flush=True)
+            if a.greedy_steps:
+                # greedy continuation, full recompute per step (no KV cache: the reference stays trivially correct)
+                open(os.path.join(a.out, name + ".ids.txt"), "w").write(" ".join(map(str, ids[0].tolist())) + "\n")
+                seq = ids[0].tolist(); greedy = [int(lg[-1].argmax())]
+                quiet = Dumper(None, 0, [], [])
+                while len(greedy) < a.greedy_steps:
+                    h = g.hidden(torch.tensor([seq + greedy]), quiet)
+                    greedy.append(int(g.lm_logits_rows(h[0, -1:])[0].argmax()))
+                open(os.path.join(a.out, name + ".greedy.txt"), "w").write(" ".join(map(str, greedy)) + "\n")
+                print(name, "greedy", greedy[:8], "%.0fs" % (time.time() - t0), flush=True)
     else:
         wins = [list(map(int, l.split())) for l in open(a.windows) if l.strip()]
         sel = list(range(a.first_window, len(wins)))
