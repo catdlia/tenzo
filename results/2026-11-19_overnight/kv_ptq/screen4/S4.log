@@ -1,0 +1,6 @@
+[kv_ptq] installed S4: K per-channel ternary over 32-token groups, V per-token g=32
+window 0 ppl 17.225 181s
+window 1 ppl 25.348 186s
+window 2 ppl 38.558 192s
+window 3 ppl 13.777 198s
+done 198s peak rss 3.10GB

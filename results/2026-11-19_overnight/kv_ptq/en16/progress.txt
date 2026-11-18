@@ -1,0 +1,4 @@
+2026-11-18T23:03:25+02:00 scheme=tenzo_int8 MemAvailable=7687896kB
+tenzo_int8 exit=0 23:14:55
+2026-11-18T23:14:55+02:00 scheme=tenzo_tl1 MemAvailable=7736320kB
+tenzo_tl1 exit=0 23:27:32

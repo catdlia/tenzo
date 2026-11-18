@@ -1,0 +1,6 @@
+[kv_ptq] installed S9: INT4 asym g=32 (comparator)
+window 0 ppl 12.221 158s
+window 1 ppl 20.988 164s
+window 2 ppl 29.482 171s
+window 3 ppl 10.162 177s
+done 177s peak rss 3.10GB

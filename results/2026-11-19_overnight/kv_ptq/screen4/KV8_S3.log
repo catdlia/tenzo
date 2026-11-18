@@ -1,0 +1,6 @@
+[kv_ptq] installed KV8:S3: V INT8, K from S2 + randomized Hadamard (D=128)
+window 0 ppl 13.033 156s
+window 1 ppl 23.407 162s
+window 2 ppl 33.900 168s
+window 3 ppl 11.412 175s
+done 175s peak rss 3.09GB

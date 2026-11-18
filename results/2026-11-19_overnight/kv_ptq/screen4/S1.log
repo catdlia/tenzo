@@ -1,0 +1,6 @@
+[kv_ptq] installed S1: ternary per token/head, TWN 0.7, LS scale
+window 0 ppl 22.175 154s
+window 1 ppl 38.388 160s
+window 2 ppl 65.676 165s
+window 3 ppl 18.598 171s
+done 171s peak rss 3.10GB

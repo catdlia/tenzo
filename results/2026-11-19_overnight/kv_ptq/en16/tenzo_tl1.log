@@ -1,0 +1,18 @@
+[kv_ptq] installed tenzo_tl1: replica of engine tl1_fused (+ q int quant)
+window 0 ppl 32.388 173s
+window 1 ppl 48.254 181s
+window 2 ppl 93.056 188s
+window 3 ppl 30.076 198s
+window 4 ppl 31.617 378s
+window 5 ppl 53.018 383s
+window 6 ppl 87.647 389s
+window 7 ppl 53.944 394s
+window 8 ppl 75.260 552s
+window 9 ppl 60.220 558s
+window 10 ppl 44.122 564s
+window 11 ppl 65.139 571s
+window 12 ppl 102.532 732s
+window 13 ppl 48.304 738s
+window 14 ppl 56.129 744s
+window 15 ppl 77.507 750s
+done 750s peak rss 3.14GB

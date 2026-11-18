@@ -1,0 +1,6 @@
+[kv_ptq] installed S2: ternary g=32 along D
+window 0 ppl 16.456 150s
+window 1 ppl 30.234 156s
+window 2 ppl 47.861 162s
+window 3 ppl 14.028 168s
+done 168s peak rss 3.08GB

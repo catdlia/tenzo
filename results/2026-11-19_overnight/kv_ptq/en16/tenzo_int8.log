@@ -1,0 +1,18 @@
+[kv_ptq] installed tenzo_int8: replica of engine int8_fused
+window 0 ppl 12.299 156s
+window 1 ppl 20.709 163s
+window 2 ppl 29.576 169s
+window 3 ppl 10.309 174s
+window 4 ppl 11.090 319s
+window 5 ppl 20.056 325s
+window 6 ppl 27.446 331s
+window 7 ppl 20.818 337s
+window 8 ppl 26.789 486s
+window 9 ppl 19.980 492s
+window 10 ppl 15.403 498s
+window 11 ppl 16.215 504s
+window 12 ppl 35.487 659s
+window 13 ppl 18.121 666s
+window 14 ppl 21.127 673s
+window 15 ppl 17.170 679s
+done 679s peak rss 3.14GB

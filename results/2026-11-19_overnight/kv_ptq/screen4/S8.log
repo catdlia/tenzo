@@ -1,0 +1,6 @@
+[kv_ptq] installed S8: 2-bit asym g=32 + Hadamard (comparator)
+window 0 ppl 13.713 156s
+window 1 ppl 23.203 162s
+window 2 ppl 34.616 168s
+window 3 ppl 11.489 174s
+done 174s peak rss 3.08GB
