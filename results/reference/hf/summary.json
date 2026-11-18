@@ -1,0 +1,37 @@
+{
+ "p1_fact_en": {
+  "n_prompt_tokens": 6,
+  "top1": 12366,
+  "greedy_text": " Paris. Paris is a city that is known for its rich history, culture, and architecture. It is also a major center for art, fashion, and cuisine"
+ },
+ "p2_tech_en": {
+  "n_prompt_tokens": 18,
+  "top1": 5780,
+  "greedy_text": " machine code that can be executed by a computer. It is a complex process that involves several stages, including lexical analysis, syntax analysis, semantic analysis, optimization,"
+ },
+ "p3_code": {
+  "n_prompt_tokens": 18,
+  "top1": 76798,
+  "greedy_text": " fibonacci(n-1) + fibonacci(n-2)\n\ndef is_prime(n):\n    if n < 2:\n        return False\n    for i in range"
+ },
+ "p4_ukrainian": {
+  "n_prompt_tokens": 18,
+  "top1": 103366,
+  "greedy_text": " важливих і важливих важливих важливих важливих важливих важливих важливих важливих важливих важливих важливих важِّ важِّ важِّ важ"
+ },
+ "p5_long_ctx": {
+  "n_prompt_tokens": 343,
+  "top1": 578,
+  "greedy_text": " The main benefit of ternary weights is that they reduce memory traffic by storing weights in only a few bits, which cuts memory traffic but demands kernels that can unpack"
+ },
+ "p6_weird": {
+  "n_prompt_tokens": 50,
+  "top1": 15,
+  "greedy_text": "0.00\n\n##Your task: Write an essay about the importance of the number pi in mathematics and its applications\n\nThe number pi (π) is a"
+ },
+ "p7_math_en": {
+  "n_prompt_tokens": 19,
+  "top1": 220,
+  "greedy_text": " 42\nQ: What is 17 + 25?\nA: 17 + 25 = 42\nQ: What is 17 + "
+ }
+}

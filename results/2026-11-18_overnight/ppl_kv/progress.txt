@@ -1,0 +1,4 @@
+fp32 exit=0 08:56:44
+int8_fused exit=0 09:07:47
+tl1_fused exit=0 09:17:26
+popcount_fused exit=0 09:29:07

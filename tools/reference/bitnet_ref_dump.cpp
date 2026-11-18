@@ -34,6 +34,7 @@ int main(int argc, char** argv) {
     std::string mode = argv[1]; const char* model_path = argv[2];
     llama_backend_init();
     llama_model_params mp = llama_model_default_params();
+    mp.vocab_only = (mode == "tokenize");   // tokenizer queries do not need the weights
     llama_model* model = llama_model_load_from_file(model_path, mp);
     if (!model) { fprintf(stderr, "failed to load model\n"); return 1; }
     const llama_vocab* vocab = llama_model_get_vocab(model);

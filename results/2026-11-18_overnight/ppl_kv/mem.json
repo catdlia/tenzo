@@ -1,0 +1,22 @@
+{
+ "fp32": {
+  "kv_bytes_per_token": 153600,
+  "rss_kb_ctx8192": 2405136,
+  "hwm_kb_ctx8192": 4197136
+ },
+ "int8_fused": {
+  "kv_bytes_per_token": 39600,
+  "rss_kb_ctx8192": 1493628,
+  "hwm_kb_ctx8192": 3285480
+ },
+ "tl1_fused": {
+  "kv_bytes_per_token": 10800,
+  "rss_kb_ctx8192": 1263104,
+  "hwm_kb_ctx8192": 3055036
+ },
+ "popcount_fused": {
+  "kv_bytes_per_token": 10800,
+  "rss_kb_ctx8192": 1263104,
+  "hwm_kb_ctx8192": 3055064
+ }
+}

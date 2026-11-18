@@ -1,0 +1,8 @@
+{
+ "source": "Goader/kobza first rows via datasets-server",
+ "src_sha256": "03c155fd6c823ce5288613feba260859d50f0a1f0e09d4f15c0d32bbadb9bd19",
+ "n_docs": 39,
+ "n_text_tokens": 30771,
+ "windows": 8,
+ "window_len": 512
+}

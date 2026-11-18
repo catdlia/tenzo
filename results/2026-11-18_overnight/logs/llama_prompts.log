@@ -1,0 +1,7 @@
+p1_fact_en 0 DUMP_OK prefix=/home/illia/CLionProjects/untitled/results/reference/llama/p1_fac 
+p2_tech_en 0 DUMP_OK prefix=/home/illia/CLionProjects/untitled/results/reference/llama/p2_tec 
+p3_code 0 DUMP_OK prefix=/home/illia/CLionProjects/untitled/results/reference/llama/p3_cod 
+p4_ukrainian 0 DUMP_OK prefix=/home/illia/CLionProjects/untitled/results/reference/llama/p4_ukr 
+p5_long_ctx 0 DUMP_OK prefix=/home/illia/CLionProjects/untitled/results/reference/llama/p5_lon 
+p6_weird 0 DUMP_OK prefix=/home/illia/CLionProjects/untitled/results/reference/llama/p6_wei 
+p7_math_en 0 DUMP_OK prefix=/home/illia/CLionProjects/untitled/results/reference/llama/p7_mat 

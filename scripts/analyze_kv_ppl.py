@@ -53,6 +53,7 @@ def main():
     ap.add_argument('--mem', default=None, help='JSON {mode: {"kv_bytes_per_token":..., "rss_kb_ctx8192":...}}')
     a = ap.parse_args()
     files = {p.stem: read_scores(p) for p in sorted(Path(a.dir).glob('*.txt'))}
+    files = {k: v for k, v in files.items() if v}          # ignore non-score files such as progress.txt
     refs = {}
     if a.hf: refs['hf_bf16'] = read_scores(a.hf)
     if a.llama: refs['bitnet_cpp_i2s'] = read_scores(a.llama)

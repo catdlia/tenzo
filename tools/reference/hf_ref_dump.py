@@ -46,9 +46,23 @@ if a.mode == "prompts":
 else:
     wins = [list(map(int, l.split())) for l in open(a.windows) if l.strip()]
     outp = os.path.join(a.out, "nll_hf_%s.txt" % a.dtype)
+    # resume support (the process can be killed by the OOM-killer): keep complete windows already on disk
+    done = {}
+    if os.path.exists(outp):
+        cur = None
+        for line in open(outp):
+            if line.startswith("w "):
+                cur = line
+            elif line.startswith("lp ") and cur is not None and line.endswith("\n"):
+                done[int(cur.split()[1])] = (cur, line); cur = None
     with open(outp, "w") as f:
         f.write("# hf transformers dtype=%s windows=%d\n" % (a.dtype, len(wins)))
+        for w in sorted(done):
+            f.write(done[w][0]); f.write(done[w][1])
+        print("resumed with", len(done), "complete windows", flush=True)
         for w, ids in enumerate(wins):
+            if w in done:
+                continue
             t = torch.tensor([ids])
             with torch.no_grad():
                 lg = model(t).logits[0, :-1].double()

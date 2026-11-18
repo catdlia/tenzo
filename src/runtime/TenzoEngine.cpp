@@ -2030,7 +2030,14 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         return TENZO_ERROR_MODEL_PARSE;
     }
 
-    // INT8 LM Head quantization
+    // INT8 LM Head quantization (default). TENZO_EXPERIMENT_FP32_LM=1 keeps embeddings/LM head in float32 instead: a DIAGNOSTIC switch
+    // used to measure how much of the quality gap vs the HF reference comes from the INT8 head (results/2026-11-18_overnight).
+    if (std::getenv("TENZO_EXPERIMENT_FP32_LM") != nullptr) {
+        is_lm_i8 = false;
+        embed_w_i8.clear();
+        embed_w_f32.assign(embed_f32, embed_f32 + static_cast<size_t>(vocab_size) * hidden_size);
+        std::cerr << "[Tenzo] EXPERIMENT: FP32 embeddings / LM head (TENZO_EXPERIMENT_FP32_LM set)\n";
+    } else {
     is_lm_i8 = true;
     embed_w_i8.resize(static_cast<size_t>(vocab_size) * hidden_size);
     embed_scales.resize(vocab_size);
@@ -2047,6 +2054,8 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         for (int i = 0; i < hidden_size; ++i) {
             embed_w_i8[v * hidden_size + i] = static_cast<int8_t>(std::clamp(std::round(row[i] * inv_s), -127.0f, 127.0f));
         }
+    }
+
     }
 
     // 2. Parse views and scales from MLIR
