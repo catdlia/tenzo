@@ -1,0 +1,56 @@
+ Container untitled-dev-run-7860c025a67f Creating 
+ Container untitled-dev-run-7860c025a67f Created 
+--- Running Audit JIT Regression Tests ---
+
+======================================================================
+🔬 Running Audit JIT Test Suite against Independent Math References
+======================================================================
+▶ Testing: Standalone Packing (81 Exhaustive + Round-Clamp) ...
+[DEBUG] registerAllTenzoDialectTranslations called
+[MicroKernel] ====== Explicit Micro-Kernel Generation ======
+[MicroKernel] Target: 6x16
+[MicroKernel] 🚀 Generating STANDALONE TERNARY PACK (4x16) Micro-Kernel
+✅ [AUDIT standalone_pack] PASS (exhaustive_81 mismatches=0, canaries=OK, vs_round_clamp=0)
+▶ Testing: Fused MatMul + Pack (81 Exhaustive + Round-Clamp) ...
+[DEBUG] registerAllTenzoDialectTranslations called
+[MicroKernel] ====== Explicit Micro-Kernel Generation ======
+[MicroKernel] Target: 6x16
+[MicroKernel] 🚀 Routing to FUSED TERNARY (1.58-bit) Micro-Kernel (4x16)
+✅ [AUDIT fused_pack] PASS (exhaustive_81 mismatches=0, canaries=OK, vs_round_clamp=0)
+▶ Testing: Fusion Multi-Consumer FP32 Buffer Preservation ...
+[DEBUG] registerAllTenzoDialectTranslations called
+[MicroKernel] ====== Explicit Micro-Kernel Generation ======
+[MicroKernel] Target: 6x16
+[MicroKernel] 🚀 Routing to FUSED TERNARY (1.58-bit) Micro-Kernel (4x16)
+[MicroKernel] ====== Explicit Micro-Kernel Generation ======
+[MicroKernel] Target: 6x16
+[MicroKernel] 🚀 Routing to FUSED TERNARY (1.58-bit) Micro-Kernel (4x16)
+✅ [AUDIT fusion_consumer_pack] PASS (packing=OK, intermediate FP32 mismatches=0, non-zero C=OK, canaries=OK)
+▶ Testing: Explicit Attention (Rank-2, Fractional Q, T=8, D=32) ...
+[DEBUG] registerAllTenzoDialectTranslations called
+[MicroKernel] ====== Explicit Micro-Kernel Generation ======
+[MicroKernel] Target: 6x16
+[MicroKernel] 🚀 Generating SIMD BITWISE PACKED ATTENTION Micro-Kernel (D=32, T=8)
+✅ [AUDIT explicit_attention_H1_KV1_T8_D32] PASS (fractional=1, max_abs=4.470348e-08, canaries=OK)
+▶ Testing: Explicit Attention (Rank-2, Integer Q, T=8, D=32) ...
+[DEBUG] registerAllTenzoDialectTranslations called
+[MicroKernel] ====== Explicit Micro-Kernel Generation ======
+[MicroKernel] Target: 6x16
+[MicroKernel] 🚀 Generating SIMD BITWISE PACKED ATTENTION Micro-Kernel (D=32, T=8)
+✅ [AUDIT explicit_attention_H1_KV1_T8_D32] PASS (fractional=0, max_abs=5.960464e-08, canaries=OK)
+▶ Testing: Explicit Attention GQA (Rank-4, B=2, Hq=20, Hkv=5, T=8, D=32) ...
+[DEBUG] registerAllTenzoDialectTranslations called
+[MicroKernel] ====== Explicit Micro-Kernel Generation ======
+[MicroKernel] Target: 6x16
+[MicroKernel] 🚀 Generating SIMD BITWISE PACKED ATTENTION Micro-Kernel (D=32, T=8)
+✅ [AUDIT explicit_gqa_H20_KV5_T8_D32] PASS (fractional=1, max_abs=1.192093e-07, canaries=OK)
+▶ Testing: Linalg Attention Fallback (Rank-2, T=8, D=32) ...
+[DEBUG] registerAllTenzoDialectTranslations called
+✅ [AUDIT linalg_attention_H1_KV1_T8_D32] PASS (fractional=1, max_abs=8.940697e-08, canaries=OK)
+▶ Testing: Linalg Attention GQA Fallback (Rank-4, B=2, Hq=20, Hkv=5, T=8, D=32) ...
+[DEBUG] registerAllTenzoDialectTranslations called
+✅ [AUDIT linalg_gqa_H20_KV5_T8_D32] PASS (fractional=1, max_abs=8.940697e-08, canaries=OK)
+======================================================================
+✅ ALL AUDIT JIT TESTS PASSED!
+======================================================================
+audit exit=0

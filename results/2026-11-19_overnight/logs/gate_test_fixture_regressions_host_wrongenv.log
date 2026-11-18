@@ -1,0 +1,26 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║   Tenzo TL1 Fixture Corruption Regression Test Suite                   ║
+║   Milestone 2 Continuation: Requirement R2.b                           ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+ℹ️ Found tenzo-cli binary: /home/illia/CLionProjects/untitled/cmake-build-debug/tenzo-cli
+✅ [PASS] Test 1 (Ref): Truncated (256B) fixture rejected: Invalid fixture size: 256 bytes, expected exactly 4096 bytes
+❌ [FAIL] Test 1 (CLI): truncated (256B) fixture: rc=127, [TL1-FIXTURE-INVALID] missing.
+✅ [PASS] Test 2 (Ref): Truncated (4095B) fixture rejected: Invalid fixture size: 4095 bytes, expected exactly 4096 bytes
+❌ [FAIL] Test 2 (CLI): truncated (4095B) fixture: rc=127, [TL1-FIXTURE-INVALID] missing.
+✅ [PASS] Test 3 (Ref): Oversized (5000B) fixture rejected: Invalid fixture size: 5000 bytes, expected exactly 4096 bytes
+❌ [FAIL] Test 3 (CLI): oversized (5000B) fixture: rc=127, [TL1-FIXTURE-INVALID] missing.
+✅ [PASS] Test 4 (Ref): Corrupted low nibble fixture rejected: Invalid nibble at byte 100: low=9, high=0 (max allowable: 8)
+❌ [FAIL] Test 4 (CLI): corrupted low nibble fixture: rc=127, [TL1-FIXTURE-INVALID] missing.
+✅ [PASS] Test 5 (Ref): Corrupted high nibble fixture rejected: Invalid nibble at byte 200: low=0, high=9 (max allowable: 8)
+❌ [FAIL] Test 5 (CLI): corrupted high nibble fixture: rc=127, [TL1-FIXTURE-INVALID] missing.
+✅ [PASS] Test 6 (Ref): Missing fixture cleanly rejected: Fixture file not found: /tmp/tmp6venhd0p/nonexistent_weights.bin
+❌ [FAIL] Test 6 (CLI): missing fixture: rc=127, [TL1-FIXTURE-INVALID] missing.
+✅ [PASS] Test 7 (Ref): Valid TL1 fixture correctly accepted.
+❌ [FAIL] Test 7 (CLI): tenzo-cli failed on valid fixture (code 127):
+/home/illia/CLionProjects/untitled/cmake-build-debug/tenzo-cli: error while loading shared libraries: libMLIR.so.21.1: cannot open shared object file: No such file or directory
+
+
+════════════════════════════════════════════════════════════════════════
+❌ TL1 FIXTURE REGRESSION TESTS FAILED!
+test_fixture_regressions exit=1

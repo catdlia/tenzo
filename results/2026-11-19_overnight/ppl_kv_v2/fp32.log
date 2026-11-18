@@ -1,0 +1,32 @@
+ Container untitled-dev-run-c14e34f6d646 Creating 
+ Container untitled-dev-run-c14e34f6d646 Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: fp32[0m[36m, Max Context: 512)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(4402.5 ms)
+
+score window 0 tokens=511 ppl=12.3 running_ppl=12.3
+score window 1 tokens=511 ppl=20.8 running_ppl=16.0
+score window 2 tokens=511 ppl=29.6 running_ppl=19.6
+score window 3 tokens=511 ppl=10.4 running_ppl=16.7
+score window 4 tokens=511 ppl=11.2 running_ppl=15.4
+score window 5 tokens=511 ppl=20.1 running_ppl=16.1
+score window 6 tokens=511 ppl=27.6 running_ppl=17.4
+score window 7 tokens=511 ppl=20.7 running_ppl=17.8
+score window 8 tokens=511 ppl=26.9 running_ppl=18.6
+score window 9 tokens=511 ppl=20.2 running_ppl=18.8
+score window 10 tokens=511 ppl=15.4 running_ppl=18.5
+score window 11 tokens=511 ppl=16.1 running_ppl=18.2
+score window 12 tokens=511 ppl=35.2 running_ppl=19.2
+score window 13 tokens=511 ppl=18.2 running_ppl=19.1
+score window 14 tokens=511 ppl=21.1 running_ppl=19.2
+score window 15 tokens=511 ppl=17.4 running_ppl=19.1
+PROC_RSS_KB=956872 PROC_HWM_KB=2748712

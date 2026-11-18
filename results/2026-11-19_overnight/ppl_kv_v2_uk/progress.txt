@@ -1,0 +1,9 @@
+2026-11-18T20:35:20+02:00 kv=fp32 MemAvailable=8493408kB
+fp32 exit=0 20:43:14
+2026-11-18T20:43:14+02:00 kv=int8_fused MemAvailable=7571500kB
+int8_fused exit=0 20:50:27
+2026-11-18T20:50:27+02:00 kv=tl1_fused MemAvailable=7361684kB
+tl1_fused exit=0 21:00:27
+2026-11-18T21:00:27+02:00 kv=popcount_fused MemAvailable=7331568kB
+popcount_fused exit=0 21:09:56
+ALLDONE

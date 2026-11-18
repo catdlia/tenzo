@@ -1,0 +1,7 @@
+416897 329.7 tenzo-i+
+384286 42.4 neko
+385346 14.1 Isolate+
+381578 9.4 Isolate+
+384280 9.4 Xorg
+    PID COMMAND
+ 382775 /usr/bin/python3 /usr/bin/supervisord -c /etc/neko/supervisord.conf

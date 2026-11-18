@@ -36,3 +36,13 @@ Times are local (EET). Memory readings before each heavy step: `logs/mem.log`.
 - **D9 (19:05)** MemAvailable 3.73 GB after the 5-minute wait (needed ~4.8 GB for tenzo-inference). Per rule 0.3 the
   G6-after and speed check for fix 2 are skipped for now and recorded as a blocker; fix 2 is committed with the tensor
   and PPL evidence only.
+- **D10 (19:26) Second resume** ("ноут вільний"): new 6 h budget from 19:26 (last block start 00:46, end 01:26).
+  MemAvailable 9.9 GB. Inhibitor restarted (the first one was still alive). governor powersave, EPP performance, AC on.
+- **D11 (19:58) Background CPU load not owned by this run**: firefox, `neko` and a browser isolate process use
+  ~100% CPU in total (load average 8-12 while tenzo-inference uses ~3 cores). Each fp32 PPL pass took 25 min instead of 10 min at 13:37.
+  PPL is deterministic and unaffected. Speed numbers ARE affected; the bitnet.cpp f16 control point is re-run
+  in the same session to expose machine drift, and the speed section carries this caveat. These processes
+  were not touched (they are the owner's).
+- **D12** `test_fixture_regressions.py` run on the host fails with rc=127 (`libMLIR.so.21.1` missing on the host);
+  it is a Docker-only suite: the gate was re-run inside the dev container -> exit 0. The host log is kept as
+  `logs/gate_test_fixture_regressions_host_wrongenv.log`.
