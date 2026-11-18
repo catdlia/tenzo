@@ -510,9 +510,9 @@ def _export_bitnet_core(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
 
         # Apply RoPE in 4D
         rope_q = get_var("tensor<1x20x1x128xf32>")
-        mlir_lines.append(f'    {rope_q} = "tenzo.rope"({q_4d}, {seq_pos_var}) : (tensor<1x20x1x128xf32>, tensor<1xi32>) -> tensor<1x20x1x128xf32>')
+        mlir_lines.append(f'    {rope_q} = "tenzo.rope"({q_4d}, {seq_pos_var}) {{theta = {float(cfg["rope_theta"]):e} : f64}} : (tensor<1x20x1x128xf32>, tensor<1xi32>) -> tensor<1x20x1x128xf32>')
         rope_k = get_var("tensor<1x5x1x128xf32>")
-        mlir_lines.append(f'    {rope_k} = "tenzo.rope"({k_4d}, {seq_pos_var}) : (tensor<1x5x1x128xf32>, tensor<1xi32>) -> tensor<1x5x1x128xf32>')
+        mlir_lines.append(f'    {rope_k} = "tenzo.rope"({k_4d}, {seq_pos_var}) {{theta = {float(cfg["rope_theta"]):e} : f64}} : (tensor<1x5x1x128xf32>, tensor<1xi32>) -> tensor<1x5x1x128xf32>')
 
         # KV Cache Update & Attention
         if packed_attention:

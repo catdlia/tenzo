@@ -324,8 +324,16 @@ class FXToMLIREmitter:
                     inp = self.ssa_map[node.args[0]]
                     inp_type = self.type_map[inp]
                     res_var = self._get_new_var(inp_type)
+                    # tenzo.rope requires the model's RoPE base; take it from the module. The in-repo Llama
+                    # RotaryEmbedding (export_llama.py, test_generation.py) has no attribute and hard-codes 10000 in
+                    # its forward, so 10000 *is* that module's semantics; say so loudly instead of guessing silently.
+                    theta = next((getattr(submod, n) for n in ("theta", "base", "rope_theta") if hasattr(submod, n)), None)
+                    if theta is None:
+                        theta = 10000.0
+                        print(f"warning: {node.target}: RotaryEmbedding has no theta/base/rope_theta attribute; "
+                              f"emitting theta=10000 (the base hard-coded in the in-repo Llama RotaryEmbedding)")
                     self.mlir_lines.append(
-                        f'    {res_var} = "tenzo.rope"({inp}, {seq_pos_arg}) : ({inp_type}, {seq_pos_type}) -> {inp_type}'
+                        f'    {res_var} = "tenzo.rope"({inp}, {seq_pos_arg}) {{theta = {float(theta):e} : f64}} : ({inp_type}, {seq_pos_type}) -> {inp_type}'
                     )
                     self.ssa_map[node] = res_var
                     self.type_map[res_var] = inp_type

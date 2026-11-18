@@ -151,6 +151,10 @@ struct RopeLoweringToLinalg : public OpConversionPattern<tenzo::RopeOp> {
   LogicalResult
   matchAndRewrite(tenzo::RopeOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto thetaAttr = op.getThetaAttr();
+    if (!thetaAttr || !(thetaAttr.getValueAsDouble() > 0.0))
+      return op.emitOpError("requires a positive 'theta' attribute (RoPE base, HF config.rope_theta)");
+    const double ropeTheta = thetaAttr.getValueAsDouble();
     auto loc = op.getLoc();
     Value input = adaptor.getInput();
     Value seqPos = adaptor.getSeqPos();
@@ -204,7 +208,7 @@ struct RopeLoweringToLinalg : public OpConversionPattern<tenzo::RopeOp> {
           Value partnerVal =
               b.create<tensor::ExtractOp>(l, input, partnerIndices);
 
-          // theta_i = 10000^(-2 * freqIdx / D)
+          // inv_freq_i = theta^(-2 * freqIdx / D), theta from the op attribute
           Value freqIdxF =
               b.create<arith::IndexCastOp>(l, b.getI64Type(), freqIdx);
           Value freqIdxFloat = b.create<arith::SIToFPOp>(l, elemType, freqIdxF);
@@ -213,9 +217,9 @@ struct RopeLoweringToLinalg : public OpConversionPattern<tenzo::RopeOp> {
               rewriter.getFloatAttr(elemType, -2.0 / static_cast<double>(D)));
           Value exponent = b.create<arith::MulFOp>(l, freqIdxFloat, factor);
 
-          // pow(10000, exponent) = exp(exponent * ln(10000))
+          // pow(theta, exponent) = exp(exponent * ln(theta))
           Value lnBase = b.create<arith::ConstantOp>(
-              l, rewriter.getFloatAttr(elemType, std::log(10000.0)));
+              l, rewriter.getFloatAttr(elemType, std::log(ropeTheta)));
           Value expArg = b.create<arith::MulFOp>(l, exponent, lnBase);
           Value invFreq = b.create<math::ExpOp>(l, expArg);
 
@@ -2309,8 +2313,10 @@ struct BitLinearTL1PackLoweringToLinalg
 
     // LUT memory
     auto vec32i8 = VectorType::get({32}, rewriter.getI8Type());
+    // Two tables per activation pair k: lut[2k][idx] = w0*a0, lut[2k+1][idx] = w1*a1 (each fits int8 since
+    // |a| <= 127); one w0*a0 + w1*a1 table would need +-254.
     Value lutMemref = rewriter.create<memref::AllocOp>(
-        loc, MemRefType::get({K_half}, vec32i8));
+        loc, MemRefType::get({2 * K_half}, vec32i8));
     Value zeros32i8 = rewriter.create<arith::ConstantOp>(
         loc, DenseElementsAttr::get(vec32i8, rewriter.getI8IntegerAttr(0)));
     Value lhsMemref = rewriter.create<memref::AllocOp>(
@@ -2373,12 +2379,14 @@ struct BitLinearTL1PackLoweringToLinalg
                 Value safeMaxAbs =
                     bS.create<arith::MaximumFOp>(locS, maxAbs, eps);
 
-                Value c31F = bS.create<arith::ConstantOp>(
-                    locS, bS.getFloatAttr(elemType, 31.0f));
+                // HF integrations/bitnet.py ActQuant: scale = 127 / max(|x|).clamp(1e-5), round half-to-even,
+                // clamp(-128, 127). Before 2026-11-19 this used 31 levels with truncation toward zero.
+                Value c127F = bS.create<arith::ConstantOp>(
+                    locS, bS.getFloatAttr(elemType, 127.0f));
                 Value scaleAct =
-                    bS.create<arith::DivFOp>(locS, c31F, safeMaxAbs);
+                    bS.create<arith::DivFOp>(locS, c127F, safeMaxAbs);
                 Value invScaleAct =
-                    bS.create<arith::DivFOp>(locS, safeMaxAbs, c31F);
+                    bS.create<arith::DivFOp>(locS, safeMaxAbs, c127F);
                 Value totalScale =
                     bS.create<arith::MulFOp>(locS, invScaleAct, scaleF);
 
@@ -2398,10 +2406,17 @@ struct BitLinearTL1PackLoweringToLinalg
                           padF32, inBounds);
                       Value vScaled =
                           b.create<arith::MulFOp>(l, vF32, scaleActVec);
+                      Value vRounded = b.create<math::RoundEvenOp>(l, vScaled);
+                      Value qLo = b.create<arith::ConstantOp>(
+                          l, DenseElementsAttr::get(vector128f32, b.getF32FloatAttr(-128.0f)));
+                      Value qHi = b.create<arith::ConstantOp>(
+                          l, DenseElementsAttr::get(vector128f32, b.getF32FloatAttr(127.0f)));
+                      Value vClamped = b.create<arith::MinimumFOp>(
+                          l, b.create<arith::MaximumFOp>(l, vRounded, qLo), qHi);
                       auto vector128i32 =
                           VectorType::get({128}, b.getI32Type());
                       Value vI32 =
-                          b.create<arith::FPToSIOp>(l, vector128i32, vScaled);
+                          b.create<arith::FPToSIOp>(l, vector128i32, vClamped);
                       Value vI16 =
                           b.create<arith::TruncIOp>(l, vector128i16, vI32);
                       b.create<vector::TransferWriteOp>(l, vI16, lhsMemref,
@@ -2429,66 +2444,32 @@ struct BitLinearTL1PackLoweringToLinalg
                       Value a1_i32 =
                           b.create<arith::ExtSIOp>(l, b.getI32Type(), a1_i16);
 
-                      Value lut_vec = zeros32i8;
-                      int w0_vals[] = {-1, 0, 1};
-                      int w1_vals[] = {-1, 0, 1};
-
+                      Value zeroI32 = b.create<arith::ConstantOp>(
+                          l, b.getI32IntegerAttr(0));
+                      Value neg_a0 = b.create<arith::SubIOp>(l, zeroI32, a0_i32);
+                      Value neg_a1 = b.create<arith::SubIOp>(l, zeroI32, a1_i32);
+                      Value lut0 = zeros32i8; // w0 * a0
+                      Value lut1 = zeros32i8; // w1 * a1
                       for (int i = 0; i < 3; ++i) {
                         for (int j = 0; j < 3; ++j) {
-                          int w0 = w0_vals[i];
-                          int w1 = w1_vals[j];
+                          int w0 = i - 1;
+                          int w1 = j - 1;
                           int idx = (w0 + 1) | ((w1 + 1) << 2);
-
-                          Value sum_i32;
-                          if (w0 == 0 && w1 == 0) {
-                            sum_i32 = b.create<arith::ConstantOp>(
-                                l, b.getI32IntegerAttr(0));
-                          } else if (w0 == 0) {
-                            sum_i32 = (w1 == 1)
-                                          ? a1_i32
-                                          : b.create<arith::SubIOp>(
-                                                l,
-                                                b.create<arith::ConstantOp>(
-                                                    l, b.getI32IntegerAttr(0)),
-                                                a1_i32);
-                          } else if (w1 == 0) {
-                            sum_i32 = (w0 == 1)
-                                          ? a0_i32
-                                          : b.create<arith::SubIOp>(
-                                                l,
-                                                b.create<arith::ConstantOp>(
-                                                    l, b.getI32IntegerAttr(0)),
-                                                a0_i32);
-                          } else {
-                            Value term0 =
-                                (w0 == 1) ? a0_i32
-                                          : b.create<arith::SubIOp>(
-                                                l,
-                                                b.create<arith::ConstantOp>(
-                                                    l, b.getI32IntegerAttr(0)),
-                                                a0_i32);
-                            Value term1 =
-                                (w1 == 1) ? a1_i32
-                                          : b.create<arith::SubIOp>(
-                                                l,
-                                                b.create<arith::ConstantOp>(
-                                                    l, b.getI32IntegerAttr(0)),
-                                                a1_i32);
-                            sum_i32 = b.create<arith::AddIOp>(l, term0, term1);
+                          Value t0 = (w0 == 0) ? zeroI32 : (w0 == 1 ? a0_i32 : neg_a0);
+                          Value t1 = (w1 == 0) ? zeroI32 : (w1 == 1 ? a1_i32 : neg_a1);
+                          Value t0_i8 = b.create<arith::TruncIOp>(l, b.getI8Type(), t0);
+                          Value t1_i8 = b.create<arith::TruncIOp>(l, b.getI8Type(), t1);
+                          for (int lane : {idx, idx + 16}) {
+                            Value li = b.create<arith::ConstantIndexOp>(l, lane);
+                            lut0 = b.create<vector::InsertElementOp>(l, t0_i8, lut0, li);
+                            lut1 = b.create<vector::InsertElementOp>(l, t1_i8, lut1, li);
                           }
-
-                          Value val_i8 = b.create<arith::TruncIOp>(
-                              l, b.getI8Type(), sum_i32);
-                          lut_vec = b.create<vector::InsertElementOp>(
-                              l, val_i8, lut_vec,
-                              b.create<arith::ConstantIndexOp>(l, idx));
-                          lut_vec = b.create<vector::InsertElementOp>(
-                              l, val_i8, lut_vec,
-                              b.create<arith::ConstantIndexOp>(l, idx + 16));
                         }
                       }
-                      b.create<memref::StoreOp>(l, lut_vec, lutMemref,
-                                                ValueRange{k_half_idx});
+                      Value lut_idx0 = b.create<arith::MulIOp>(l, k_half_idx, c2);
+                      Value lut_idx1 = b.create<arith::AddIOp>(l, lut_idx0, oneIdx);
+                      b.create<memref::StoreOp>(l, lut0, lutMemref, ValueRange{lut_idx0});
+                      b.create<memref::StoreOp>(l, lut1, lutMemref, ValueRange{lut_idx1});
                       b.create<scf::YieldOp>(l);
                     });
 
@@ -2506,7 +2487,8 @@ struct BitLinearTL1PackLoweringToLinalg
                     [&](OpBuilder &b, Location loc2, ValueRange ivs,
                         ValueRange nArgs) {
                       Value n_block_idx = ivs[0];
-                      Value c256 = b.create<arith::ConstantIndexOp>(loc2, 256);
+                      // int16 accumulation per chunk: 128 pairs * 2 * 127 = 32512 < 32767 (8-bit activations)
+                      Value c256 = b.create<arith::ConstantIndexOp>(loc2, 128);
 
                       auto kLoop = b.create<scf::ForOp>(
                           loc2, zeroIdx, ck_half, c256,
@@ -2535,11 +2517,15 @@ struct BitLinearTL1PackLoweringToLinalg
                                       b3.create<arith::AddIOp>(
                                           loc4, k_micro_idx, oneIdx);
 
-                                  Value lut_k0 = b3.create<memref::LoadOp>(
-                                      loc4, lutMemref, ValueRange{k_micro_idx});
-                                  Value lut_k1 = b3.create<memref::LoadOp>(
-                                      loc4, lutMemref,
-                                      ValueRange{k_micro_plus_1});
+                                  Value c2i = b3.create<arith::ConstantIndexOp>(loc4, 2);
+                                  Value l00 = b3.create<arith::MulIOp>(loc4, k_micro_idx, c2i);
+                                  Value l01 = b3.create<arith::AddIOp>(loc4, l00, oneIdx);
+                                  Value l10 = b3.create<arith::MulIOp>(loc4, k_micro_plus_1, c2i);
+                                  Value l11 = b3.create<arith::AddIOp>(loc4, l10, oneIdx);
+                                  Value lut_k0a = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{l00});
+                                  Value lut_k0b = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{l01});
+                                  Value lut_k1a = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{l10});
+                                  Value lut_k1b = b3.create<memref::LoadOp>(loc4, lutMemref, ValueRange{l11});
 
                                   bool inB[] = {true};
                                   ArrayRef<bool> inBounds1D(inB);
@@ -2593,18 +2579,16 @@ struct BitLinearTL1PackLoweringToLinalg
                                         loc4, vec32i16, res_high_w);
                                   };
 
-                                  Value res_low_k0_16, res_high_k0_16;
-                                  process_w(w_k0, lut_k0, res_low_k0_16,
-                                            res_high_k0_16);
-
-                                  Value res_low_k1_16, res_high_k1_16;
-                                  process_w(w_k1, lut_k1, res_low_k1_16,
-                                            res_high_k1_16);
-
-                                  Value sum_low_16 = b3.create<arith::AddIOp>(
-                                      loc4, res_low_k0_16, res_low_k1_16);
-                                  Value sum_high_16 = b3.create<arith::AddIOp>(
-                                      loc4, res_high_k0_16, res_high_k1_16);
+                                  Value rl0a, rh0a, rl0b, rh0b, rl1a, rh1a, rl1b, rh1b;
+                                  process_w(w_k0, lut_k0a, rl0a, rh0a);
+                                  process_w(w_k0, lut_k0b, rl0b, rh0b);
+                                  process_w(w_k1, lut_k1a, rl1a, rh1a);
+                                  process_w(w_k1, lut_k1b, rl1b, rh1b);
+                                  auto add16 = [&](Value x, Value y) -> Value {
+                                    return b3.create<arith::AddIOp>(loc4, x, y);
+                                  };
+                                  Value sum_low_16 = add16(add16(rl0a, rl0b), add16(rl1a, rl1b));
+                                  Value sum_high_16 = add16(add16(rh0a, rh0b), add16(rh1a, rh1b));
 
                                   Value next_acc_low_i16 =
                                       b3.create<arith::AddIOp>(
@@ -2815,12 +2799,14 @@ struct BitLinearTL1LoweringToLinalg
                 Value safeMaxAbs =
                     bS.create<arith::MaximumFOp>(locS, maxAbs, eps);
 
-                Value c63F = bS.create<arith::ConstantOp>(
-                    locS, bS.getFloatAttr(elemType, 63.0f));
+                // HF integrations/bitnet.py ActQuant: scale = 127 / max(|x|).clamp(1e-5), round half-to-even,
+                // clamp(-128, 127). Before 2026-11-19 this used 63 levels with truncation toward zero.
+                Value c127F = bS.create<arith::ConstantOp>(
+                    locS, bS.getFloatAttr(elemType, 127.0f));
                 Value scaleAct =
-                    bS.create<arith::DivFOp>(locS, c63F, safeMaxAbs);
+                    bS.create<arith::DivFOp>(locS, c127F, safeMaxAbs);
                 Value invScaleAct =
-                    bS.create<arith::DivFOp>(locS, safeMaxAbs, c63F);
+                    bS.create<arith::DivFOp>(locS, safeMaxAbs, c127F);
                 Value totalScale =
                     bS.create<arith::MulFOp>(locS, invScaleAct, scaleF);
 
@@ -2840,10 +2826,17 @@ struct BitLinearTL1LoweringToLinalg
                           padF32, inBounds);
                       Value vScaled =
                           b.create<arith::MulFOp>(l, vF32, scaleActVec);
+                      Value vRounded = b.create<math::RoundEvenOp>(l, vScaled);
+                      Value qLo = b.create<arith::ConstantOp>(
+                          l, DenseElementsAttr::get(vector128f32, b.getF32FloatAttr(-128.0f)));
+                      Value qHi = b.create<arith::ConstantOp>(
+                          l, DenseElementsAttr::get(vector128f32, b.getF32FloatAttr(127.0f)));
+                      Value vClamped = b.create<arith::MinimumFOp>(
+                          l, b.create<arith::MaximumFOp>(l, vRounded, qLo), qHi);
                       auto vector128i32 =
                           VectorType::get({128}, b.getI32Type());
                       Value vI32 =
-                          b.create<arith::FPToSIOp>(l, vector128i32, vScaled);
+                          b.create<arith::FPToSIOp>(l, vector128i32, vClamped);
                       Value vI16 =
                           b.create<arith::TruncIOp>(l, vector128i16, vI32);
                       b.create<vector::TransferWriteOp>(l, vI16, lhsMemref,
@@ -2952,7 +2945,8 @@ struct BitLinearTL1LoweringToLinalg
                     [&](OpBuilder &b, Location loc2, ValueRange ivs,
                         ValueRange nArgs) {
                       Value n_block_idx = ivs[0];
-                      Value c256 = b.create<arith::ConstantIndexOp>(loc2, 256);
+                      // int16 accumulation per chunk: 128 pairs * 2 * 127 = 32512 < 32767 (8-bit activations)
+                      Value c256 = b.create<arith::ConstantIndexOp>(loc2, 128);
 
                       auto kLoop = b.create<scf::ForOp>(
                           loc2, zeroIdx, ck_half, c256,

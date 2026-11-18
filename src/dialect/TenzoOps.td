@@ -193,11 +193,15 @@ def RopeOp : Tenzo_Op<"rope", [Pure]> {
   let summary = "Rotary Position Embedding";
   let description = [{
     Applies Rotary Position Embedding (RoPE) to Query or Key tensor at seq_pos.
+    HF semantics (rotate_half pairing (i, i + D/2)): inv_freq_i = theta^(-2i/D).
+    `theta` is the model's RoPE base (HF config.rope_theta, e.g. 500000 for BitNet-b1.58-2B-4T,
+    10000 for Llama-1/2) and is required: lowering fails if it is absent, there is no default.
   }];
   
   let arguments = (ins 
     AnyTensor:$input,
-    AnyTensor:$seq_pos
+    AnyTensor:$seq_pos,
+    OptionalAttr<F64Attr>:$theta
   );
   let results = (outs AnyTensor:$result);
   
