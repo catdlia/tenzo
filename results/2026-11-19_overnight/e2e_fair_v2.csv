@@ -1,0 +1,36 @@
+engine,kv,prompt_len,gen_len,rep,pp_tps,tg_tps,pg_tps,rss_mb,threads,cpus,governor,note
+tenzo,fp32,16,128,0,10.8203151416785,6.53878572705678,6.839490457960881,2778.5,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,1,13.360053440213761,9.9055107142028,10.19851696565791,2778.69921875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,2,14.00437636761488,9.27865691441164,9.640102827763496,2778.45703125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,3,6.939926263283453,6.862350891301435,6.870884626395649,2778.66796875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,4,12.265235722499042,7.323785710607474,7.666996773472191,2778.5859375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,0,9.923711468089067,6.304331765459158,6.570602031411128,2667.21484375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,1,3.7055908101347907,8.10732065719968,7.162041181736795,2667.3359375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,2,10.4835539247805,8.907818002143445,9.059110697299882,2666.921875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,3,10.436370752070967,5.755602719522285,6.057470248987268,2667.33984375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,4,10.255752836356645,9.181484961731858,9.289603385544345,2667.2109375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,0,9.8348059930849,6.356205742434626,7.721821384619096,2778.3828125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,1,12.657476811106935,8.324174573548635,10.04335118382079,2778.71875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,2,12.290084398313954,8.258757186086575,9.878982464806125,2778.5625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,3,9.424862492728865,7.9053824537566,8.598510039432231,2778.640625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,4,10.545568389658753,10.921222153016561,10.73010843277545,2778.75,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,0,8.657188848458615,6.571449107207031,7.471485774991537,2667.3359375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,1,5.7103343668443705,4.786889905271937,5.207994271206302,2667.35546875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,2,14.140990090259288,8.072959370309169,10.278193768042044,2667.2890625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,3,14.009894487982137,7.176175098672408,9.490902080583691,2667.33203125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,4,10.696974761825173,8.759144067390665,9.631555383324617,2667.125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+bitnet.cpp,f16,128,128,0,50.588629,8.216755,12.419343,1226.76171875,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,1,47.855238,8.454012,12.205478,1226.703125,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,2,46.072941,7.309201,11.659189,1226.7109375,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,3,43.357174,7.184529,12.939219,1226.7421875,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,4,38.980824,5.293147,11.525739,1226.73046875,4,0-3,powersave,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+tenzo,fp32,512,128,0,12.511148850904737,6.330178135169086,10.467076954276864,2778.3125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,1,8.505576801039274,7.738581058613705,8.340250963364145,2778.36328125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,2,7.714712348210775,7.963071257045451,7.76313698661708,2778.41796875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,3,7.645636685915154,6.051122530503804,7.262872874758567,2778.44140625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,4,7.944315314840043,4.064511417149063,6.670787267551728,2778.51953125,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,0,7.663041688742812,7.622132768025152,7.654824812157775,2667.35546875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,1,9.409689039182533,7.18798259160466,8.861872485962932,2667.38671875,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,2,9.87073577466961,7.049312141338709,9.139162310094633,2667.0859375,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,3,11.16309898093116,5.232177894048398,9.10003497825945,2667.2265625,4,0-3,powersave,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,4,12.168081126878388,7.06709879031145,10.63310150956813,2667.3203125,4,0-3,powersave,token-by-token prefill; tg after the prompt

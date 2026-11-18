@@ -26,3 +26,5 @@ MemAvailable:   11524828 kB
 2026-11-18T21:17:50+02:00 golden prompts greedy MemAvailable=7053880kB
 2026-11-18T21:28:26+02:00 golden prompts greedy (cached) MemAvailable=7368812kB
 2026-11-18T22:09:09+02:00 parity MemAvailable=7431684kB
+2026-11-18T22:17:23+02:00 e2e speed MemAvailable=7116720kB
+2026-11-18T22:47:34+02:00 ab builds MemAvailable=7635452kB

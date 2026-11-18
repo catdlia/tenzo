@@ -1,0 +1,26 @@
+ Container untitled-dev-run-0d019820c10f Creating 
+ Container untitled-dev-run-0d019820c10f Created 
+ninja: Entering directory `/app/cmake-build-debug/ab/build_new'
+[1/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/HeteroPipeline.cpp.o
+[2/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/net/TenzoComm.cpp.o
+[3/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/TenzoEngine.cpp.o
+[4/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/VulkanRuntime.cpp.o
+[5/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/CUDARuntime.cpp.o
+[6/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/ROCmRuntime.cpp.o
+[7/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/MicroarchProfiler.cpp.o
+[8/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/ThreadPool.cpp.o
+[9/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/KVCacheManager.cpp.o
+[10/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/Sampler.cpp.o
+[11/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/Tokenizer.cpp.o
+[12/15] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/ExecutionContext.cpp.o
+/app/cmake-build-debug/ab/src_new/src/runtime/ExecutionContext.cpp: In constructor 'tenzo::runtime::ExecutionContext::ExecutionContext(mlir::MLIRContext&, mlir::ModuleOp)':
+/app/cmake-build-debug/ab/src_new/src/runtime/ExecutionContext.cpp:39:40: warning: 'llvm::TargetMachine* llvm::Target::createTargetMachine(llvm::StringRef, llvm::StringRef, llvm::StringRef, const llvm::TargetOptions&, std::optional<llvm::Reloc::Model>, std::optional<llvm::CodeModel::Model>, llvm::CodeGenOptLevel, bool) const' is deprecated: Use overload accepting Triple instead [-Wdeprecated-declarations]
+   39 |             target->createTargetMachine(targetTriple, llvm::sys::getHostCPUName(), "", opt, llvm::Reloc::PIC_)
+      |             ~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /app/cmake-build-debug/ab/src_new/src/runtime/ExecutionContext.cpp:12:
+/usr/include/llvm-21/llvm/MC/TargetRegistry.h:478:18: note: declared here
+  478 |   TargetMachine *createTargetMachine(
+      |                  ^~~~~~~~~~~~~~~~~~~
+[13/15] Linking CXX static library libtenzo_runtime.a
+[14/15] Building CXX object CMakeFiles/tenzo-inference.dir/src/main_inference.cpp.o
+[15/15] Linking CXX executable tenzo-inference

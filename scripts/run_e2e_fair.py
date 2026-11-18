@@ -24,9 +24,9 @@ def governor():
     except Exception: return "unknown"
 
 
-def run_tenzo(kv, pp, tg, ids_file, ctx):
+def run_tenzo(kv, pp, tg, ids_file, ctx, model="models/bitnet-1.58b"):
     cmd = ["docker", "compose", "-f", str(ROOT / "docker-compose.yml"), "run", "--rm", "-e", "OMP_PLACES=cores", "-e", "OMP_PROC_BIND=spread", "dev",
-           "/app/cmake-build-debug/tenzo-inference", "-m", "/app/models/bitnet-1.58b", "--kv-quant", kv, "-c", str(ctx),
+           "/app/cmake-build-debug/tenzo-inference", "-m", "/app/" + model, "--kv-quant", kv, "-c", str(ctx),
            "--ids-file", "/app/" + str(ids_file), "--bench-pp", str(pp), "--bench-tg", str(tg)]
     out = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT).stdout
     m = re.search(r"BENCH_FAIR,(.*)", out)
@@ -64,6 +64,9 @@ def main():
     ap.add_argument("--out", required=True); ap.add_argument("--reps", type=int, default=5); ap.add_argument("--gen", type=int, default=128)
     ap.add_argument("--prompts", default="16,128,512"); ap.add_argument("--ids-file", default="results/2026-11-18_overnight/e2e_ids.txt")
     ap.add_argument("--tenzo-kv", default="fp32,int8_fused,tl1_fused"); ap.add_argument("--skip-llama", action="store_true")
+    ap.add_argument("--model", default="models/bitnet-1.58b", help="Tenzo model dir (relative to repo)")
+    ap.add_argument("--llama-prompts", default=None, help="prompt lengths for bitnet.cpp (default: same as --prompts)")
+    ap.add_argument("--llama-ctk", default="f16,q8_0", help="bitnet.cpp KV types")
     a = ap.parse_args()
     gov = governor(); rows = []
     prompts = [int(x) for x in a.prompts.split(",")]
@@ -71,12 +74,13 @@ def main():
     def emit(r):
         r.update(threads=4, cpus="0-3", governor=gov); w.writerow(r); sys.stdout.flush()
     for pp in prompts:
-        for kv in a.tenzo_kv.split(","):
+        for kv in [k for k in a.tenzo_kv.split(",") if k]:
             for rep in range(a.reps):
-                m = run_tenzo(kv, pp, a.gen, a.ids_file, 1024)
+                m = run_tenzo(kv, pp, a.gen, a.ids_file, 1024, a.model)
                 emit({"engine": "tenzo", "kv": kv, "prompt_len": pp, "gen_len": a.gen, "rep": rep, **m, "note": "token-by-token prefill; tg after the prompt"})
         if a.skip_llama: continue
-        for ctk in ("f16", "q8_0"):
+        if a.llama_prompts is not None and pp not in [int(x) for x in a.llama_prompts.split(",")]: continue
+        for ctk in a.llama_ctk.split(","):
             extra = [] if ctk == "f16" else ["-fa", "1"]
             for rep in range(a.reps):
                 try:
