@@ -1,0 +1,26 @@
+{
+ "raw_sha256": "bbf94c53a05abe9ee670d3b6343608095822c85e26de37c70b24fc571964574a",
+ "n_text_tokens": 288936,
+ "seed": 0,
+ "window_len": 512,
+ "starts": [
+  7877,
+  17089,
+  31921,
+  73135,
+  80186,
+  82457,
+  86293,
+  117952,
+  122579,
+  150055,
+  152315,
+  170584,
+  211543,
+  220760,
+  230131,
+  255653
+ ],
+ "bos": 128000,
+ "tokenizer": "microsoft/bitnet-b1.58-2B-4T (HF fast, add_special_tokens=False)"
+}

@@ -1,0 +1,70 @@
+start: 2026-11-18T02:05:21+02:00
+git HEAD: de664430499b0d954c7411ccdd4eebc9647d7d75 branch: overnight/2026-11-18
+ac_online: 1 
+governor:       8 powersave 
+sudo -n: sudo: a password is required  => governor left as-is (powersave)
+docker image: sha256:2e3977eb8135eb73569bf1d9a4377f44bfee438a17d1d39e0d3528c4871e1b62
+host clang: clang version 23.1.3
+container clang/llvm:
+Ubuntu clang version 21.1.8 (++20251221032922+2078da43e25a-1~exp1~20251221153059.70)
+21.1.8
+cmake version 3.28.3
+loadavg: 0.48 0.70 0.90 5/2312 98237
+mem:
+               total        used        free      shared  buff/cache   available
+Mem:           19679       13028        1385        3900        9538        6651
+Swap:           9839        8293        1546
+--- lscpu
+Architecture:                            x86_64
+CPU op-mode(s):                          32-bit, 64-bit
+Address sizes:                           39 bits physical, 48 bits virtual
+Byte Order:                              Little Endian
+CPU(s):                                  8
+On-line CPU(s) list:                     0-7
+Vendor ID:                               GenuineIntel
+Model name:                              12th Gen Intel(R) Core(TM) i3-1215U
+CPU family:                              6
+Model:                                   154
+Thread(s) per core:                      2
+Core(s) per socket:                      6
+Socket(s):                               1
+Stepping:                                4
+Microcode version:                       0x43b
+CPU(s) scaling MHz:                      82%
+CPU max MHz:                             4400.0000
+CPU min MHz:                             400.0000
+BogoMIPS:                                4992.00
+Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize arch_lbr ibt flush_l1d arch_capabilities
+Virtualization:                          VT-x
+L1d cache:                               224 KiB (6 instances)
+L1i cache:                               320 KiB (6 instances)
+L2 cache:                                4.5 MiB (3 instances)
+L3 cache:                                10 MiB (1 instance)
+NUMA node(s):                            1
+NUMA node0 CPU(s):                       0-7
+Vulnerability Gather data sampling:      Not affected
+Vulnerability Ghostwrite:                Not affected
+Vulnerability Indirect target selection: Not affected
+Vulnerability Itlb multihit:             Not affected
+Vulnerability L1tf:                      Not affected
+Vulnerability Mds:                       Not affected
+Vulnerability Meltdown:                  Not affected
+Vulnerability Mmio stale data:           Not affected
+Vulnerability Old microcode:             Not affected
+Vulnerability Reg file data sampling:    Mitigation; Clear Register File
+Vulnerability Retbleed:                  Not affected
+Vulnerability Spec rstack overflow:      Not affected
+Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+Vulnerability Srbds:                     Not affected
+Vulnerability Tsa:                       Not affected
+Vulnerability Tsx async abort:           Not affected
+Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
+--- other heavy procs at start
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+illia      62348  8.3  5.2 7897224 1067384 ?     Sl   00:12   9:26 /home/illia/.local/share/JetBrains/Toolbox/apps/clion/bin/clion
+illia       3337  7.8  2.8 3055052 572816 ?      Sl   Nov16 129:30 Telegram --
+illia      44232  5.4 16.9 4984200 3421476 ?     Sl   Nov17  26:11 /usr/bin/qemu-system-x86_64 -name claude-cowork-vm -sandbox on,obsolete=deny,elevat
+illia      62432  2.8  0.6 274005660 139700 ?    Sl   00:12   3:13 /home/illia/.local/share/JetBrains/Toolbox/apps/clion/plugins/clion-radler/DotFiles
+illia       1975  2.5  1.7 13078964 359912 ?     Sl   Nov16  42:29 /opt/zen-browser-bin/zen-bin

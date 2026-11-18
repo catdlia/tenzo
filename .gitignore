@@ -82,3 +82,6 @@ ccache_data/
 .env.*
 .DS_Store
 Thumbs.db
+
+# Reference binaries (regenerate with tools/reference/*; manifest in results/reference/MANIFEST.sha256)
+*.f32
