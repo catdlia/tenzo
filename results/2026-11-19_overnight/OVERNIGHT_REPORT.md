@@ -88,3 +88,34 @@ fb0bfee feat(ref): layer-major fp32 golden reference for BitNet-2B-4T
 ```
 
 Weights sha256 is the same at start and end: `68c8f32b…00d1` (`weights_sha256_start.txt`, `weights_sha256_end.txt`).
+
+---
+
+# Update: second session (resumed 19:26, laptop free; cut off at ~23:15 by the agent's usage limit)
+
+| step | status | key result | files |
+|---|---|---|---|
+| C: G6 after fix 2 | done | fp32 and int8_fused now generate the same text as HF ("Paris. Paris is a city that is known for its rich history…") | `g6/after_actquant_*` |
+| C: gates | done | tenzo-cli test, audit, fixture (in Docker), compiler, references: all exit 0, also after the compiler fixes | `logs/gate_*`, `logs/gates_after_compilerfix/` |
+| C: PPL, 4 KV modes, EN + UK | done | EN: fp32 19.124 (×1.0030 vs golden), int8 19.141 (×1.0039), tl1 54.9 (×2.88), popcount 207.7 (×10.9). UK: fp32 ×1.0007, int8 ×1.0020 (both within CI), tl1 ×8.87, popcount ×29.3 | `ppl_kv_v2.md`, `ppl_kv_v2_uk.md` |
+| C: parity v2 | done | cosine > 0.999 on 6/7 prompts (fp32, int8), top-1 6/7 (fp32) and 7/7 (int8), greedy up to 32/32; max_abs 0.54–2.27 > 0.25, so **0/7 pass the unchanged gates** | `parity_v2.md` |
+| 2: speed | done | same-time A/B (old vs new kernel): **decode ×0.81, prefill ×0.68**. Kernel not rewritten (>10% rule) | `speed_after_fix2.md`, `design_i2s_kernel.md` |
+| 3: same bugs elsewhere | done | Pybind (theta + 31 levels), MLIR `tenzo.rope` (theta is now a required attribute), `bitlinear_tl1_pack` (31 levels, truncation) and `bitlinear_tl1` (63 levels, truncation) fixed; AuditJIT/refs encoded neither 31 nor 10000 | commits 5b100cc, 1fd1aa2 |
+| 3: tests | done | `tenzo-cli hf-semantics` (compiler + engine via the C API, also in `test`/`all`) and `scripts/test_pybind_hf_semantics.py`. Every path matches HF (rel ≤ 4e-7), and the old semantics would fail | commit f02ba8b |
+| 6: v2 config | done | `models/bitnet-1.58b-v2/config.json` (rope_theta, rms_norm_eps from HF; weights symlinked; `tools/reference/make_config_v2.py`); every v2 run uses it | – |
+| D: PTQ | **partial** | simulator committed; replica runs (int8 / tl1 on 16 EN) and screening of S1–S4, S8, S9 on 4 windows were still running in the background when the session was cut off (`kv_ptq/`); results not analysed or committed | `kv_ptq/` (uncommitted) |
+| E: bitnet.cpp | not started | – | – |
+
+## What changed relative to the 2026-11-18 tables
+
+- **ppl_kv / ppl_kv_uk.** All of them were measured with broken RoPE and 6-bit activations. Current numbers are in `ppl_kv_v2*.md`.
+  - fp32/int8: from ×1.21 to ×1.003 (EN) and from ×1.47 to ×1.001 (UK).
+  - tl1: ×3.12 → ×2.88 (EN), ×15.4 → ×8.9 (UK).
+  - popcount got **worse** on EN (175 → 208) and better on UK (9076 → 4162).
+- **parity_summary.** cosine went from 0.91–0.999 to > 0.999 on 6/7. The max_abs gate still fails on every prompt.
+- **e2e_fair.** These numbers are for the old (6-bit) kernel. The new kernel is ~19% slower in decode (A/B). Tonight's absolute e2e numbers are unusable because of background load: the bitnet.cpp control point fell to 0.38×.
+- **attn_ablation, spill_report, tokenization.** Not affected by the fixes. These are synthetic microbenchmarks and the tokenizer, which did not change.
+
+## Still to do
+
+Analyse block D (finalists on 16 EN + 8 UK, Pareto, conclusion), block E, the final weights hash, and stopping the inhibitor.
