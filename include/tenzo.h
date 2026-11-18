@@ -193,6 +193,18 @@ TENZO_API int tenzo_generate_step(
 );
 
 /**
+ * @brief Evaluation path: runs one token through the full decode path (same kernels and KV mode as
+ *        tenzo_generate_step) and copies the raw logits of that position to logits_out.
+ *        No sampler, no repetition penalty. logits_len must be >= vocab_size.
+ */
+TENZO_API tenzo_status_t tenzo_forward_logits(
+    tenzo_engine_t engine,
+    int token_id,
+    float* logits_out,
+    int logits_len
+);
+
+/**
  * @brief Configures heterogeneous layer partitioning across devices (CPU, Vulkan, CUDA, ROCm, Remote).
  * @param engine Target engine handle.
  * @param partition_spec Partition string e.g. "gpu:0:0-14,cpu:15-29" or "vulkan:0-14,remote:192.168.1.50:9200:15-29"

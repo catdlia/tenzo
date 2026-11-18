@@ -268,6 +268,9 @@ public:
     void forward_layers_hetero();
 
     void prefill_token(int token_id);
+    // Teacher-forcing / evaluation path: same decode path as generate_step minus the sampler.
+    // Copies the raw (un-penalised) logits of the position just processed into out[vocab_size].
+    void forward_logits(int token_id, float* out_logits);
     int generate_step(int cur_token, const tenzo_sampling_params_t* params, const int* past_tokens, int past_tokens_len);
 };
 

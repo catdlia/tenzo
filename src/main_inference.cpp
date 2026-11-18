@@ -19,6 +19,9 @@
 #include <chrono>
 #include <cstring>
 #include <iomanip>
+#include <cmath>
+#include <algorithm>
+#include <cstdio>
 
 // ANSI Color Codes
 #define ANSI_RESET   "\033[0m"
@@ -137,6 +140,51 @@ public:
     }
 };
 
+// ---------------------------------------------------------------------------
+// Evaluation helpers (token-id driven, tokenizer-independent)
+// ---------------------------------------------------------------------------
+static std::vector<std::vector<int>> read_id_lines(const std::string& path) {
+    std::vector<std::vector<int>> out;
+    std::ifstream f(path);
+    std::string line;
+    while (std::getline(f, line)) {
+        std::istringstream iss(line);
+        std::vector<int> ids;
+        int v;
+        while (iss >> v) ids.push_back(v);
+        if (!ids.empty()) out.push_back(std::move(ids));
+    }
+    return out;
+}
+
+static void read_rss_kb(long& rss_kb, long& hwm_kb) {
+    rss_kb = hwm_kb = -1;
+    std::ifstream f("/proc/self/status");
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.rfind("VmRSS:", 0) == 0) rss_kb = std::atol(line.c_str() + 6);
+        else if (line.rfind("VmHWM:", 0) == 0) hwm_kb = std::atol(line.c_str() + 6);
+    }
+}
+
+static int argmax_f(const std::vector<float>& v) {
+    int best = 0;
+    for (size_t i = 1; i < v.size(); ++i) if (v[i] > v[best]) best = (int)i;
+    return best;
+}
+
+// log P(target) under softmax(logits), accumulated in double precision.
+static double log_prob_of(const std::vector<float>& logits, int target) {
+    float mx = *std::max_element(logits.begin(), logits.end());
+    double sum = 0.0;
+    for (float l : logits) sum += std::exp((double)l - (double)mx);
+    return ((double)logits[target] - (double)mx) - std::log(sum);
+}
+
+static bool valid_kv_mode(const std::string& m) {
+    return m == "fp32" || m == "int8_fused" || m == "tl1_fused" || m == "popcount_fused" || m == "paged_int8";
+}
+
 struct CliOptions {
     std::string model_dir = "/app/tenzo-frontend/export_output";
     std::string prompt = "";
@@ -153,6 +201,15 @@ struct CliOptions {
     bool show_banner = true;
     bool benchmark = false;
     bool profile = false;
+    // --- evaluation / measurement modes (token-id driven) ---
+    bool tokenize_only = false;
+    std::string ids_file;        // whitespace-separated token ids, one sequence per line
+    std::string dump_prefix;     // writes <prefix>.logits.f32 and <prefix>.greedy.txt
+    int greedy_steps = 32;
+    std::string score_file;      // windows of token ids, one per line (teacher forcing)
+    std::string score_out;
+    int bench_pp = 0;            // prompt tokens for the fair e2e benchmark
+    int bench_tg = 0;            // generated tokens for the fair e2e benchmark
 };
 
 void print_banner() {
@@ -246,7 +303,30 @@ int main(int argc, char** argv) {
             opt.benchmark = true;
         } else if (arg == "--profile") {
             opt.profile = true;
+        } else if (arg == "--tokenize-only") {
+            opt.tokenize_only = true;
+        } else if (arg == "--ids-file" && i + 1 < argc) {
+            opt.ids_file = argv[++i];
+        } else if (arg == "--dump-prefix" && i + 1 < argc) {
+            opt.dump_prefix = argv[++i];
+        } else if (arg == "--greedy-steps" && i + 1 < argc) {
+            opt.greedy_steps = std::atoi(argv[++i]);
+        } else if (arg == "--score" && i + 1 < argc) {
+            opt.score_file = argv[++i];
+        } else if (arg == "--score-out" && i + 1 < argc) {
+            opt.score_out = argv[++i];
+        } else if (arg == "--bench-pp" && i + 1 < argc) {
+            opt.bench_pp = std::atoi(argv[++i]);
+        } else if (arg == "--bench-tg" && i + 1 < argc) {
+            opt.bench_tg = std::atoi(argv[++i]);
         }
+    }
+
+    if (!valid_kv_mode(opt.kv_mode)) {
+        std::cerr << "error: unknown --kv-quant mode '" << opt.kv_mode
+                  << "' (valid: fp32, int8_fused, tl1_fused, popcount_fused, paged_int8). "
+                     "Previously unknown modes silently ran the fp32 path.\n";
+        return 2;
     }
 
     if (opt.show_banner) {
@@ -294,6 +374,15 @@ int main(int argc, char** argv) {
     }
     std::cout << ANSI_GREEN << " [OK] " << ANSI_RESET << "(" << tokenizer.id_to_token.size() << " tokens)\n";
 
+    if (opt.tokenize_only) {
+        // Machine-readable: "TOKENS: id id id ..." (BOS included, as in single-shot generation)
+        std::vector<int> ids = tokenizer.encode(opt.prompt, true);
+        std::cout << "TOKENS:";
+        for (int t : ids) std::cout << " " << t;
+        std::cout << "\n";
+        return 0;
+    }
+
     // Initialize Tenzo Engine
     tenzo_config_t config = tenzo_default_config();
     config.kv_mode = opt.kv_mode.c_str();
@@ -325,6 +414,98 @@ int main(int argc, char** argv) {
     params.top_p = opt.top_p;
     params.top_k = opt.top_k;
     params.repetition_penalty = opt.rep_penalty;
+
+    // ======================= Evaluation / measurement modes =======================
+    if (!opt.dump_prefix.empty() || !opt.score_file.empty() || opt.bench_pp > 0) {
+        const int V = config.vocab_size;
+        std::vector<float> logits(V);
+
+        if (!opt.dump_prefix.empty()) {
+            auto seqs = read_id_lines(opt.ids_file);
+            if (seqs.empty()) { std::cerr << "error: --dump-prefix needs --ids-file with one sequence\\n"; return 2; }
+            const std::vector<int>& ids = seqs[0];
+            if ((int)ids.size() + opt.greedy_steps >= opt.ctx_size) { std::cerr << "error: ids + greedy_steps exceed --ctx-size\\n"; return 2; }
+            engine.reset();
+            for (int id : ids) engine.forward_logits(id, logits);
+            {
+                std::ofstream lf(opt.dump_prefix + ".logits.f32", std::ios::binary);
+                lf.write(reinterpret_cast<const char*>(logits.data()), sizeof(float) * V);
+            }
+            std::ofstream gf(opt.dump_prefix + ".greedy.txt");
+            for (int k = 0; k < opt.greedy_steps; ++k) {
+                int nxt = argmax_f(logits);
+                gf << nxt << (k + 1 < opt.greedy_steps ? " " : "\\n");
+                if (k + 1 < opt.greedy_steps) engine.forward_logits(nxt, logits);
+            }
+            std::cout << "DUMP_OK prefix=" << opt.dump_prefix << " prompt_tokens=" << ids.size() << " kv=" << opt.kv_mode << "\\n";
+        }
+
+        if (!opt.score_file.empty()) {
+            auto windows = read_id_lines(opt.score_file);
+            if (windows.empty() || opt.score_out.empty()) { std::cerr << "error: --score needs windows and --score-out\\n"; return 2; }
+            std::ofstream of(opt.score_out);
+            of << std::setprecision(9);
+            of << "# kv_mode=" << opt.kv_mode << " ctx=" << opt.ctx_size << " windows=" << windows.size() << "\\n";
+            double tot_nll = 0.0; long tot_n = 0;
+            for (size_t w = 0; w < windows.size(); ++w) {
+                const auto& ids = windows[w];
+                if ((int)ids.size() > opt.ctx_size) { std::cerr << "error: window longer than --ctx-size\\n"; return 2; }
+                engine.reset();
+                std::vector<double> lps;
+                lps.reserve(ids.size());
+                for (size_t i = 0; i + 1 < ids.size(); ++i) {
+                    engine.forward_logits(ids[i], logits);
+                    lps.push_back(log_prob_of(logits, ids[i + 1]));
+                }
+                double nll = 0.0;
+                for (double lp : lps) nll -= lp;
+                tot_nll += nll; tot_n += (long)lps.size();
+                of << "w " << w << " " << lps.size() << " " << nll << "\\n";
+                of << "lp";
+                for (double lp : lps) of << " " << lp;
+                of << "\\n";
+                of.flush();
+                std::cout << "score window " << w << " tokens=" << lps.size() << " ppl=" << std::exp(nll / lps.size())
+                          << " running_ppl=" << std::exp(tot_nll / tot_n) << std::endl;
+            }
+        }
+
+        if (opt.bench_pp > 0) {
+            auto seqs = read_id_lines(opt.ids_file);
+            if (seqs.empty() || (int)seqs[0].size() < opt.bench_pp) { std::cerr << "error: --ids-file must hold >= --bench-pp ids\\n"; return 2; }
+            if (opt.bench_pp + opt.bench_tg >= opt.ctx_size) { std::cerr << "error: pp+tg exceed --ctx-size\\n"; return 2; }
+            const std::vector<int>& ids = seqs[0];
+            using clk = std::chrono::steady_clock;
+            auto run_once = [&](int pp, int tg, double& pp_ms, double& tg_ms) {
+                engine.reset();
+                auto t0 = clk::now();
+                for (int i = 0; i + 1 < pp; ++i) engine.prefill_token(ids[i]);
+                engine.forward_logits(ids[pp - 1], logits);          // last prompt token: logits (LM head) computed once
+                auto t1 = clk::now();
+                int cur = argmax_f(logits);
+                tenzo_sampling_params_t gp = tenzo_default_sampling_params();
+                gp.temperature = 0.0f; gp.repetition_penalty = 1.0f;
+                std::vector<int> none;
+                for (int s2 = 0; s2 < tg; ++s2) cur = engine.generate_step(cur, gp, none);
+                auto t2 = clk::now();
+                pp_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+                tg_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
+            };
+            double a, b;
+            run_once(std::min(16, opt.bench_pp), 4, a, b);           // warm-up (not reported)
+            double pp_ms = 0, tg_ms = 0;
+            run_once(opt.bench_pp, opt.bench_tg, pp_ms, tg_ms);
+            long rss, hwm; read_rss_kb(rss, hwm);
+            std::cout << "BENCH_FAIR,kv=" << opt.kv_mode << ",pp_tokens=" << opt.bench_pp << ",pp_ms=" << pp_ms
+                      << ",tg_tokens=" << opt.bench_tg << ",tg_ms=" << tg_ms
+                      << ",pp_tps=" << (pp_ms > 0 ? opt.bench_pp / (pp_ms / 1000.0) : 0.0)
+                      << ",tg_tps=" << (tg_ms > 0 ? opt.bench_tg / (tg_ms / 1000.0) : 0.0)
+                      << ",rss_kb=" << rss << ",hwm_kb=" << hwm << "\\n";
+        }
+        long rss, hwm; read_rss_kb(rss, hwm);
+        std::cout << "PROC_RSS_KB=" << rss << " PROC_HWM_KB=" << hwm << "\\n";
+        return 0;
+    }
 
     // --- REPL / Interactive Chat Mode ---
     if (opt.chat_mode) {

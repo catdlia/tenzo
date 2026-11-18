@@ -87,6 +87,14 @@ public:
         return next_tok;
     }
 
+    // Evaluation path (no sampler): writes vocab_size raw logits for the position just processed.
+    void forward_logits(int token_id, std::vector<float>& logits_out) {
+        tenzo_status_t status = tenzo_forward_logits(engine_, token_id, logits_out.data(), static_cast<int>(logits_out.size()));
+        if (status != TENZO_SUCCESS) {
+            throw std::runtime_error("Failed during tenzo_forward_logits");
+        }
+    }
+
     tenzo_engine_t get_raw_handle() const { return engine_; }
 
 private:

@@ -1883,6 +1883,18 @@ int TenzoEngineImpl::generate_step(
     return sample_top_k_top_p(params, past_tokens, past_tokens_len);
 }
 
+void TenzoEngineImpl::forward_logits(int token_id, float* out_logits) {
+    embedding_lookup(token_id);
+    forward_layers_hetero();
+    if (use_paged_kv) {
+        paged_kv_cache.increment_seq_len(1);
+    } else {
+        kv_cache.increment_seq_len(1);
+    }
+    compute_logits();
+    std::memcpy(out_logits, logits_scratch.data(), sizeof(float) * static_cast<size_t>(config.vocab_size));
+}
+
 // Helpers for model loading
 namespace {
 std::vector<int8_t> pack_ternary_weights_raw(const uint8_t* raw_bytes, int64_t N, int64_t K) {
@@ -2353,6 +2365,13 @@ int tenzo_generate_step(
 ) {
     if (!engine || !engine->impl) return -1;
     return engine->impl->generate_step(cur_token, params, past_tokens, past_tokens_len);
+}
+
+tenzo_status_t tenzo_forward_logits(tenzo_engine_t engine, int token_id, float* logits_out, int logits_len) {
+    if (!engine || !engine->impl || !logits_out) return TENZO_ERROR_INVALID_ARGUMENT;
+    if (logits_len < engine->impl->config.vocab_size) return TENZO_ERROR_INVALID_ARGUMENT;
+    engine->impl->forward_logits(token_id, logits_out);
+    return TENZO_SUCCESS;
 }
 
 tenzo_status_t tenzo_set_hetero_pipeline(tenzo_engine_t engine, const char* partition_spec) {
