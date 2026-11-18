@@ -388,6 +388,25 @@ int main(int argc, char** argv) {
     config.kv_mode = opt.kv_mode.c_str();
     config.max_seq_len = opt.ctx_size;
     config.device = opt.device.c_str();
+    {
+        // rope_theta comes from the model's config.json when present (HF field name). Exports made before
+        // 2026-11-19 lack it; then the API default (BitNet-b1.58-2B-4T value) is used and this is said loudly.
+        std::ifstream cf(opt.model_dir + "/config.json");
+        std::stringstream cs; cs << cf.rdbuf();
+        const std::string ctext = cs.str();
+        const size_t kp = ctext.find("\"rope_theta\"");
+        if (kp != std::string::npos) {
+            const size_t colon = ctext.find(':', kp);
+            config.rope_theta = std::strtof(ctext.c_str() + colon + 1, nullptr);
+            if (!(config.rope_theta > 0.0f)) {
+                std::cerr << "error: invalid rope_theta in " << opt.model_dir << "/config.json\n";
+                return 2;
+            }
+        } else {
+            std::cerr << "warning: " << opt.model_dir << "/config.json has no rope_theta; using default "
+                      << config.rope_theta << " (microsoft/bitnet-b1.58-2B-4T)\n";
+        }
+    }
 
     std::cout << ANSI_CYAN << "⚙️  Initializing Execution Engine (" 
               << ANSI_BOLD << "Backend: " << opt.device 

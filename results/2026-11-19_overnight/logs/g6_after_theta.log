@@ -1,0 +1,4 @@
+fp32: 8878b4e0f44d ⚡ Output:  Paris. Paris is a city in the north of France. It is a very important city in the world
+int8_fused: f905200efb55 ⚡ Output:  Paris. Paris is a city in the Ãİle-de-France region of France. It is located in the n
+tl1_fused: e9e7e2edf465 ⚡ Output:  Paris. Paris is the capital of France. Paris is the capital of France. Paris is the cap
+popcount_fused: a7ab6dc1f270 ⚡ Output:  the capital of the United States of America is the capital of the United Kingdom of the

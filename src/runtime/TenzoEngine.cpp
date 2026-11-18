@@ -254,7 +254,9 @@ void PagedKVCache::forward_attention_raw(
 ) {
     const int pos = cur_seq_len;
     const int half_dim = head_dim / 2;
-    const float theta_base = 10000.0f;
+    // HF BitNetRotaryEmbedding: inv_freq = 1 / rope_theta^(2i/D) with rope_theta from config.json (500000 for
+    // BitNet-b1.58-2B-4T). This was hard-coded to 10000 before (Llama-1 value), which corrupted every position > 0.
+    const float theta_base = rope_theta;
 
     // 1. In-place AVX2 RoPE on Q
     for (int h = 0; h < num_q_heads; ++h) {
@@ -453,7 +455,9 @@ void FusedKVCache::forward_attention_raw(
 ) {
     const int pos = cur_seq_len;
     const int half_dim = head_dim / 2;
-    const float theta_base = 10000.0f;
+    // HF BitNetRotaryEmbedding: inv_freq = 1 / rope_theta^(2i/D) with rope_theta from config.json (500000 for
+    // BitNet-b1.58-2B-4T). This was hard-coded to 10000 before (Llama-1 value), which corrupted every position > 0.
+    const float theta_base = rope_theta;
 
     // 1. In-place AVX2 RoPE on Q
     for (int h = 0; h < num_q_heads; ++h) {
@@ -1218,6 +1222,8 @@ TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
       paged_kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, (cfg.max_seq_len + 15) / 16) {
     
     use_paged_kv = (cfg.kv_mode && std::string(cfg.kv_mode) == "paged_int8");
+    kv_cache.rope_theta = cfg.rope_theta;
+    paged_kv_cache.rope_theta = cfg.rope_theta;
     q_dim = cfg.num_q_heads * cfg.head_dim;
     kv_dim = cfg.num_kv_heads * cfg.head_dim;
     ffn_dim = cfg.ffn_dim;
@@ -2302,6 +2308,7 @@ tenzo_config_t tenzo_default_config(void) {
     cfg.max_seq_len = 8192;
     cfg.kv_mode = "int8_fused";
     cfg.device = "cpu";
+    cfg.rope_theta = 500000.0f; // microsoft/bitnet-b1.58-2B-4T config.json "rope_theta"
     return cfg;
 }
 
@@ -2316,6 +2323,10 @@ tenzo_sampling_params_t tenzo_default_sampling_params(void) {
 
 tenzo_engine_t tenzo_create_engine(const tenzo_config_t* config) {
     tenzo_config_t cfg = config ? *config : tenzo_default_config();
+    if (!(cfg.rope_theta > 0.0f)) {
+        std::cerr << "❌ [Tenzo Error] tenzo_config_t.rope_theta must be > 0 (start from tenzo_default_config())\n";
+        return nullptr;
+    }
     auto handle = new tenzo_engine_opaque();
     handle->impl = std::make_unique<tenzo::TenzoEngineImpl>(cfg);
     return handle;

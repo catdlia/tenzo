@@ -70,6 +70,7 @@ public:
     int max_seq_len;
     std::string kv_mode; // "int8_fused", "tl1_fused", "fp32"
     int cur_seq_len = 0;
+    float rope_theta = 0.0f; // set from tenzo_config_t::rope_theta by TenzoEngineImpl
 
     // Buffers
     std::vector<float> fp32_k;
@@ -164,6 +165,7 @@ public:
     int head_dim;
     static constexpr int BLOCK_SIZE = 16;
     int total_blocks;
+    float rope_theta = 0.0f; // set from tenzo_config_t::rope_theta by TenzoEngineImpl
 
     PagedBlockManager block_mgr;
     std::vector<int32_t> block_table; // Sequence logical-to-physical block mapping

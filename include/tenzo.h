@@ -61,6 +61,7 @@ typedef struct {
     int max_seq_len;     /* Default: 8192 */
     const char* kv_mode; /* "int8_fused", "tl1_fused", or "fp32" */
     const char* device;  /* "cpu" (default) or "gpu" (Vulkan compute) */
+    float rope_theta;    /* RoPE base; Default: 500000 (config.json of microsoft/bitnet-b1.58-2B-4T). Must be > 0. */
 } tenzo_config_t;
 
 /* Sampling parameters */

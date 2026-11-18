@@ -185,6 +185,10 @@ def _export_bitnet_core(model_name="microsoft/bitnet-b1.58-2B-4T", output_dir="e
     cfg["vocab_size"] = vocab_size
     cfg["num_layers_exported"] = num_layers
     cfg["quant_mode"] = quant_mode
+    # The runtime reads rope_theta / rms_norm_eps from this file; never let them silently fall back to a default.
+    for key in ("rope_theta", "rms_norm_eps"):
+        if key not in cfg:
+            raise RuntimeError(f"source config.json for {model_name} has no '{key}'; refusing to export without it")
 
     config_out_path = os.path.join(output_dir, "config.json")
     with open(config_out_path, "w", encoding="utf-8") as f:
