@@ -1,0 +1,29 @@
+[tokenization] p1_fact_en     vs hf   : identical=True first_divergence=None (tenzo 6 / ref 6 tokens)
+[tokenization] p1_fact_en     vs llama: identical=True first_divergence=None (tenzo 6 / ref 6 tokens)
+[tokenization] p2_tech_en     vs hf   : identical=True first_divergence=None (tenzo 18 / ref 18 tokens)
+[tokenization] p2_tech_en     vs llama: identical=False first_divergence=14 (tenzo 18 / ref 19 tokens)
+[tokenization] p3_code        vs hf   : identical=False first_divergence=5 (tenzo 18 / ref 18 tokens)
+[tokenization] p3_code        vs llama: identical=False first_divergence=3 (tenzo 18 / ref 22 tokens)
+[tokenization] p4_ukrainian   vs hf   : identical=False first_divergence=1 (tenzo 10 / ref 18 tokens)
+[tokenization] p4_ukrainian   vs llama: identical=False first_divergence=1 (tenzo 10 / ref 18 tokens)
+[tokenization] p5_long_ctx    vs hf   : identical=False first_divergence=23 (tenzo 340 / ref 343 tokens)
+[tokenization] p5_long_ctx    vs llama: identical=False first_divergence=23 (tenzo 340 / ref 345 tokens)
+[tokenization] p6_weird       vs hf   : identical=False first_divergence=43 (tenzo 51 / ref 50 tokens)
+[tokenization] p6_weird       vs llama: identical=False first_divergence=2 (tenzo 51 / ref 59 tokens)
+[tokenization] p7_math_en     vs hf   : identical=True first_divergence=None (tenzo 19 / ref 19 tokens)
+[tokenization] p7_math_en     vs llama: identical=False first_divergence=7 (tenzo 19 / ref 23 tokens)
+[FAIL] p1_fact_en     vs hf    cos=0.940729 max_abs=4.4057 top1=True top5=0.8 KL=0.0051 greedy=6/32
+[FAIL] p1_fact_en     vs llama cos=-0.719977 max_abs=18.1497 top1=False top5=0.6 KL=3.9663 greedy=0/32
+[FAIL] p2_tech_en     vs hf    cos=0.994274 max_abs=3.6320 top1=True top5=0.8 KL=0.0892 greedy=10/32
+[FAIL] p2_tech_en     vs llama cos=-0.631450 max_abs=19.1422 top1=False top5=0.6 KL=1.3013 greedy=0/32
+[FAIL] p3_code        vs hf    cos=0.998419 max_abs=3.0471 top1=True top5=1.0 KL=0.0021 greedy=32/32
+[FAIL] p3_code        vs llama cos=0.903657 max_abs=15.5017 top1=False top5=0.6 KL=5.6569 greedy=0/32
+[FAIL] p4_ukrainian   vs hf    cos=0.999131 max_abs=4.4895 top1=True top5=0.6 KL=0.2163 greedy=7/32
+[FAIL] p4_ukrainian   vs llama cos=0.980707 max_abs=29.2183 top1=False top5=0.0 KL=12.5021 greedy=0/32
+[FAIL] p5_long_ctx    vs hf    cos=0.913559 max_abs=4.2553 top1=True top5=0.8 KL=0.4143 greedy=10/32
+[FAIL] p5_long_ctx    vs llama cos=-0.277817 max_abs=17.8280 top1=False top5=0.4 KL=6.2278 greedy=0/32
+[FAIL] p6_weird       vs hf    cos=0.980200 max_abs=6.2642 top1=True top5=0.6 KL=0.2717 greedy=3/32
+[FAIL] p6_weird       vs llama cos=0.382676 max_abs=10.3139 top1=False top5=0.6 KL=1.1952 greedy=0/32
+[FAIL] p7_math_en     vs hf    cos=0.998316 max_abs=2.7361 top1=True top5=0.8 KL=0.0001 greedy=7/32
+[FAIL] p7_math_en     vs llama cos=0.448671 max_abs=14.5977 top1=True top5=0.4 KL=0.2093 greedy=1/32
+PARITY RESULT: GATE FAILURES (see numbers above)
