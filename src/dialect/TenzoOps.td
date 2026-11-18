@@ -315,11 +315,14 @@ def BitLinearTL1Op : Tenzo_Op<"bitlinear_tl1", [Pure]> {
   let summary = "TL1 (Ternary Lookup Table) BitLinear matmul with N-major layout";
   let description = [{
     Computes a BitNet 1.58-bit linear layer using TL1 (g=2) with packed weights
-    in [K/2, N/2] layout for hardware-accelerated pshufb table lookup.
+    for hardware-accelerated pshufb table lookup.
 
     Operands:
-      input   : FP32 activations [..., K]
-      weights : packed uint8 weights [K/2, N/2].
+      input   : FP32 activations [B, S, K]
+      weights : packed int8 weights [N/64, K/2, 32] (n_blocks, K/2, 32 bytes of two 4-bit
+                indices each; enforced by BitLinearTL1LoweringToLinalg, produced by
+                tenzo-frontend/export_bitnet.py and pack_ternary_weights_raw in the runtime).
+                NOTE: an earlier revision of this comment said [K/2, N/2]; that was stale.
       scale   : optional FP32 per-tensor dequantization scale.
   }];
 

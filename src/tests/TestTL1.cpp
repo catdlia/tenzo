@@ -32,10 +32,10 @@ bool runTestTL1(MLIRContext& context, const std::string& custom_weights_path = "
     // 1. Locate and parse MLIR module
     const char* default_mlir = R"(
 module {
-  func.func @main(%arg0: tensor<1x1x128xf32>, %arg1: memref<1x64x64xi8>) -> tensor<1x1x128xf32> attributes {llvm.emit_c_interface} {
+  func.func @main(%arg0: tensor<1x1x128xf32>, %arg1: memref<2x64x32xi8>) -> tensor<1x1x128xf32> attributes {llvm.emit_c_interface} {
     %scale = arith.constant 1.5 : f32
-    %w_tens = bufferization.to_tensor %arg1 restrict : memref<1x64x64xi8> to tensor<1x64x64xi8>
-    %out = "tenzo.bitlinear_tl1"(%arg0, %w_tens, %scale) : (tensor<1x1x128xf32>, tensor<1x64x64xi8>, f32) -> tensor<1x1x128xf32>
+    %w_tens = bufferization.to_tensor %arg1 restrict : memref<2x64x32xi8> to tensor<2x64x32xi8>
+    %out = "tenzo.bitlinear_tl1"(%arg0, %w_tens, %scale) : (tensor<1x1x128xf32>, tensor<2x64x32xi8>, f32) -> tensor<1x1x128xf32>
     return %out : tensor<1x1x128xf32>
   }
 }
@@ -61,16 +61,6 @@ module {
         return false;
     }
 
-    PassManager pm(&context);
-    addTenzoToLinalgPass(pm);
-    addTenzoBufferizationPasses(pm);
-    addTenzoToLLVMPasses(pm, false, {8, 16, 4}, true);
-
-    if (failed(pm.run(module.get()))) {
-        llvm::errs() << "❌ [TL1-FAIL] MLIR compilation failed\n";
-        return false;
-    }
-
     // 2. Locate weights fixture file
     std::vector<std::string> weights_candidates;
     if (!custom_weights_path.empty()) {
@@ -84,23 +74,23 @@ module {
         if (std::ifstream(p).is_open()) { weights_path = p; break; }
     }
     if (weights_path.empty()) {
-        llvm::errs() << "❌ [TL1-FAIL] Failed to locate TL1 weights fixture ("
+        llvm::errs() << "❌ [TL1-FAIL] [TL1-FIXTURE-INVALID] Failed to locate TL1 weights fixture ("
                      << (custom_weights_path.empty() ? "default" : custom_weights_path) << ")\n";
         return false;
     }
 
     std::ifstream file(weights_path, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
-        llvm::errs() << "❌ [TL1-FAIL] Cannot open weights fixture: " << weights_path << "\n";
+        llvm::errs() << "❌ [TL1-FAIL] [TL1-FIXTURE-INVALID] Cannot open weights fixture: " << weights_path << "\n";
         return false;
     }
     std::streamsize size = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    // 3. Strict Fixture Size Validation: 1 block x 64 k_half x 64 bytes = 4096 bytes
+    // 3. Strict Fixture Size Validation: 2 blocks x 64 k_half x 32 bytes = 4096 bytes
     constexpr size_t EXPECTED_TL1_SIZE = 4096;
     if (size != static_cast<std::streamsize>(EXPECTED_TL1_SIZE)) {
-        llvm::errs() << "❌ [TL1-FAIL] Corrupted TL1 fixture: size is " << size
+        llvm::errs() << "❌ [TL1-FAIL] [TL1-FIXTURE-INVALID] Corrupted TL1 fixture: size is " << size
                      << " bytes, expected exactly " << EXPECTED_TL1_SIZE << " bytes!\n";
         return false;
     }
@@ -108,7 +98,7 @@ module {
     std::vector<uint8_t> weights(EXPECTED_TL1_SIZE);
     file.read(reinterpret_cast<char*>(weights.data()), EXPECTED_TL1_SIZE);
     if (!file) {
-        llvm::errs() << "❌ [TL1-FAIL] Failed to read full fixture content: " << weights_path << "\n";
+        llvm::errs() << "❌ [TL1-FAIL] [TL1-FIXTURE-INVALID] Failed to read full fixture content: " << weights_path << "\n";
         return false;
     }
 
@@ -118,10 +108,20 @@ module {
         uint8_t low_nibble = b & 0x0F;
         uint8_t high_nibble = (b >> 4) & 0x0F;
         if (low_nibble > 8 || high_nibble > 8) {
-            llvm::errs() << "❌ [TL1-FAIL] Corrupted TL1 fixture: invalid nibble value at byte " << i
+            llvm::errs() << "❌ [TL1-FAIL] [TL1-FIXTURE-INVALID] Corrupted TL1 fixture: invalid nibble value at byte " << i
                          << " (low=" << int(low_nibble) << ", high=" << int(high_nibble) << " > 8)\n";
             return false;
         }
+    }
+
+    PassManager pm(&context);
+    addTenzoToLinalgPass(pm);
+    addTenzoBufferizationPasses(pm);
+    addTenzoToLLVMPasses(pm, false, {8, 16, 4}, true);
+
+    if (failed(pm.run(module.get()))) {
+        llvm::errs() << "❌ [TL1-FAIL] MLIR compilation failed\n";
+        return false;
     }
 
     // 5. Execute Forward Pass
@@ -133,7 +133,9 @@ module {
         input.data[i] = 2.0f; // Fill with 2.0
     }
 
-    std::vector<int64_t> w_shape = {1, 64, 64}; // n_blocks=1, k_half=64, 64 bytes
+    // Contract of tenzo.bitlinear_tl1 (BitLinearTL1LoweringToLinalg, runtime pack_ternary_weights_raw, export_bitnet.py):
+    // weights are [n_blocks = N/64, K/2, 32] bytes. Here N = K = 128 -> [2, 64, 32] = 4096 bytes.
+    std::vector<int64_t> w_shape = {2, 64, 32};
     runtime::Tensor w_tensor(w_shape); // Use default float Tensor but we'll cast its memory
     std::memcpy(reinterpret_cast<int8_t*>(w_tensor.data), weights.data(), weights.size());
 
