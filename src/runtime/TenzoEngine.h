@@ -46,6 +46,10 @@ struct LayerWeightsInternal {
     std::vector<float> post_norm;
     std::vector<float> ffn_sub_norm;
 
+    // I2_S layout (built at load when the i2s GEMV is selected): per output row, blocks of 128 inputs in 32 bytes;
+    // byte j holds u = w + 1 in {0,1,2} for inputs 128*kb + 32*s + j at bits [2s, 2s+1], s = 0..3.
+    std::vector<uint8_t> q_i2, k_i2, v_i2, out_i2, gate_i2, up_i2, down_i2;
+
     // Fast direct pointers
     const int8_t* q_w_ptr = nullptr;
     const int8_t* k_w_ptr = nullptr;
@@ -237,6 +241,9 @@ public:
     std::vector<Vec256i> lut_buf;
     std::vector<float> logits_scratch;
     std::vector<int8_t> buf_x_i8;
+    std::vector<int8_t> buf_act_q;  // int8 activations for the i2s GEMV
+    bool use_i2s = true;            // TENZO_GEMV=i2s (default) | lut
+    void build_i2s_layer(int layer_idx);
     std::vector<Vec256i> buf_x_expanded;
 
     __m256i* lut_ptr() { return reinterpret_cast<__m256i*>(lut_buf.data()); }
@@ -257,6 +264,7 @@ public:
 
     void embedding_lookup(int token_id);
     void forward_layer_raw(int layer_idx);
+    void forward_layer_i2s(int layer_idx, int dpos, bool dmp);
     void forward_layer_gpu(int layer_idx);
     void forward_layer_cuda(int layer_idx);
     void forward_layer_rocm(int layer_idx);

@@ -2,7 +2,7 @@
 # G6 regression check: greedy generation must be unchanged by any engine change.
 # Usage: scripts/g6_check.sh <out_dir> [model_dir]   (run on host; executes inside docker)
 set -u
-OUT=${1:?out dir}; MODEL=${2:-/app/models/bitnet-1.58b}
+OUT=${1:?out dir}; MODEL=${2:-/app/models/bitnet-1.58b-v2}
 mkdir -p "$OUT"
 for kv in fp32 int8_fused tl1_fused popcount_fused; do
   docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev \

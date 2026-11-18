@@ -156,6 +156,107 @@ inline void compute_from_lut(
     }
 }
 
+// ---------------------------------------------------------------- I2_S-style ternary GEMV (maddubs)
+// Same activation quantization as build_lut (HF ActQuant: 127 / max(|x|, 1e-5), half-to-even, clamp), but the
+// int8 codes are kept as a vector: y[n] = (sum_k u[n][k] * q[k] - sum_k q[k]) * inv_scale * w_scale, u = w + 1.
+// The integer sum equals the LUT kernel's sum exactly, so both kernels produce bit-identical outputs.
+inline float quantize_act_i8(const float* __restrict__ act, int64_t K, int8_t* __restrict__ q, int32_t& sum_q) {
+    float max_abs = 0.0f;
+    for (int64_t k = 0; k < K; ++k) max_abs = std::max(max_abs, std::abs(act[k]));
+    max_abs = std::max(max_abs, 1e-5f);
+    const float scale_act = 127.0f / max_abs;
+    int32_t s = 0;
+    for (int64_t k = 0; k < K; ++k) {
+        int v = static_cast<int>(std::clamp(std::nearbyint(act[k] * scale_act), -128.0f, 127.0f));
+        q[k] = static_cast<int8_t>(v);
+        s += v;
+    }
+    sum_q = s;
+    return 1.0f / scale_act;
+}
+
+// Rows [row0, row0 + nrows) of an I2_S matrix with K inputs (K % 128 == 0); 4 rows share the activation loads.
+inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t nrows, int64_t K,
+                          const int8_t* __restrict__ q, int32_t sum_q, float scale, float* __restrict__ out) {
+    const int64_t kb_n = K / 128;
+    const int64_t row_bytes = K / 4;
+    const __m256i m3 = _mm256_set1_epi8(0x03);
+    const __m256i ones = _mm256_set1_epi16(1);
+    auto hsum = [](__m256i v) {
+        __m128i x = _mm_add_epi32(_mm256_castsi256_si128(v), _mm256_extracti128_si256(v, 1));
+        x = _mm_add_epi32(x, _mm_shuffle_epi32(x, 0x4E));
+        x = _mm_add_epi32(x, _mm_shuffle_epi32(x, 0xB1));
+        return _mm_cvtsi128_si32(x);
+    };
+    auto block = [&](const uint8_t* wr, int64_t kb, __m256i q0, __m256i q1, __m256i q2, __m256i q3) {
+        __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(wr + kb * 32));
+        __m256i u0 = _mm256_and_si256(b, m3);
+        __m256i u1 = _mm256_and_si256(_mm256_srli_epi16(b, 2), m3);
+        __m256i u2 = _mm256_and_si256(_mm256_srli_epi16(b, 4), m3);
+        __m256i u3 = _mm256_and_si256(_mm256_srli_epi16(b, 6), m3);
+        // |u*q| <= 254, pair sums <= 508, four of them <= 2032: no int16 saturation
+        __m256i p = _mm256_add_epi16(_mm256_add_epi16(_mm256_maddubs_epi16(u0, q0), _mm256_maddubs_epi16(u1, q1)),
+                                     _mm256_add_epi16(_mm256_maddubs_epi16(u2, q2), _mm256_maddubs_epi16(u3, q3)));
+        return _mm256_madd_epi16(p, ones);
+    };
+    int64_t r = 0;
+    for (; r + 4 <= nrows; r += 4) {
+        const uint8_t* w0 = w + (row0 + r) * row_bytes;
+        const uint8_t* w1 = w0 + row_bytes;
+        const uint8_t* w2 = w1 + row_bytes;
+        const uint8_t* w3 = w2 + row_bytes;
+        __m256i a0 = _mm256_setzero_si256(), a1 = a0, a2 = a0, a3 = a0;
+        for (int64_t kb = 0; kb < kb_n; ++kb) {
+            const int8_t* qb = q + kb * 128;
+            __m256i q0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb));
+            __m256i q1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 32));
+            __m256i q2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 64));
+            __m256i q3 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 96));
+            a0 = _mm256_add_epi32(a0, block(w0, kb, q0, q1, q2, q3));
+            a1 = _mm256_add_epi32(a1, block(w1, kb, q0, q1, q2, q3));
+            a2 = _mm256_add_epi32(a2, block(w2, kb, q0, q1, q2, q3));
+            a3 = _mm256_add_epi32(a3, block(w3, kb, q0, q1, q2, q3));
+        }
+        out[r + 0] = static_cast<float>(hsum(a0) - sum_q) * scale;
+        out[r + 1] = static_cast<float>(hsum(a1) - sum_q) * scale;
+        out[r + 2] = static_cast<float>(hsum(a2) - sum_q) * scale;
+        out[r + 3] = static_cast<float>(hsum(a3) - sum_q) * scale;
+    }
+    for (; r < nrows; ++r) {
+        const uint8_t* wr = w + (row0 + r) * row_bytes;
+        __m256i a = _mm256_setzero_si256();
+        for (int64_t kb = 0; kb < kb_n; ++kb) {
+            const int8_t* qb = q + kb * 128;
+            a = _mm256_add_epi32(a, block(wr, kb, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb)),
+                                          _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 32)),
+                                          _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 64)),
+                                          _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 96))));
+        }
+        out[r] = static_cast<float>(hsum(a) - sum_q) * scale;
+    }
+}
+
+// TL1-packed [N/64][K/2][32] -> I2_S rows (see LayerWeightsInternal). Exact re-encoding of the same ternary values.
+inline std::vector<uint8_t> tl1_to_i2s(const int8_t* tl1, int64_t N, int64_t K) {
+    std::vector<uint8_t> out(static_cast<size_t>(N) * (K / 4), 0);
+    const int64_t K_half = K / 2;
+    for (int64_t n = 0; n < N; ++n) {
+        const int64_t b = n / 64, c = n % 64;
+        uint8_t* row = out.data() + n * (K / 4);
+        for (int64_t k2 = 0; k2 < K_half; ++k2) {
+            const uint8_t byte = static_cast<uint8_t>(tl1[(b * K_half + k2) * 32 + (c % 32)]);
+            const uint8_t nib = (c < 32) ? (byte & 0x0F) : (byte >> 4);
+            const int u[2] = {nib & 3, (nib >> 2) & 3};  // u = w + 1 (TL1 stores w + 1 too)
+            for (int t = 0; t < 2; ++t) {
+                const int64_t k = 2 * k2 + t;
+                const int64_t kb = k / 128, s = (k % 128) / 32, j = k % 32;
+                row[kb * 32 + j] |= static_cast<uint8_t>(u[t] << (2 * s));
+            }
+        }
+    }
+    return out;
+}
+
 inline void rms_norm_raw(const float* src, const float* w, float* dst, int dim, float eps = 1e-5f) {
     float sum_sq = 0.0f;
     #pragma omp simd reduction(+:sum_sq)
@@ -1260,6 +1361,11 @@ TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
     lut_buf.resize(max_dim); // two LUT vectors per activation pair (see build_lut)
     logits_scratch.resize(cfg.vocab_size);
     buf_x_i8.resize(max_dim);
+    buf_act_q.resize(max_dim);
+    {
+        const char* g = std::getenv("TENZO_GEMV"); // validated in tenzo_create_engine
+        use_i2s = !(g && std::string(g) == "lut");
+    }
     buf_x_expanded.resize(max_dim / 16);
 }
 
@@ -1291,6 +1397,20 @@ void TenzoEngineImpl::set_layer_weights(int layer_idx, const tenzo_layer_weights
     lw.attn_sub_norm_ptr = w->attn_sub_norm;
     lw.post_norm_ptr = w->post_norm;
     lw.ffn_sub_norm_ptr = w->ffn_sub_norm;
+    if (use_i2s) build_i2s_layer(layer_idx);
+}
+
+void TenzoEngineImpl::build_i2s_layer(int layer_idx) {
+    auto& lw = layers[layer_idx];
+    const int h = config.hidden_size;
+    auto conv = [](const int8_t* p, int64_t N, int64_t K) { return p ? tl1_to_i2s(p, N, K) : std::vector<uint8_t>(); };
+    lw.q_i2 = conv(lw.q_w_ptr, q_dim, h);
+    lw.k_i2 = conv(lw.k_w_ptr, kv_dim, h);
+    lw.v_i2 = conv(lw.v_w_ptr, kv_dim, h);
+    lw.out_i2 = conv(lw.out_w_ptr, h, q_dim);
+    lw.gate_i2 = conv(lw.gate_w_ptr, ffn_dim, h);
+    lw.up_i2 = conv(lw.up_w_ptr, ffn_dim, h);
+    lw.down_i2 = conv(lw.down_w_ptr, h, ffn_dim);
 }
 
 void TenzoEngineImpl::set_final_norm(const float* norm_w) {
@@ -1563,6 +1683,11 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
     rms_norm_raw(buf_x.data(), lw.in_norm_ptr, buf_norm_x.data(), h_dim);
     TENZO_DUMP("input_norm", buf_norm_x, h_dim);
 
+    if (use_i2s) {
+        forward_layer_i2s(layer_idx, dpos, dmp);
+        return;
+    }
+
     // 2. Build LUT for norm_x ONCE (reused across Q, K, V)
     float inv_scale_act = build_lut(buf_norm_x.data(), h_dim, lut_ptr());
 
@@ -1662,6 +1787,89 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
         compute_from_lut(lut_ptr(), lw.down_w_ptr, h_dim / 64, cur_ffn / 2, buf_down.data(), inv_s_down * lw.down_scale);
         TENZO_DUMP("down", buf_down, h_dim);
 
+        #pragma omp simd
+        for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
+    } else {
+        std::memcpy(buf_x.data(), buf_h1.data(), h_dim * sizeof(float));
+    }
+    TENZO_DUMP("resid_ffn", buf_x, h_dim);
+#undef TENZO_DUMP
+}
+
+// CPU decode layer with the I2_S GEMV. Mirrors forward_layer_raw step by step (same buffers, same dump names).
+void TenzoEngineImpl::forward_layer_i2s(int layer_idx, int dpos, bool dmp) {
+    const auto& lw = layers[layer_idx];
+    const int h_dim = config.hidden_size;
+    int8_t* qa = buf_act_q.data();
+#define TENZO_DUMP(name, buf, n) do { if (dmp) dumper.dump(name, layer_idx, dpos, (buf).data(), (n)); } while (0)
+    int32_t sq = 0;
+    const float inv = quantize_act_i8(buf_norm_x.data(), h_dim, qa, sq);
+    const int q_blocks = q_dim / 64, kv_blocks = kv_dim / 64, total_qkv = q_blocks + 2 * kv_blocks;
+    #pragma omp parallel for schedule(dynamic, 4)
+    for (int b = 0; b < total_qkv; ++b) {
+        if (b < q_blocks)
+            gemv_i2s_rows(lw.q_i2.data(), int64_t(b) * 64, 64, h_dim, qa, sq, inv * lw.q_scale, buf_q.data() + b * 64);
+        else if (b < q_blocks + kv_blocks)
+            gemv_i2s_rows(lw.k_i2.data(), int64_t(b - q_blocks) * 64, 64, h_dim, qa, sq, inv * lw.k_scale,
+                          buf_k.data() + (b - q_blocks) * 64);
+        else
+            gemv_i2s_rows(lw.v_i2.data(), int64_t(b - q_blocks - kv_blocks) * 64, 64, h_dim, qa, sq, inv * lw.v_scale,
+                          buf_v.data() + (b - q_blocks - kv_blocks) * 64);
+    }
+    TENZO_DUMP("q", buf_q, q_dim);
+    TENZO_DUMP("k", buf_k, kv_dim);
+    TENZO_DUMP("v", buf_v, kv_dim);
+
+    if (use_paged_kv) {
+        paged_kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    } else {
+        kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
+    }
+    TENZO_DUMP("q_rope", buf_q, q_dim);
+    TENZO_DUMP("k_rope", buf_k, kv_dim);
+    TENZO_DUMP("attn_out", buf_attn_out, h_dim);
+
+    rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+    TENZO_DUMP("attn_sub_norm", buf_attn_sub, h_dim);
+
+    const float inv_o = quantize_act_i8(buf_attn_sub.data(), q_dim, qa, sq);
+    #pragma omp parallel for schedule(dynamic, 4)
+    for (int b = 0; b < h_dim / 64; ++b)
+        gemv_i2s_rows(lw.out_i2.data(), int64_t(b) * 64, 64, q_dim, qa, sq, inv_o * lw.out_scale, buf_out.data() + b * 64);
+    TENZO_DUMP("o_proj", buf_out, h_dim);
+
+    #pragma omp simd
+    for (int i = 0; i < h_dim; ++i) buf_h1[i] = buf_x[i] + buf_out[i];
+    TENZO_DUMP("resid_attn", buf_h1, h_dim);
+
+    if (!lw.gate_i2.empty() && !lw.up_i2.empty() && !lw.down_i2.empty()) {
+        rms_norm_raw(buf_h1.data(), lw.post_norm_ptr, buf_post_norm.data(), h_dim);
+        TENZO_DUMP("post_attn_norm", buf_post_norm, h_dim);
+        const float inv_m = quantize_act_i8(buf_post_norm.data(), h_dim, qa, sq);
+        const int ffn_blocks = ffn_dim / 64;
+        #pragma omp parallel for schedule(dynamic, 8)
+        for (int b = 0; b < 2 * ffn_blocks; ++b) {
+            if (b < ffn_blocks)
+                gemv_i2s_rows(lw.gate_i2.data(), int64_t(b) * 64, 64, h_dim, qa, sq, inv_m * lw.gate_scale, buf_gate.data() + b * 64);
+            else
+                gemv_i2s_rows(lw.up_i2.data(), int64_t(b - ffn_blocks) * 64, 64, h_dim, qa, sq, inv_m * lw.up_scale,
+                              buf_up.data() + (b - ffn_blocks) * 64);
+        }
+        TENZO_DUMP("gate", buf_gate, ffn_dim);
+        TENZO_DUMP("up", buf_up, ffn_dim);
+        #pragma omp simd
+        for (int i = 0; i < ffn_dim; ++i) {
+            float r = std::max(0.0f, buf_gate[i]);
+            buf_act[i] = (r * r) * buf_up[i];
+        }
+        TENZO_DUMP("act", buf_act, ffn_dim);
+        rms_norm_raw(buf_act.data(), lw.ffn_sub_norm_ptr, buf_ffn_norm.data(), ffn_dim);
+        TENZO_DUMP("ffn_sub_norm", buf_ffn_norm, ffn_dim);
+        const float inv_d = quantize_act_i8(buf_ffn_norm.data(), ffn_dim, qa, sq);
+        #pragma omp parallel for schedule(dynamic, 4)
+        for (int b = 0; b < h_dim / 64; ++b)
+            gemv_i2s_rows(lw.down_i2.data(), int64_t(b) * 64, 64, ffn_dim, qa, sq, inv_d * lw.down_scale, buf_down.data() + b * 64);
+        TENZO_DUMP("down", buf_down, h_dim);
         #pragma omp simd
         for (int i = 0; i < h_dim; ++i) buf_x[i] = buf_h1[i] + buf_down[i];
     } else {
@@ -2287,6 +2495,9 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         return TENZO_ERROR_MODEL_PARSE;
     }
     final_norm_ptr = final_norm_w.data();
+    if (use_i2s) {
+        for (int l = 0; l < num_layers; ++l) build_i2s_layer(l);
+    }
 
     return TENZO_SUCCESS;
 }
@@ -2334,6 +2545,13 @@ tenzo_sampling_params_t tenzo_default_sampling_params(void) {
 
 tenzo_engine_t tenzo_create_engine(const tenzo_config_t* config) {
     tenzo_config_t cfg = config ? *config : tenzo_default_config();
+    if (const char* g = std::getenv("TENZO_GEMV")) {
+        const std::string gs(g);
+        if (gs != "i2s" && gs != "lut") {
+            std::cerr << "❌ [Tenzo Error] TENZO_GEMV must be 'i2s' or 'lut' (got '" << gs << "')\n";
+            return nullptr;
+        }
+    }
     if (!(cfg.rope_theta > 0.0f)) {
         std::cerr << "❌ [Tenzo Error] tenzo_config_t.rope_theta must be > 0 (start from tenzo_default_config())\n";
         return nullptr;

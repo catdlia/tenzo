@@ -1,0 +1,9 @@
+w0 fp32 logits.f32 lut-vs-i2s: IDENTICAL
+w0 fp32 greedy.txt lut-vs-i2s: IDENTICAL
+w0 int8_fused logits.f32 lut-vs-i2s: IDENTICAL
+w0 int8_fused greedy.txt lut-vs-i2s: IDENTICAL
+p5 fp32 logits.f32 lut-vs-i2s: IDENTICAL
+p5 fp32 greedy.txt lut-vs-i2s: IDENTICAL
+p5 int8_fused logits.f32 lut-vs-i2s: IDENTICAL
+p5 int8_fused greedy.txt lut-vs-i2s: IDENTICAL
+score 2 windows int8_fused: IDENTICAL

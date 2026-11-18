@@ -1,0 +1,21 @@
+start: 2026-11-19T01:00:22+02:00
+AC: 1 
+governor: powersave EPP: performance
+--- free -m
+               total        used        free      shared  buff/cache   available
+Mem:           19679       12488        1174        1487        7875        7190
+Swap:           9839        6002        3836
+load: 4.29 4.35 6.70 13/3127 721956
+--- top10 cpu
+    PID %CPU   RSS COMMAND
+ 721957  100  4232 ps
+ 384282 82.2 543216 firefox-bin
+ 384286 57.7 67820 neko
+ 384280 28.1 63196 Xorg
+ 385346 23.9 648952 Isolated Web Co
+ 124979 19.5 729840 Telegram
+ 433995 19.3 168300 Isolated Web Co
+ 381578 14.5 168532 Isolated Web Co
+ 124014 11.4 484644 zen-bin
+ 379028  8.5 370924 claude
+HEAD: 5e7e2356862c9f23ff08a049a0cd8433a09798d4

@@ -1,0 +1,64 @@
+╔════════════════════════════════════════════════════════════════════════╗
+║   Tenzo Compiler Core & Math Regressions (Requirement R3)             ║
+║   Milestone M3_continuation: Automated Verification Suite              ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+============================================================================
+🔬 Test 1: Initial C Write Ordering & Uninitialized Memory Read
+============================================================================
+✅ [PASS] Defective 'hasNonzeroInitialC = !isZeroFilled;' correctly removed.
+✅ [PASS] Strict initial C detection verified: uninitialized memref.alloc() produces hasNonzeroInitialC = false.
+✅ [PASS] Correct write-back ordering verified: dual-write occurs before emitTernaryPackingAST when needed.
+✅ [PASS] Dead allocation cleanup verified: unconsumed AllocOp and DeallocOp properly erased.
+
+============================================================================
+🔬 Test 2: Exact Causal Masking Uniformity & Index Clamping
+============================================================================
+✅ [PASS] Zero occurrences of weak '-1e9' mask value in LinalgLowering.cpp.
+✅ [PASS] Uniform '-1e30' causal mask constant verified in LinalgLowering.cpp.
+✅ [PASS] Zero occurrences of weak '-10000.0f' mask in ExplicitMicroKernelPass.cpp.
+✅ [PASS] Host reference microkernel initializes scores with robust -1e30f.
+✅ [PASS] seqPos index clamping to valid bounds [0, T-1] verified.
+✅ [PASS] Numerical causal isolation: valid_prob=1.000000, masked_leakage=0.00e+00 under -1.5e9 logit.
+
+============================================================================
+🔬 Test 3: Shape, Layout, and Type Rejections
+============================================================================
+✅ [PASS] cType.getRank() != 2 rejection verified in ExplicitMicroKernelPattern.
+✅ [PASS] Non-identity memref layout rejection on A, B, C verified.
+✅ [PASS] Key and Value i8 element type verification verified.
+✅ [PASS] Key and Value shape identity verification verified.
+✅ [PASS] Key and Value rank consistency verification verified.
+✅ [PASS] Non-divisible GQA heads rejection (H % H_kv != 0) verified in LinalgLowering.cpp.
+✅ [PASS] Mismatched head dimensions rejection verified in LinalgLowering.cpp.
+
+============================================================================
+🔬 Test 4: Regressions for Random A/B/C and Boundary Canaries
+============================================================================
+✅ [PASS] Independent math parity verified across random A, B, non-zero C, and scales {0.5, 1.0, 2.5, -1.0}.
+✅ [PASS] Buffer canaries: Clean state reports 0 corruptions across all 5 buffers.
+✅ [PASS] Buffer canaries: Overrun detector successfully caught all 3 injected boundary corruptions.
+
+============================================================================
+🔬 Test 5: Audit JIT Test Source Code Coverage
+============================================================================
+✅ [PASS] Found canary buffer 'a_buf' in AuditJITTest.cpp.
+✅ [PASS] Found canary buffer 'b_buf' in AuditJITTest.cpp.
+✅ [PASS] Found canary buffer 'c_buf' in AuditJITTest.cpp.
+✅ [PASS] Found canary buffer 'other_buf' in AuditJITTest.cpp.
+✅ [PASS] Found canary buffer 'packed_buf' in AuditJITTest.cpp.
+✅ [PASS] 'checkCanaries' boundary validation function found.
+✅ [PASS] Random A and B matrix distribution testing found.
+✅ [PASS] Non-zero initial C accumulation testing found.
+
+============================================================================
+📊 REGRESSION SUITE EXECUTION SUMMARY
+============================================================================
+  ✅ PASS : Initial C Write Ordering & Uninit Read
+  ✅ PASS : Causal Masking Uniformity & Index Clamping
+  ✅ PASS : Shape, Layout, and Type Rejections
+  ✅ PASS : Random A/B/C and Boundary Canaries
+  ✅ PASS : Audit JIT Test Source Coverage
+============================================================================
+🎉 ALL COMPILER REGRESSION TESTS PASSED CLEANLY (EXIT CODE 0)! 🎉
+compiler exit=0
