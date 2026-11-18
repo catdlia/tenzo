@@ -1,0 +1,11 @@
+MemAvailable:   11524828 kB
+2026-11-18T12:46:49+02:00 build start MemAvailable=11527740kB
+2026-11-18T12:47:11+02:00 g6 MemAvailable=11514212kB
+2026-11-18T12:49:36+02:00 golden smoke MemAvailable=12086712kB
+2026-11-18T12:49:57+02:00 golden bf16 validate MemAvailable=11977368kB
+2026-11-18T12:54:57+02:00 HF bf16 eager validate MemAvailable=12051788kB
+2026-11-18T12:56:51+02:00 HF probe weights MemAvailable=12425984kB
+2026-11-18T12:57:23+02:00 golden bf16 v2 MemAvailable=12422496kB
+2026-11-18T12:58:45+02:00 golden bf16 2w MemAvailable=12418084kB
+2026-11-18T13:01:58+02:00 golden fp32 EN MemAvailable=12327200kB
+2026-11-18T13:08:21+02:00 golden fp32 UK MemAvailable=12304296kB

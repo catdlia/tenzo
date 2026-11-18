@@ -1,0 +1,2 @@
+0 ppl_a 12.331 ppl_b 12.264 mean|dlogp| 0.0536 max 0.609
+1 ppl_a 20.687 ppl_b 20.677 mean|dlogp| 0.0605 max 0.512
