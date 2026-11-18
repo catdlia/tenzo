@@ -7,6 +7,17 @@
 //   nll      <model.gguf> <windows_file> <out_file>    -> same text format as `tenzo-inference --score-out`
 // Build: tools/reference/build_ref_dump.sh   (host build, links BitNet/build/bin/libllama.so)
 #include "llama.h"
+// -DTENZO_LEGACY_LLAMA_API: map to the 2025-era libllama API (e.g. microsoft/BitNet@c17d1c5 -> llama.cpp 5eb47b7).
+#ifdef TENZO_LEGACY_LLAMA_API
+typedef llama_model llama_vocab;
+static inline llama_model* llama_model_load_from_file(const char* p, llama_model_params mp) { return llama_load_model_from_file(p, mp); }
+static inline const llama_vocab* llama_model_get_vocab(const llama_model* m) { return m; }
+static inline int llama_vocab_n_tokens(const llama_vocab* v) { return llama_n_vocab(v); }
+static inline llama_context* llama_init_from_model(llama_model* m, llama_context_params cp) { return llama_new_context_with_model(m, cp); }
+static inline llama_context* llama_get_memory(llama_context* c) { return c; }
+static inline void llama_memory_clear(llama_context* c, bool) { llama_kv_cache_clear(c); }
+static inline void llama_model_free(llama_model* m) { llama_free_model(m); }
+#endif
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>

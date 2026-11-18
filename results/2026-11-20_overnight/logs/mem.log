@@ -1,2 +1,4 @@
 2026-11-19T01:00:34+02:00 build MemAvailable=7407556kB
 2026-11-19T01:04:03+02:00 build i2s MemAvailable=7825392kB
+2026-11-19T01:21:16+02:00 bitnet build MemAvailable=8732324kB
+2026-11-19T01:26:37+02:00 bitnet ref nll MemAvailable=8850668kB

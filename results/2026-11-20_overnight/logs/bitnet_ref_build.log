@@ -1,0 +1,48 @@
+ Container untitled-dev-run-20709d71ba2b Creating 
+ Container untitled-dev-run-20709d71ba2b Created 
+/usr/lib/llvm-21/bin/clang
+/usr/lib/llvm-21/bin/clang++
+Ubuntu clang version 21.1.8 (++20251221032922+2078da43e25a-1~exp1~20251221153059.70)
+fatal: detected dubious ownership in repository at '/refs/BitNet/3rdparty/llama.cpp'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /refs/BitNet/3rdparty/llama.cpp
+fatal: detected dubious ownership in repository at '/refs/BitNet/3rdparty/llama.cpp'
+To add an exception for this directory, call:
+
+	git config --global --add safe.directory /refs/BitNet/3rdparty/llama.cpp
+[ 99%] Built target llama-tokenize
+[100%] Linking CXX executable ../../../../bin/llama-speculative
+[100%] Built target llama-speculative
+llama-baby-llama
+llama-batched
+llama-batched-bench
+llama-bench
+llama-cli
+llama-convert-llama2c-to-ggml
+llama-cvector-generator
+llama-embedding
+llama-eval-callback
+llama-export-lora
+llama-gbnf-validator
+llama-gguf
+llama-gguf-hash
+llama-gguf-split
+llama-gritlm
+llama-imatrix
+llama-infill
+llama-llava-cli
+llama-lookahead
+llama-lookup
+llama-lookup-create
+llama-lookup-merge
+llama-lookup-stats
+llama-minicpmv-cli
+llama-parallel
+llama-passkey
+llama-perplexity
+llama-quantize
+llama-quantize-stats
+llama-retrieval
+c17d1c5d77c48af7d6fb29c9f28a3da0277fc394
+ 5eb47b72106e3b35f10e8befa616a9241242b226 3rdparty/llama.cpp (b3639-318-g5eb47b721)

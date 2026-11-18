@@ -11,3 +11,10 @@
 - **D4** I2_S kernel: weights re-packed at load from the TL1 buffers (exact re-encoding), TL1 buffers kept for the
   `lut` fallback and the GPU/RVV paths -> +~600 MB resident (not freed tonight). TENZO_GEMV=i2s (default) | lut; any
   other value makes tenzo_create_engine fail.
+- **D5 (01:12-01:37) Clean-machine rule failed 3/3** (`logs/clean_machine_checks.log`): firefox/zen/neko (16 processes)
+  stay open while the owner sleeps; load average 4-13. Per the rule all speed series are skipped (I2_S A/B, clean
+  e2e vs bitnet.cpp). One extra check is made at the end of the night; if it passes, the A/B is run then.
+- **D6 (01:15) bitnet.cpp baseline**: microsoft/BitNet@c17d1c5 (2025-04-23, right after the 2B-4T release) +
+  Eddie-Wang1120/llama.cpp@5eb47b7, clang 21 in the dev container, setup_env.py codegen recipe. First approach
+  worked (greedy == HF, PPL 19.059 EN / 141.8 UK, within CI of golden), so the second approach (upstream HEAD) was
+  not needed. tools/reference/bitnet_ref_dump.cpp gained a TENZO_LEGACY_LLAMA_API shim (old libllama names).
