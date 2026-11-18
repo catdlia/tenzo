@@ -67,7 +67,7 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 | Engine / Configuration | Model Format | KV-Cache | Decode Speed | Latency / Token | Note |
 |---|---|---|---|---|---|
 | **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms | Official Microsoft C++ Reference Engine |
-| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms** | **1.65x FASTER than BitNet.cpp 🚀** |
+| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms** | 1.65x vs BitNet.cpp **(UNVERIFIED, historical; see README 'Measured (2026-11-18)')** |
 
 ---
 
@@ -79,7 +79,7 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 - [x] Hand-tuned AVX2 micro-kernels (Zero-Spill).
 - [x] Fused OpenMP Loops & 16-Bit SIMD Accumulation.
 - [x] Fused in-register quantized INT8 KV-Cache compression.
-- [x] Beat Microsoft `BitNet.cpp` reference performance on edge CPUs (**20.32 tok/sec**).
+- [ ] Beat Microsoft `BitNet.cpp` on edge CPUs: **UNVERIFIED**. An earlier run reported 20.32 tok/sec; not reproduced (see README 'Measured (2026-11-18)').
 
 ### Phase 2 (Phase E): C/C++ SDK, Packaging & Ternary KV-Cache (Completed ✅)
 - [x] **Tenzo C/C++ SDK**: ABI-stable pure C header [`include/tenzo.h`](include/tenzo.h) and modern C++ wrapper [`include/tenzo.hpp`](include/tenzo.hpp).

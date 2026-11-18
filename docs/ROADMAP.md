@@ -7,7 +7,7 @@
 - [x] **Frontend Exporter Suite:** Standalone Python exporters generating MLIR and binary weights for all formats.
 - [x] **Fused Zero-Allocation KV Cache:** `popcount_fused`, `tl1_fused`, `int8_fused` caches with 14.2x memory footprint reduction.
 - [x] **C/C++ Standalone Engine & SDK:** Pure C ABI (`libtenzo_runtime.a` / `libtenzo_runtime.so` / `include/tenzo.h`).
-- [x] **Tenzo Production CLI:** Model hub, model pulling, stats inspection, memory telemetry, and graceful interrupt handling.
+- [x] **Tenzo CLI (not a verified production claim):** Model hub, model pulling, stats inspection, memory telemetry, and graceful interrupt handling.
 - [x] **Repository Health Standards:** Complete GitHub community profile, security policy, and contributing guidelines.
 
 ---

@@ -16,12 +16,14 @@ Modern quantized LLMs (1-bit, 3-bit, 4-bit) require specialized memory represent
 **Tenzo** bridges this divide by providing:
 1. **Universal Quantization Matrix:** Native MLIR dialect operations and micro-kernels for **BitNet 1.58b (TL1)**, **GGUF (Q4_0 / Q8_0)**, **AutoGPTQ**, **AutoAWQ**, **ExLlamaV2 (EXL2)**, **INT4**, and **INT3**.
 2. **Zero-Allocation Execution:** The entire autoregressive decode loop across all transformer layers runs in pure C++ with zero intermediate heap allocations.
-3. **Official Reference Outperformance:** Tenzo delivers **20.32 tok/sec** on consumer CPUs (Intel Core i3-1215U, 15W TDP), **1.65x faster than Microsoft BitNet.cpp**.
+3. **Official Reference Outperformance (UNVERIFIED, historical):** an earlier run reported **20.32 tok/sec** on an Intel Core i3-1215U (15W TDP) and **1.65x** over Microsoft BitNet.cpp. It was not reproduced under controlled conditions and the BitNet.cpp build used for comparison is not numerically trustworthy; see [Measured (2026-11-18)](#measured-2026-11-18) for the like-for-like numbers.
 4. **Heterogeneous Multi-Backend Runtime:** Compiles and runs natively on x86_64 (AVX2/VNNI), ARM64 (NEON/DotProd/SVE2/I8MM), RISC-V (RVV), with GPU acceleration via Vulkan compute, CUDA, and ROCm translation layers.
 
 ---
 
 ## 🏆 Benchmark: Tenzo Native Engine vs Microsoft BitNet.cpp
+
+> **UNVERIFIED / historical.** The block below is a pre-recovery measurement with no raw logs; do not cite it. Re-measured numbers: [Measured (2026-11-18)](#measured-2026-11-18).
 
 *Benchmarked on an ultra-low-power consumer CPU: **Intel Core i3-1215U** (2 P-Cores + 4 E-Cores, 15W TDP).*  
 *Model:* `BitNet-b1.58-2B-4T` *(30 Layers, Hidden Size 2560, Vocab Size 128,256).*
@@ -58,12 +60,12 @@ Effective Memory Bandwidth     | ~10.5 GB/s           | ~17.3 GB/s
 
 | Format / Scheme | Bit Width | Description | Status |
 | :--- | :--- | :--- | :--- |
-| **BitNet TL1** | **1.58-bit** | Ternary weights $\{-1, 0, 1\}$ with dual-element 4-bit LUT packing | ✅ Production |
-| **GGUF (llama.cpp)** | **4-bit / 8-bit** | Block quantization (`Q4_0`, `Q8_0`) with FP16 scale factors | ✅ Production |
-| **AutoGPTQ** | **4-bit** | Groupwise symmetric/asymmetric quantization with `qzeros` | ✅ Production |
-| **AutoAWQ** | **4-bit** | Activation-aware column-interleaved salient channel packing | ✅ Production |
-| **ExLlamaV2 (EXL2)**| **2.0–8.0 bpw**| Variable bitrate group dispatch with multi-rate masks | ✅ Production |
-| **INT4 / INT3** | **3-bit / 4-bit** | Dense symmetric integer packing for ultra-low memory footprints | ✅ Production |
+| **BitNet TL1** | **1.58-bit** | Ternary weights $\{-1, 0, 1\}$ with dual-element 4-bit LUT packing | ⚠️ Runs end-to-end; parity vs HF reference not met (see Measured) |
+| **GGUF (llama.cpp)** | **4-bit / 8-bit** | Block quantization (`Q4_0`, `Q8_0`) with FP16 scale factors | ⚠️ Unverified (no end-to-end test) |
+| **AutoGPTQ** | **4-bit** | Groupwise symmetric/asymmetric quantization with `qzeros` | ⚠️ Unverified (no end-to-end test) |
+| **AutoAWQ** | **4-bit** | Activation-aware column-interleaved salient channel packing | ⚠️ Unverified (no end-to-end test) |
+| **ExLlamaV2 (EXL2)**| **2.0–8.0 bpw**| Variable bitrate group dispatch with multi-rate masks | ⚠️ Unverified (no end-to-end test) |
+| **INT4 / INT3** | **3-bit / 4-bit** | Dense symmetric integer packing for ultra-low memory footprints | ⚠️ Unverified (no end-to-end test) |
 
 ---
 
@@ -174,6 +176,28 @@ Tenzo v1.1.0-beta introduces a multi-backend runtime HAL:
 The `MicroarchProfiler` automatically detects all available backends and SIMD capabilities at startup.
 
 ---
+
+---
+
+<a id="measured-2026-11-18"></a>
+## Measured (2026-11-18)
+
+Everything below was produced on one laptop (Intel Core i3-1215U, governor `powersave`, no sudo to change it) by the scripts and logs under
+[`results/2026-11-18_overnight/`](results/2026-11-18_overnight/). It is a snapshot of branch `overnight/2026-11-18`, not a release claim.
+The ground truth for quality is HF transformers bf16 on the same checkpoint; the local bitnet.cpp build turned out not to be a valid reference.
+
+| What | Result | Source |
+|---|---|---|
+| Parity vs HF, first-step logits (7 prompts, kv int8_fused) | top-1 equal on 7/7, cosine 0.91-0.999, max abs diff 2.7-6.3. **Gates (cos > 0.999, max_abs <= 0.25) are NOT met** | [parity_summary.md](results/2026-11-18_overnight/parity_summary.md) |
+| WikiText-2 perplexity (16 x 511 tokens) | HF bf16 **19.09**; Tenzo fp32 KV **23.13** (+21%); int8_fused **23.22** (CI of difference contains 0); tl1_fused **59.42**; popcount_fused **174.98** | [ppl_kv.md](results/2026-11-18_overnight/ppl_kv.md) |
+| Ukrainian slice perplexity (8 x 511 tokens) | HF 142; Tenzo fp32 209; int8_fused 207; tl1_fused 2186; popcount_fused 9076 | [ppl_kv.md](results/2026-11-18_overnight/ppl_kv.md) |
+| Local bitnet.cpp i2_s build | WikiText-2 PPL 102, first-step logits uncorrelated with HF: not usable as a reference | [ppl_kv.md](results/2026-11-18_overnight/ppl_kv.md), [parity_summary.md](results/2026-11-18_overnight/parity_summary.md) |
+| Attention micro-benchmark (synthetic Gaussian KV, 1 thread) | zero-copy GQA (b vs a): 0.26-0.38x time; ternary packed KV vs FP32 direct (d vs b): 1.9-4.8x **slower**; vs INT8 KV (d vs c): 4.4-6.3x slower; ternary output cosine to FP32 about 0.77-0.79 | [attn_ablation.md](results/2026-11-18_overnight/attn_ablation.md) |
+| End-to-end vs bitnet.cpp (4 threads, prompt 16/128/512 + 128 tokens) | prompt+gen tok/s: Tenzo 24.5 / 28.1 / 31.1 (int8 KV), bitnet.cpp f16 20.6 / 29.1 / 41.5; decode after prompt 21-24 vs 19 tok/s; Tenzo prefill ~35 vs ~66-70 tok/s; peak RSS ~2.7 GB vs ~1.2 GB | [e2e_fair.md](results/2026-11-18_overnight/e2e_fair.md) |
+
+The historical figures above (20.32 tok/s, 1.65x) are **not** supported by these runs: Tenzo's decode is about 1.1-1.2x of this bitnet.cpp build, prefill is about half, and
+the longer the prompt the more the batched prefill of llama.cpp wins. `laptop_metrics.txt` (the 80x "memory reduction") comes from a formula that was later found to be wrong and is kept only as history.
+Full list of what these data do and do not support: [OVERNIGHT_REPORT.md](results/2026-11-18_overnight/OVERNIGHT_REPORT.md).
 
 ## 📚 Documentation & Deep Dives
 

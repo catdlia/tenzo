@@ -69,5 +69,5 @@ The high-performance C++ execution engine that powers ultra-fast autoregressive 
 | Engine | Model Format | KV-Cache | Decode Throughput | Per-Token Latency |
 |---|---|---|---|---|
 | **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms |
-| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms (1.65x faster 🚀)** |
+| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | 49.21 ms (1.65x vs BitNet.cpp, **UNVERIFIED, historical**) |
 
