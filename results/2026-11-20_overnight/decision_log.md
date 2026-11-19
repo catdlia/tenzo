@@ -42,3 +42,15 @@
   batched prefill, RSS) inside the 8 h active budget, the calibration pipeline is paused automatically after the UK-calibrated
   evals (a watcher kills the script before "calibrate mix"); the EN+UK mix calibration (cal. (iii)) resumes afterwards if time allows
   (the script skips finished steps). Evals of (i) EN-only and (ii) UK-only are complete first.
+- **D14 (14:45) Mislabelled commit.** `git commit` run for a log/results commit also took changes I had staged earlier with
+  `git add -A src ...`: commit e367633 ("results: EN-calibrated ternary KV (interim)") contains the first, UNBUILT versions of
+  the ternary_rot KV mode, the batched-prefill code, the mmap loader and the CLI options (include/tenzo.h, tenzo.hpp,
+  src/main_inference.cpp, src/runtime/Hadamard*.h, TenzoEngine.{h,cpp}). History is not rewritten (no force-push). They were built
+  and verified afterwards, and the follow-up commits say so: 545d24a (bit-identity fix), e095a78 (tests), 8e3fcf5 (RSS).
+- **D15 (14:20-14:40) Batched-prefill gate failed first, then passed.** First run on the real model: batched vs sequential logits
+  differed by up to 1.09 (top-1 flip in one prompt), although my 1-layer tiny-model test was bit-identical. The tiny test
+  could not see the residual chain (last-layer output is dead), so it was extended (2 layers, ffn != hidden) and reproduced a
+  4e-6 difference. Cause: the SIMD reduction/association order of the inlined `rms_norm_raw` (-ffast-math) depends on the
+  call site. Fix: `noinline`; afterwards all 21 (kv mode x prompt) pairs are bit-identical and G6 of the existing modes is unchanged.
+  This also means that tiny float differences are amplified to O(1) logit differences by the 8-bit activation rounding;
+  it explains the 0.5-1.6 max_abs between golden fp32 and HF bf16 as well.
