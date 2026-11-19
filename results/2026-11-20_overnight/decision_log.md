@@ -54,3 +54,8 @@
   call site. Fix: `noinline`; afterwards all 21 (kv mode x prompt) pairs are bit-identical and G6 of the existing modes is unchanged.
   This also means that tiny float differences are amplified to O(1) logit differences by the 8-bit activation rounding;
   it explains the 0.5-1.6 max_abs between golden fp32 and HF bf16 as well.
+- **D16 (15:35) Second model run in quiet mode with MemoryMax=4G** (not 3G): Qwen2.5-1.5B needs ~3.1 GB of bf16 weights in anonymous memory
+  plus ~0.5 GB for activations/logit chunks, so 3G cannot work; 4G is the quiet-mode ceiling ("nothing needing > 4 GB"). Compute is fp32 from the
+  bf16 checkpoint (exact upcast per use), windows EN16 + UK16 (not UK32) to fit the time budget; schemes: fp, S3+s4r32, tenzo_int8, S3, S2.
+- **D17 (16:25) Mix calibration resumed** after the engine blocks and the second-model run finished (~5.9 h active): calibrate on 4 EN + 4 UK windows,
+  then evaluate on 16 EN + 32 UK. Hard stop: if it is not finished by ~17:50 (7.4 h active) the report is written without it.
