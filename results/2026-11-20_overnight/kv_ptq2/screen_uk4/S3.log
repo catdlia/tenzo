@@ -1,0 +1,6 @@
+[kv_ptq] installed S3: S2 + randomized Hadamard (D=128)
+window 0 ppl 343.629 153s
+window 1 ppl 247.977 159s
+window 2 ppl 305.878 165s
+window 3 ppl 297.634 171s
+done 171s peak rss 3.01GB

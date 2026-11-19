@@ -1,0 +1,6 @@
+[kv_ptq] installed S13+s4r32: K INT4 asym g=32, V S10 + sinks 4 + recent 32 INT8
+window 0 ppl 154.479 95s
+window 1 ppl 147.624 99s
+window 2 ppl 185.149 104s
+window 3 ppl 185.406 108s
+done 108s peak rss 3.08GB

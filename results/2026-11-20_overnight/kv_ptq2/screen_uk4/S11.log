@@ -1,0 +1,6 @@
+[kv_ptq] installed S11: LS-optimal ternary g=16 + Hadamard
+window 0 ppl 314.902 144s
+window 1 ppl 242.956 150s
+window 2 ppl 310.774 156s
+window 3 ppl 279.841 161s
+done 161s peak rss 2.91GB

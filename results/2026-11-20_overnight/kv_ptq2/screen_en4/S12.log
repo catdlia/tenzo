@@ -1,0 +1,6 @@
+[kv_ptq] installed S12: K: Hadamard + per-channel LS-opt ternary over 32-token groups; V: S10
+window 0 ppl 16.186 162s
+window 1 ppl 24.112 169s
+window 2 ppl 35.172 176s
+window 3 ppl 12.697 183s
+done 183s peak rss 3.09GB

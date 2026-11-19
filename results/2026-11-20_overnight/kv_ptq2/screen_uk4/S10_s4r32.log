@@ -1,0 +1,6 @@
+[kv_ptq] installed S10+s4r32: LS-optimal ternary g=32 + Hadamard + sinks 4 + recent 32 INT8
+window 0 ppl 159.646 140s
+window 1 ppl 156.106 146s
+window 2 ppl 218.673 151s
+window 3 ppl 205.837 156s
+done 156s peak rss 3.12GB

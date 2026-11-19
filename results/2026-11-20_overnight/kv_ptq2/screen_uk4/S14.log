@@ -1,0 +1,6 @@
+[kv_ptq] installed S14: 2-term residual ternary g=32 + Hadamard (comparator)
+window 0 ppl 145.959 135s
+window 1 ppl 153.962 140s
+window 2 ppl 185.412 146s
+window 3 ppl 186.710 151s
+done 151s peak rss 3.05GB
