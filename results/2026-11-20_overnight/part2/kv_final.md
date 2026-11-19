@@ -22,4 +22,4 @@ Consistency: golden fp32 on UK32 windows 0-7 reproduces the 2026-11-19 UK8 golde
 
 | nll_golden_float32_uk.txt | 8 | 141.911 | [109.281, 178.420] | 1.0000 | [1.0000, 1.0000] |
 
-Bits/element at ctx 512: S3+s4r32 2.896, S13+s4r32 4.271 (asymptotic 2.5 / 3.75; kv_ptq.bits). ctx-2048 runs: not done (time).
+Bits/element at ctx 512: S3+s4r32 2.896, S13+s4r32 4.058 (asymptotic 2.5 / 3.75; kv_ptq.bits). ctx-2048 runs: not done (time).
