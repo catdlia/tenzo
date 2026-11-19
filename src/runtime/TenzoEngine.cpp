@@ -1598,7 +1598,10 @@ void compute_linear_exl2(
 TenzoEngineImpl::TenzoEngineImpl(const tenzo_config_t& cfg)
     : config(cfg),
       kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, cfg.max_seq_len, cfg.kv_mode ? cfg.kv_mode : "int8_fused"),
-      paged_kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim, (cfg.max_seq_len + 15) / 16) {
+      // The paged pool is only used by kv_mode "paged_int8"; for every other mode keep a 1-block stub (it was a second full
+      // INT8 KV allocation, ~80 MB at ctx 2048 and ~315 MB at ctx 8192, zero-filled and resident for nothing).
+      paged_kv_cache(cfg.num_layers, cfg.num_q_heads, cfg.num_kv_heads, cfg.head_dim,
+                     (cfg.kv_mode && std::string(cfg.kv_mode) == "paged_int8") ? (cfg.max_seq_len + 15) / 16 : 1) {
     
     use_paged_kv = (cfg.kv_mode && std::string(cfg.kv_mode) == "paged_int8");
     kv_cache.rope_theta = cfg.rope_theta;
@@ -2679,7 +2682,12 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
     embed_w_i8.resize(static_cast<size_t>(vocab_size) * hidden_size);
     embed_scales.resize(vocab_size);
 
+    int released_to = 0;
     for (int v = 0; v < vocab_size; ++v) {
+        if (v - released_to >= 4096) {   // drop the converted fp32 pages (42 MB steps): the mapped file never reaches 1.3 GB resident
+            raw_bytes.release(static_cast<size_t>(released_to) * hidden_size * sizeof(float), static_cast<size_t>(v - released_to) * hidden_size * sizeof(float));
+            released_to = v;
+        }
         const float* row = embed_f32 + v * hidden_size;
         float amax = 1e-8f;
         for (int i = 0; i < hidden_size; ++i) {

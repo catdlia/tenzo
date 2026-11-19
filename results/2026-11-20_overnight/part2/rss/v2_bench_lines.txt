@@ -1,0 +1,5 @@
+int8_fused ctx=2048 BENCH_FAIR,kv=int8_fused,pp_tokens=16,pp_ms=1152.5,tg_tokens=128,tg_ms=13536.9,pp_tps=13.9,tg_tps=9.5,rss_kb=957056,hwm_kb=957056
+int8_fused ctx=8192 BENCH_FAIR,kv=int8_fused,pp_tokens=16,pp_ms=1577.7,tg_tokens=128,tg_ms=14077.7,pp_tps=10.1,tg_tps=9.1,rss_kb=1194432,hwm_kb=1194432
+fp32 ctx=8192 BENCH_FAIR,kv=fp32,pp_tokens=16,pp_ms=1174.9,tg_tokens=128,tg_ms=14207.5,pp_tps=13.6,tg_tps=9.0,rss_kb=2106536,hwm_kb=2106536
+tl1_fused ctx=8192 BENCH_FAIR,kv=tl1_fused,pp_tokens=16,pp_ms=1206.3,tg_tokens=128,tg_ms=13631.4,pp_tps=13.3,tg_tps=9.4,rss_kb=964068,hwm_kb=964068
+ternary_rot ctx=8192 BENCH_FAIR,kv=ternary_rot,pp_tokens=16,pp_ms=1117.9,tg_tokens=128,tg_ms=13588.6,pp_tps=14.3,tg_tps=9.4,rss_kb=994400,hwm_kb=994400

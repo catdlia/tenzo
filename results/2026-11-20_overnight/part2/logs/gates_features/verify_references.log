@@ -1,0 +1,77 @@
+
+❌ [DIFF FAILURE] SelfTest: NaN Reference: Reference (expected) contains 1 non-finite values (NaN / Inf)! References must be finite numbers.
+
+❌ [DIFF FAILURE] SelfTest: Inf Reference: Reference (expected) contains 1 non-finite values (NaN / Inf)! References must be finite numbers.
+
+❌ [DIFF FAILURE] SelfTest: Negative Tol: Invalid tolerance '-0.0001'! Tolerance must be a positive finite number.
+
+❌ [DIFF FAILURE] SelfTest: Zero Tol: Invalid tolerance '0.0'! Tolerance must be a positive finite number.
+
+❌ [DIFF FAILURE] SelfTest: Inf Tol: Invalid tolerance 'inf'! Tolerance must be a positive finite number.
+❌ Error: Incomplete binary dump in actual file '/tmp/tmpmncdh_7f/trunc_bytes.bin': size 15 bytes is not divisible by 4 (float32). Truncated dump detected!
+❌ Error: Incomplete binary dump in expected file '/tmp/tmpmncdh_7f/trunc_bytes.bin': size 15 bytes is not divisible by 4 (float32). Truncated dump detected!
+❌ Error: Incomplete binary dump in actual file '/tmp/tmpmncdh_7f/trunc_elems.bin': contains 2 elements, but expected 4 elements for shape [4]!
+❌ Error: Incomplete binary dump in expected file '/tmp/tmpmncdh_7f/trunc_elems.bin': contains 2 elements, but expected 4 elements for shape [4]!
+❌ Error: Incomplete binary dump: actual file has 2 elements, expected file has 4 elements (size mismatch)!
+╔════════════════════════════════════════════════════════════════════════╗
+║   Tenzo Independent Mathematical Reference Verification Suite          ║
+║   Milestone 2: Independent CI & Math Hardening (W02, W03)              ║
+╚════════════════════════════════════════════════════════════════════════╝
+
+--- [Suite 1] Independent Reference: Ternary Packing Verification ---
+✅ [PASS] TernaryPack: 81 Exhaustive Combinations: Exact match across 81 integer elements.
+✅ [PASS] TernaryPack: Round-Trip Unpack Parity: Exact match across 324 integer elements.
+✅ [PASS] TernaryPack: Continuous Float Round & Clamp -> Pack Verified (100x16 elements)
+
+--- [Suite 2] Independent Reference: GEMM Multi-Consumer FP32 Output ---
+✅ [PASS] GEMM Consumer 2: Intermediate FP32 Buffer Parity (Zero Initial C): max_abs_err=1.1024e-07 <= tol=1.0e-05 (mean=2.0216e-08)
+✅ [PASS] GEMM Consumer 1: Fused Ternary Pack Output Parity (Zero Initial C): Exact match across 16 integer elements.
+✅ [PASS] GEMM Consumer 2: Non-Zero Initial C Parity (scale=0.5): max_abs_err=6.4729e-07 <= tol=1.0e-05 (mean=1.0395e-07)
+✅ [PASS] GEMM Consumer 1: Non-Zero Initial C Fused Pack Parity (scale=0.5): Exact match across 16 integer elements.
+✅ [PASS] GEMM Consumer 2: Non-Zero Initial C Parity (scale=1.0): max_abs_err=7.1694e-07 <= tol=1.0e-05 (mean=1.4042e-07)
+✅ [PASS] GEMM Consumer 1: Non-Zero Initial C Fused Pack Parity (scale=1.0): Exact match across 16 integer elements.
+✅ [PASS] GEMM Consumer 2: Non-Zero Initial C Parity (scale=2.5): max_abs_err=4.7024e-07 <= tol=1.0e-05 (mean=1.2169e-07)
+✅ [PASS] GEMM Consumer 1: Non-Zero Initial C Fused Pack Parity (scale=2.5): Exact match across 16 integer elements.
+✅ [PASS] GEMM Consumer 2: Non-Zero Initial C Parity (scale=-1.0): max_abs_err=8.1894e-07 <= tol=1.0e-05 (mean=1.4360e-07)
+✅ [PASS] GEMM Consumer 1: Non-Zero Initial C Fused Pack Parity (scale=-1.0): Exact match across 16 integer elements.
+✅ [PASS] GEMM Multi-Consumer: Random A/B, Non-Zero Initial C, and All Scales Parity Verified.
+
+--- [Suite 3] Independent Reference: Causal GQA Attention (Arbitrary B, Hq, Hkv, T, D) ---
+✅ [PASS] Causal GQA: MHA Single Head Rank-2 pos=0 analytical invariant (out == V[:, kh, 0, :]): max_diff=0.00e+00 < 1e-12
+✅ [PASS] Causal GQA: MHA Single Head Rank-2 pos=0/7 output shape=(1, 1, 1, 32) finite=True
+✅ [PASS] Causal GQA: MHA Single Head Rank-2 pos=7/7 output shape=(1, 1, 1, 32) finite=True
+✅ [PASS] Causal GQA Prefill: MHA Single Head Rank-2 sequence=8 output shape=(1, 1, 8, 32) (decode-prefill parity cross-validated, max_diff=0.00e+00 < 1e-12)
+✅ [PASS] Causal GQA: MQA Multi-Query Attention pos=0 analytical invariant (out == V[:, kh, 0, :]): max_diff=0.00e+00 < 1e-12
+✅ [PASS] Causal GQA: MQA Multi-Query Attention pos=0/7 output shape=(2, 4, 1, 32) finite=True
+✅ [PASS] Causal GQA: MQA Multi-Query Attention pos=7/7 output shape=(2, 4, 1, 32) finite=True
+✅ [PASS] Causal GQA Prefill: MQA Multi-Query Attention sequence=8 output shape=(2, 4, 8, 32) (decode-prefill parity cross-validated, max_diff=0.00e+00 < 1e-12)
+✅ [PASS] Causal GQA: GQA 4:1 Ratio (Audit Baseline) pos=0 analytical invariant (out == V[:, kh, 0, :]): max_diff=0.00e+00 < 1e-12
+✅ [PASS] Causal GQA: GQA 4:1 Ratio (Audit Baseline) pos=0/7 output shape=(2, 20, 1, 32) finite=True
+✅ [PASS] Causal GQA: GQA 4:1 Ratio (Audit Baseline) pos=7/7 output shape=(2, 20, 1, 32) finite=True
+✅ [PASS] Causal GQA Prefill: GQA 4:1 Ratio (Audit Baseline) sequence=8 output shape=(2, 20, 8, 32) (decode-prefill parity cross-validated, max_diff=0.00e+00 < 1e-12)
+✅ [PASS] Causal GQA: GQA High Dimension Large Context pos=0 analytical invariant (out == V[:, kh, 0, :]): max_diff=0.00e+00 < 1e-12
+✅ [PASS] Causal GQA: GQA High Dimension Large Context pos=0/15 output shape=(1, 32, 1, 64) finite=True
+✅ [PASS] Causal GQA: GQA High Dimension Large Context pos=15/15 output shape=(1, 32, 1, 64) finite=True
+✅ [PASS] Causal GQA Prefill: GQA High Dimension Large Context sequence=16 output shape=(1, 32, 16, 64) (decode-prefill parity cross-validated, max_diff=0.00e+00 < 1e-12)
+
+--- [Suite 4] Independent Reference: Comparator Robustness Verification ---
+✅ [PASS] Comparator Robustness: NaN/Inf references and invalid tolerances strictly rejected.
+
+--- [Suite 5] Independent Reference: Incomplete Binary Dump Rejection ---
+✅ [PASS] Incomplete binary dump (non-aligned bytes in actual) strictly rejected.
+✅ [PASS] Incomplete binary dump (non-aligned bytes in expected) strictly rejected.
+✅ [PASS] Incomplete tensor dump (missing elements in actual) strictly rejected.
+✅ [PASS] Incomplete tensor dump (missing elements in expected) strictly rejected.
+✅ [PASS] Incomplete binary dump (unshaped size mismatch) strictly rejected.
+✅ [PASS] File Compare: valid.bin vs valid.bin: max_abs_err=0.0000e+00 <= tol=1.0e-04 (mean=0.0000e+00)
+✅ [PASS] Valid binary dumps successfully verified.
+✅ [PASS] Incomplete Binary Dumps: Non-aligned bytes and incomplete elements strictly rejected.
+
+--- [Suite 6] Independent Reference: Causal Masking Robustness Under Large Negative Logits ---
+⚠️ [VULNERABILITY CONFIRMED] Defective mask (-1e9) allocated 1.0000 weight to masked future tokens! (Inverted attention when logits <= -1e9)
+✅ [PASS] Robust Causal Mask (-1e30f): masked position leakage = 1.42e-217 (valid tokens weight = 1.000000) under large negative logits (<= -1e9).
+✅ [PASS] Causal Mask Robustness: Multi-head attention decode preserves strict causality across all positions.
+
+════════════════════════════════════════════════════════════════════════
+🎉 ALL INDEPENDENT REFERENCE VERIFICATION CHECKS PASSED SUCCESSFULLY! 🎉
+verify_references exit=0

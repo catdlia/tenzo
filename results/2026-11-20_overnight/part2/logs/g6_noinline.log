@@ -1,0 +1,10 @@
+fp32: 37b6e02003fd ⚡ Output:  Paris. Paris is a city that is known for its rich history, culture, and architecture. I
+int8_fused: 2dfd79933b0e ⚡ Output:  Paris. Paris is a city that is known for its rich history, culture, and architecture. I
+tl1_fused: e9e7e2edf465 ⚡ Output:  Paris. Paris is the capital of France. Paris is the capital of France. Paris is the cap
+popcount_fused: dd40633550d9 ⚡ Output:  the most important city in the world the capital of the united states the capital of th
+ternary_rot: 2dfd79933b0e ⚡ Output:  Paris. Paris is a city that is known for its rich history, culture, and architecture. I
+fp32 G6 identical to part-1 baseline
+int8_fused G6 identical to part-1 baseline
+tl1_fused G6 identical to part-1 baseline
+popcount_fused G6 identical to part-1 baseline
+ternary_rot G6 unchanged vs previous build

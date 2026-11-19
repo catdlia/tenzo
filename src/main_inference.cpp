@@ -450,6 +450,18 @@ int main(int argc, char** argv) {
         for (int i = 0; i < n; ++i) engine.prefill_token(toks[i]);
     };
 
+    // TENZO_SMAPS_DIR=<dir>: copy /proc/self/smaps_rollup and /proc/self/smaps to <dir>/<tag>.{rollup,smaps} (RSS breakdown by mapping)
+    auto dump_smaps = [&](const char* tag) {
+        const char* dir = std::getenv("TENZO_SMAPS_DIR");
+        if (!dir || !*dir) return;
+        for (const char* what : {"smaps_rollup", "smaps"}) {
+            std::ifstream in(std::string("/proc/self/") + what);
+            std::ofstream out(std::string(dir) + "/" + tag + (std::string(what) == "smaps" ? ".smaps" : ".rollup"));
+            out << in.rdbuf();
+        }
+    };
+    dump_smaps("after_engine_create");
+
     std::cout << ANSI_CYAN << "📦 Mapping weights & MLIR graph from " << opt.model_dir << "..." << ANSI_RESET;
     auto t_load_start = std::chrono::high_resolution_clock::now();
     try {
@@ -463,6 +475,7 @@ int main(int argc, char** argv) {
     double load_ms = std::chrono::duration<double, std::milli>(t_load_end - t_load_start).count();
     std::cout << ANSI_GREEN << " [OK] " << ANSI_RESET << "(" << std::fixed << std::setprecision(1) << load_ms << " ms)\n\n";
 
+    dump_smaps("after_load");
     tenzo_sampling_params_t params = tenzo_default_sampling_params();
     params.temperature = opt.temp;
     params.top_p = opt.top_p;
@@ -550,6 +563,7 @@ int main(int argc, char** argv) {
             run_once(std::min(16, opt.bench_pp), 4, a, b);           // warm-up (not reported)
             double pp_ms = 0, tg_ms = 0;
             run_once(opt.bench_pp, opt.bench_tg, pp_ms, tg_ms);
+            dump_smaps("after_bench");
             long rss, hwm; read_rss_kb(rss, hwm);
             std::cout << "BENCH_FAIR,kv=" << opt.kv_mode << ",pp_tokens=" << opt.bench_pp << ",pp_ms=" << pp_ms
                       << ",tg_tokens=" << opt.bench_tg << ",tg_ms=" << tg_ms

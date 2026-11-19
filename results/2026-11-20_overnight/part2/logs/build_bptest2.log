@@ -1,0 +1,5 @@
+ Container untitled-dev-run-7c6b760a1e66 Creating 
+ Container untitled-dev-run-7c6b760a1e66 Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/2] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TestEngineAPI.cpp.o
+[2/2] Linking CXX executable tenzo-cli

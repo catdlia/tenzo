@@ -1,3 +1,14 @@
 2026-11-19T02:29:17+02:00 0c start MemAvailable=15681112kB load=1.13
 2026-11-19T11:18:45+02:00 build T34/T37 MemAvailable=14487476kB quiet
 2026-11-19T11:21:46+02:00 calib smoke MemAvailable=14717760kB quiet
+2026-11-19T14:05:40+02:00 build engine features MemAvailable=5349788kB quiet(-j1)
+2026-11-19T14:07:21+02:00 g6 features MemAvailable=5299228kB quiet
+2026-11-19T14:09:39+02:00 prefill gates MemAvailable=7523820kB quiet
+2026-11-19T14:23:38+02:00 build noinline MemAvailable=5775256kB quiet
+2026-11-19T14:24:25+02:00 g6 after noinline MemAvailable=5751140kB quiet
+2026-11-19T14:25:57+02:00 prefill gates v2 MemAvailable=5791576kB quiet
+2026-11-19T14:38:54+02:00 rss runs MemAvailable=4976088kB quiet
+2026-11-19T14:43:12+02:00 rss v2 MemAvailable=4858164kB quiet
+2026-11-19T14:45:57+02:00 build part-1 binary MemAvailable=5459248kB quiet
+2026-11-19T14:47:49+02:00 rss before MemAvailable=5392892kB quiet
+2026-11-19T14:49:19+02:00 rss gates MemAvailable=5556296kB quiet

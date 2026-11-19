@@ -1,0 +1,28 @@
+ Container untitled-dev-run-a21ebf324d83 Creating 
+ Container untitled-dev-run-a21ebf324d83 Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/11] Building CXX object CMakeFiles/tenzo-cli.dir/src/main.cpp.o
+[2/11] Building CXX object CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o
+/app/src/runtime/TenzoEngine.cpp: In function 'void tenzo::{anonymous}::gemv_i2s_rows(const uint8_t*, int64_t, int64_t, int64_t, const int8_t*, int32_t, float, float*)':
+/app/src/runtime/TenzoEngine.cpp:237:39: warning: iteration 274877906883 invokes undefined behavior [-Waggressive-loop-optimizations]
+  237 |         const uint8_t* wr = w + (row0 + r) * row_bytes;
+      |                                 ~~~~~~^~~~
+/app/src/runtime/TenzoEngine.cpp:236:14: note: within this loop
+  236 |     for (; r < nrows; ++r) {
+      |            ~~^~~~~~~
+[3/11] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o
+[4/11] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TestHFSemantics.cpp.o
+[5/11] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TestEngineAPI.cpp.o
+[6/11] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/HeteroTests.cpp.o
+[7/11] Linking CXX executable tenzo-cli
+[8/11] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/TenzoEngine.cpp.o
+/app/src/runtime/TenzoEngine.cpp: In function 'void tenzo::{anonymous}::gemv_i2s_rows(const uint8_t*, int64_t, int64_t, int64_t, const int8_t*, int32_t, float, float*)':
+/app/src/runtime/TenzoEngine.cpp:237:39: warning: iteration 274877906883 invokes undefined behavior [-Waggressive-loop-optimizations]
+  237 |         const uint8_t* wr = w + (row0 + r) * row_bytes;
+      |                                 ~~~~~~^~~~
+/app/src/runtime/TenzoEngine.cpp:236:14: note: within this loop
+  236 |     for (; r < nrows; ++r) {
+      |            ~~^~~~~~~
+[9/11] Linking CXX static library libtenzo_runtime.a
+[10/11] Building CXX object CMakeFiles/tenzo-inference.dir/src/main_inference.cpp.o
+[11/11] Linking CXX executable tenzo-inference

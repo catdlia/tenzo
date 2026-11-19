@@ -1,0 +1,4 @@
+ Container untitled-dev-run-89172fa80441 Creating 
+ Container untitled-dev-run-89172fa80441 Created 
+[14/15] Building CXX object CMakeFiles/tenzo-inference.dir/src/main_inference.cpp.o
+[15/15] Linking CXX executable tenzo-inference

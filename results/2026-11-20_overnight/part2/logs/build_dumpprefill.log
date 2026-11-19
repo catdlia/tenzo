@@ -1,0 +1,5 @@
+ Container untitled-dev-run-857ed65bb5f5 Creating 
+ Container untitled-dev-run-857ed65bb5f5 Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/2] Building CXX object CMakeFiles/tenzo-inference.dir/src/main_inference.cpp.o
+[2/2] Linking CXX executable tenzo-inference
