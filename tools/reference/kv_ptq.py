@@ -207,8 +207,8 @@ def _apply(fn, x):
     return fn(x)
 
 
-def install(name, golden_module):
-    """Install hooks into the golden module. name may be NAME or NAME+s4r32 style handled by callers via register()."""
+def make_hook(name):
+    """hook(k, v, layer) -> (k_hat, v_hat) or {k, v, k_alt, v_alt, alt_mask} for scheme `name` (k, v: [B, Hkv, T, D])."""
     kf, vf, pc, sinks, recent, desc = resolve(name)
 
     def hook(k, v, layer):
@@ -225,6 +225,12 @@ def install(name, golden_module):
             return kh, vh
         return {"k": kh, "v": vh, "k_alt": int8_absmax(k), "v_alt": int8_absmax(v), "alt_mask": mask}
 
+    return hook, desc
+
+
+def install(name, golden_module):
+    """Install hooks into the golden module. name may be NAME or NAME+s4r32 style handled by callers via register()."""
+    hook, desc = make_hook(name)
     golden_module.kv_quant = hook
     if name == "tenzo_tl1":
         def qq(q, layer):

@@ -1,7 +1,7 @@
 # Tenzo Compiler Makefile
 # Convenience wrapper for common operations
 
-.PHONY: build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help audit verify-references
+.PHONY: paper-tables build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help audit verify-references
 
 # Default target
 all: build
@@ -275,3 +275,6 @@ help:
 
 stop-cloud:
 	hcloud server delete tenzo-build-node
+# Paper tables generated from the result CSVs / score files (results/paper/tables.md, tables.tex)
+paper-tables:
+	python3 scripts/build_paper_tables.py
