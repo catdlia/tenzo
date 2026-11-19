@@ -4,3 +4,10 @@ eval en eval_en16 exit=0 12:16:07
 2026-11-19T12:16:07+02:00 eval en eval_uk32 MemAvailable=6168960kB
 eval en eval_uk32 exit=0 12:41:22
 2026-11-19T12:41:22+02:00 calibrate uk MemAvailable=5908132kB
+calib uk exit=0 13:26:31
+2026-11-19T13:26:31+02:00 eval uk eval_en16 MemAvailable=6112592kB
+eval uk eval_en16 exit=0 13:39:24
+2026-11-19T13:39:24+02:00 eval uk eval_uk32 MemAvailable=6124268kB
+eval uk eval_uk32 exit=0 14:05:09
+2026-11-19T14:05:09+02:00 calibrate mix MemAvailable=5391904kB
+2026-11-19T14:05:15+02:00 pipeline paused after the UK-calibrated evals (to free the CPU for engine work); resume with scripts/run_kv_calib.sh results/2026-11-20_overnight/part2/calib 100

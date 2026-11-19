@@ -1,0 +1,34 @@
+/home/illia/CLionProjects/untitled/tools/reference/kv_calib.py:128: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)
+  l, base, final, float(ak.min()), float(ak.max()), float(av.min()), float(av.max()), time.time() - t0, G.rss_gb()),
+layer  0 rel_mse 0.05991 -> 0.04848  alpha_k [0.58,1.09] alpha_v [0.50,1.20]  91s rss 1.09GB
+layer  1 rel_mse 0.02148 -> 0.01739  alpha_k [0.94,1.50] alpha_v [0.76,1.19]  183s rss 1.08GB
+layer  2 rel_mse 0.06057 -> 0.04361  alpha_k [0.69,1.42] alpha_v [0.50,1.42]  270s rss 1.09GB
+layer  3 rel_mse 0.11543 -> 0.08741  alpha_k [0.57,1.41] alpha_v [0.85,1.49]  357s rss 1.14GB
+layer  4 rel_mse 0.06147 -> 0.05672  alpha_k [0.90,1.25] alpha_v [0.92,1.14]  443s rss 1.07GB
+layer  5 rel_mse 0.02822 -> 0.02408  alpha_k [0.72,1.31] alpha_v [0.73,1.18]  534s rss 1.18GB
+layer  6 rel_mse 0.04960 -> 0.04703  alpha_k [0.86,1.31] alpha_v [0.84,1.08]  626s rss 1.11GB
+layer  7 rel_mse 0.04145 -> 0.03723  alpha_k [0.90,1.27] alpha_v [0.70,1.07]  714s rss 1.18GB
+layer  8 rel_mse 0.03752 -> 0.03340  alpha_k [0.99,1.22] alpha_v [0.74,1.00]  803s rss 1.24GB
+layer  9 rel_mse 0.02363 -> 0.01961  alpha_k [0.92,1.20] alpha_v [0.85,1.25]  888s rss 1.23GB
+layer 10 rel_mse 0.03425 -> 0.03137  alpha_k [0.93,1.24] alpha_v [0.78,1.06]  973s rss 1.23GB
+layer 11 rel_mse 0.01500 -> 0.01322  alpha_k [0.91,1.30] alpha_v [0.84,1.17]  1061s rss 1.25GB
+layer 12 rel_mse 0.02064 -> 0.01819  alpha_k [0.98,1.21] alpha_v [0.79,1.19]  1151s rss 1.28GB
+layer 13 rel_mse 0.00918 -> 0.00820  alpha_k [0.82,1.19] alpha_v [0.94,1.09]  1243s rss 1.26GB
+layer 14 rel_mse 0.02406 -> 0.01781  alpha_k [1.00,1.19] alpha_v [0.82,1.02]  1335s rss 1.32GB
+layer 15 rel_mse 0.00773 -> 0.00624  alpha_k [0.94,1.32] alpha_v [0.87,1.12]  1424s rss 1.32GB
+layer 16 rel_mse 0.00843 -> 0.00626  alpha_k [0.97,1.32] alpha_v [0.89,1.03]  1516s rss 1.33GB
+layer 17 rel_mse 0.00703 -> 0.00548  alpha_k [1.03,1.23] alpha_v [0.92,1.05]  1601s rss 1.42GB
+layer 18 rel_mse 0.00923 -> 0.00642  alpha_k [1.03,1.35] alpha_v [0.89,1.09]  1689s rss 1.45GB
+layer 19 rel_mse 0.02798 -> 0.02225  alpha_k [0.88,1.48] alpha_v [0.89,1.14]  1772s rss 1.50GB
+layer 20 rel_mse 0.02910 -> 0.01965  alpha_k [0.77,1.39] alpha_v [0.84,0.99]  1867s rss 1.42GB
+layer 21 rel_mse 0.03803 -> 0.02862  alpha_k [0.88,1.35] alpha_v [0.80,0.96]  1963s rss 1.37GB
+layer 22 rel_mse 0.01423 -> 0.01208  alpha_k [0.90,1.22] alpha_v [0.87,1.03]  2056s rss 1.47GB
+layer 23 rel_mse 0.06890 -> 0.04943  alpha_k [0.77,1.32] alpha_v [0.93,1.25]  2144s rss 1.49GB
+layer 24 rel_mse 0.01931 -> 0.01706  alpha_k [0.90,1.43] alpha_v [0.87,1.04]  2237s rss 1.51GB
+layer 25 rel_mse 0.02383 -> 0.01870  alpha_k [0.94,1.33] alpha_v [0.84,1.04]  2328s rss 1.49GB
+layer 26 rel_mse 0.01986 -> 0.01347  alpha_k [0.89,1.45] alpha_v [0.93,1.12]  2415s rss 1.55GB
+layer 27 rel_mse 0.01645 -> 0.01319  alpha_k [0.95,1.35] alpha_v [0.90,1.05]  2505s rss 1.50GB
+layer 28 rel_mse 0.04807 -> 0.02715  alpha_k [0.83,1.49] alpha_v [0.93,1.14]  2599s rss 1.57GB
+layer 29 rel_mse 0.01447 -> 0.01285  alpha_k [0.79,1.22] alpha_v [0.97,1.17]  2690s rss 1.55GB
+done 2700s peak 2.31GB
