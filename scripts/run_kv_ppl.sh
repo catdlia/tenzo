@@ -7,7 +7,7 @@ mkdir -p "$OUT"
 for kv in $MODES; do
   echo "$(date -Is) kv=$kv MemAvailable=$(awk '/MemAvailable/{print $2}' /proc/meminfo)kB" >> "$OUT/progress.txt"
   docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev \
-    /app/cmake-build-debug/tenzo-inference -m /app/$MODEL --kv-quant $kv -c 512 \
+    ${RUN_PREFIX:-} /app/cmake-build-debug/tenzo-inference -m /app/$MODEL --kv-quant $kv -c 512 \
     --score /app/$WIN --score-out /app/$OUT/$kv.txt > "$OUT/$kv.log" 2>&1
   echo "$kv exit=$? $(date +%T)" >> "$OUT/progress.txt"
 done
