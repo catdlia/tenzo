@@ -13,6 +13,7 @@
 #include "tenzo.hpp"
 #include "runtime/MicroarchProfiler.h"
 #include <iostream>
+#include <memory>
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
@@ -182,7 +183,7 @@ static double log_prob_of(const std::vector<float>& logits, int target) {
 }
 
 static bool valid_kv_mode(const std::string& m) {
-    return m == "fp32" || m == "int8_fused" || m == "tl1_fused" || m == "popcount_fused" || m == "paged_int8";
+    return m == "fp32" || m == "int8_fused" || m == "tl1_fused" || m == "popcount_fused" || m == "paged_int8" || m == "ternary_rot";
 }
 
 struct CliOptions {
@@ -208,6 +209,8 @@ struct CliOptions {
     int greedy_steps = 32;
     std::string score_file;      // windows of token ids, one per line (teacher forcing)
     std::string score_out;
+    std::string prefill_mode = "sequential";   // --prefill sequential|batched
+    int prefill_chunk = 32;                    // --prefill-chunk
     int bench_pp = 0;            // prompt tokens for the fair e2e benchmark
     int bench_tg = 0;            // generated tokens for the fair e2e benchmark
 };
@@ -241,6 +244,8 @@ void print_help(const char* prog_name) {
               << ANSI_GREEN << "rocm" << ANSI_RESET << " (AMDGCN/Vulkan), "
               << ANSI_GREEN << "riscv" << ANSI_RESET << " (RVV 1.0)\n";
     std::cout << "  --kv-quant <mode>           KV-Cache Quantization mode (default: int8_fused)\n";
+    std::cout << "  --prefill <sequential|batched>  prompt prefill: token by token (default) or in chunks (CPU + I2_S)\n";
+    std::cout << "  --prefill-chunk <n>         chunk size for --prefill batched (default 32)\n";
     std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (14.2x comp, 84MB), " 
               << ANSI_GREEN << "int8_fused" << ANSI_RESET << " (4x comp, 309MB), " 
               << ANSI_GREEN << "fp32" << ANSI_RESET << " (1.2GB)\n";
@@ -293,6 +298,14 @@ int main(int argc, char** argv) {
             opt.rep_penalty = std::atof(argv[++i]);
         } else if ((arg == "-c" || arg == "--ctx-size") && i + 1 < argc) {
             opt.ctx_size = std::atoi(argv[++i]);
+        } else if (arg == "--prefill" && i + 1 < argc) {
+            opt.prefill_mode = argv[++i];
+            if (opt.prefill_mode != "sequential" && opt.prefill_mode != "batched") {
+                std::cerr << "error: --prefill must be sequential or batched\n"; return 2;
+            }
+        } else if (arg == "--prefill-chunk" && i + 1 < argc) {
+            opt.prefill_chunk = std::atoi(argv[++i]);
+            if (opt.prefill_chunk < 1) { std::cerr << "error: --prefill-chunk must be >= 1\n"; return 2; }
         } else if (arg == "--kv-quant" && i + 1 < argc) {
             opt.kv_mode = argv[++i];
         } else if (arg == "--system" && i + 1 < argc) {
@@ -324,7 +337,7 @@ int main(int argc, char** argv) {
 
     if (!valid_kv_mode(opt.kv_mode)) {
         std::cerr << "error: unknown --kv-quant mode '" << opt.kv_mode
-                  << "' (valid: fp32, int8_fused, tl1_fused, popcount_fused, paged_int8). "
+                  << "' (valid: fp32, int8_fused, tl1_fused, popcount_fused, paged_int8, ternary_rot). "
                      "Previously unknown modes silently ran the fp32 path.\n";
         return 2;
     }
@@ -412,8 +425,30 @@ int main(int argc, char** argv) {
               << ANSI_BOLD << "Backend: " << opt.device 
               << ", KV-Cache: " << opt.kv_mode << ANSI_RESET << ANSI_CYAN << ", Max Context: " 
               << opt.ctx_size << ")..." << ANSI_RESET;
-    tenzo::Engine engine(config);
+    std::unique_ptr<tenzo::Engine> engine_ptr;
+    try {
+        engine_ptr = std::make_unique<tenzo::Engine>(config);
+    } catch (const std::exception& e) {
+        std::cout << ANSI_RED << " [FAILED]" << ANSI_RESET << std::endl;
+        std::cerr << "❌ Engine initialization failed: " << e.what() << std::endl;
+        return 1;
+    }
+    tenzo::Engine& engine = *engine_ptr;
     std::cout << ANSI_GREEN << " [OK]\n" << ANSI_RESET;
+
+    // Prompt prefill: --prefill batched processes the prompt in chunks (CPU + I2_S + non-paged KV), bit-identical to token by token.
+    auto prefill_prompt = [&](const int* toks, int n) {
+        if (n <= 0) return;
+        if (opt.prefill_mode == "batched") {
+            if (engine.prefill_tokens(toks, n, opt.prefill_chunk)) return;
+            static bool warned = false;
+            if (!warned) {
+                std::cerr << "warning: --prefill batched is unsupported for this configuration (needs CPU, TENZO_GEMV=i2s, non-paged KV); using sequential\n";
+                warned = true;
+            }
+        }
+        for (int i = 0; i < n; ++i) engine.prefill_token(toks[i]);
+    };
 
     std::cout << ANSI_CYAN << "📦 Mapping weights & MLIR graph from " << opt.model_dir << "..." << ANSI_RESET;
     auto t_load_start = std::chrono::high_resolution_clock::now();
@@ -498,7 +533,7 @@ int main(int argc, char** argv) {
             auto run_once = [&](int pp, int tg, double& pp_ms, double& tg_ms) {
                 engine.reset();
                 auto t0 = clk::now();
-                for (int i = 0; i + 1 < pp; ++i) engine.prefill_token(ids[i]);
+                prefill_prompt(ids.data(), pp - 1);
                 engine.forward_logits(ids[pp - 1], logits);          // last prompt token: logits (LM head) computed once
                 auto t1 = clk::now();
                 int cur = argmax_f(logits);
@@ -672,9 +707,7 @@ int main(int argc, char** argv) {
     std::cout << ANSI_BOLD << ANSI_CYAN << "⚡ Output: " << ANSI_RESET << std::flush;
 
     auto t_prefill_0 = std::chrono::high_resolution_clock::now();
-    for (size_t i = 0; i < prompt_tokens.size() - 1; ++i) {
-        engine.prefill_token(prompt_tokens[i]);
-    }
+    prefill_prompt(prompt_tokens.data(), static_cast<int>(prompt_tokens.size()) - 1);
     auto t_prefill_1 = std::chrono::high_resolution_clock::now();
     double ttft_ms = std::chrono::duration<double, std::milli>(t_prefill_1 - t_prefill_0).count();
 
@@ -698,7 +731,8 @@ int main(int argc, char** argv) {
     auto t_dec_1 = std::chrono::high_resolution_clock::now();
     double dec_ms = std::chrono::duration<double, std::milli>(t_dec_1 - t_dec_0).count();
     double tok_per_sec = (gen_tokens.size() > 0 && dec_ms > 0) ? (gen_tokens.size() / (dec_ms / 1000.0)) : 0.0;
-    double bytes_per_weight = (opt.kv_mode == "tl1_fused" || opt.kv_mode == "popcount_fused") ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : 4.0);
+    // ternary_rot: 96 B per kv head and token (K and V: 32 B codes + 4 fp32 scales each) vs 128 * bytes_per_weight * 2
+    double bytes_per_weight = (opt.kv_mode == "tl1_fused" || opt.kv_mode == "popcount_fused") ? 0.25 : (opt.kv_mode == "int8_fused" ? 1.0 : (opt.kv_mode == "ternary_rot" ? 0.375 : 4.0));
     double kv_mem_mb = (30.0 * 8192 * 5 * 128 * bytes_per_weight * 2) / (1024.0 * 1024.0);
 
     std::cout << "\n\n" << ANSI_BOLD << "╔════════════════════════════════════════════════════════╗\n";

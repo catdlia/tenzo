@@ -19,8 +19,13 @@ ev() { # name, windows file, count, subdir
     --kv-scheme "calib:$OUT/alpha_$1.json" --out "$f" > "${f%.txt}.log" 2>&1
   echo "eval $1 $4 exit=$? $(date +%T)" >> "$OUT/progress.txt"
 }
+# wait for a calibration that is still running from an earlier invocation of this script
+while ps -eo args | grep -q "[k]v_calib.py calibrate"; do sleep 15; done
+# interleaved order: every calibration is evaluated right away, so partial results are usable if the night is cut short
 PF=8; cal en results/reference/calib_en8.ids
+ev en results/reference/windows.ids 16 eval_en16; ev en results/reference/windows_uk32.ids 32 eval_uk32
 PF=8; cal uk results/reference/calib_uk8.ids
+ev uk results/reference/windows.ids 16 eval_en16; ev uk results/reference/windows_uk32.ids 32 eval_uk32
 PF=4; cal mix results/reference/calib_en8.ids results/reference/calib_uk8.ids
-for n in en uk mix; do ev $n results/reference/windows.ids 16 eval_en16; ev $n results/reference/windows_uk32.ids 32 eval_uk32; done
+ev mix results/reference/windows.ids 16 eval_en16; ev mix results/reference/windows_uk32.ids 32 eval_uk32
 echo PIPELINEDONE >> "$OUT/progress.txt"

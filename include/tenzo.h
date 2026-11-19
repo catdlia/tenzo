@@ -177,6 +177,14 @@ TENZO_API tenzo_status_t tenzo_load_model(
 TENZO_API tenzo_status_t tenzo_prefill_token(tenzo_engine_t engine, int token_id);
 
 /**
+ * @brief Prefills n_tokens prompt tokens. chunk <= 1: token by token (same as repeated tenzo_prefill_token).
+ *        chunk > 1: batched prefill in chunks of `chunk` tokens (CPU + I2_S GEMV + non-paged KV only); per-token results are
+ *        bit-identical to the sequential path. Returns TENZO_ERROR_UNSUPPORTED (and does nothing) if batched prefill is
+ *        not available for this engine configuration.
+ */
+TENZO_API tenzo_status_t tenzo_prefill_tokens(tenzo_engine_t engine, const int* tokens, int n_tokens, int chunk);
+
+/**
  * @brief Executes a single autoregressive step: Transformer forward + LM Head + Sampler.
  * @param engine Target engine handle.
  * @param cur_token Current input token ID.

@@ -101,6 +101,20 @@ public:
     std::vector<uint8_t> popcount_v;
     std::vector<float> popcount_v_scales;
 
+    // ternary_rot: K (post-RoPE) and V are rotated by the fixed randomized Hadamard R (HadamardSigns.h), quantized to
+    // ternary per group of 32 (TWN threshold 0.7*mean|y|, scale = mean |y| over the support) and stored as 2-bit codes
+    // (byte j of a token holds element 32*g + j in bit pair g) + fp32 scale per group. The 4 sink tokens and the 32 most
+    // recent tokens are additionally kept as per-token INT8 (unrotated) and attended from INT8 instead.
+    static constexpr int TR_SINKS = 4, TR_RECENT = 32, TR_SLOTS = TR_SINKS + TR_RECENT;
+    std::vector<uint8_t> tr_k_codes, tr_v_codes;      // [layer][kv_head][pos][head_dim / 4]
+    std::vector<float> tr_k_scales, tr_v_scales;      // [layer][kv_head][pos][head_dim / 32]
+    std::vector<int8_t> tr_k_i8, tr_v_i8;             // [layer][kv_head][TR_SLOTS][head_dim]
+    std::vector<float> tr_k_i8_scales, tr_v_i8_scales;// [layer][kv_head][TR_SLOTS]
+    std::vector<float> tr_alpha_k, tr_alpha_v;        // optional calibrated clip multipliers [layer][kv_head][head_dim / 32]
+    bool load_kv_alpha(const char* path);
+    void forward_attention_ternary_rot(int layer_idx, int pos, const float* q_ptr, const float* k_ptr, const float* v_ptr,
+                                       float* out_ptr);
+
     FusedKVCache(
         int num_layers = 30,
         int num_q_heads = 20,
@@ -280,6 +294,10 @@ public:
     void forward_layers_hetero();
 
     void prefill_token(int token_id);
+    // Prompt prefill in chunks of `chunk` tokens (CPU + I2_S + non-paged KV): every weight tile is unpacked once per chunk and
+    // applied to all tokens of the chunk. Per-token results are bit-identical to prefill_token. chunk <= 1 or an unsupported
+    // configuration: returns false and does nothing (the caller falls back to prefill_token).
+    bool prefill_tokens_batched(const int* tokens, int n, int chunk);
     // Teacher-forcing / evaluation path: same decode path as generate_step minus the sampler.
     // Copies the raw (un-penalised) logits of the position just processed into out[vocab_size].
     void forward_logits(int token_id, float* out_logits);

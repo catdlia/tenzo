@@ -62,6 +62,14 @@ public:
         return tenzo_get_seq_len(engine_);
     }
 
+    // Returns false if batched prefill (chunk > 1) is unsupported for this engine; nothing is prefetched in that case.
+    bool prefill_tokens(const int* tokens, int n_tokens, int chunk) {
+        tenzo_status_t status = tenzo_prefill_tokens(engine_, tokens, n_tokens, chunk);
+        if (status == TENZO_ERROR_UNSUPPORTED) return false;
+        if (status != TENZO_SUCCESS) throw std::runtime_error("Failed to prefill tokens");
+        return true;
+    }
+
     void prefill_token(int token_id) {
         tenzo_status_t status = tenzo_prefill_token(engine_, token_id);
         if (status != TENZO_SUCCESS) {

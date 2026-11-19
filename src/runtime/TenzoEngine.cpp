@@ -9,6 +9,17 @@
 #include "ROCmRuntime.h"
 #include "MicroarchProfiler.h"
 #include "arch/RISCV_RVV.h"
+#include "Hadamard.h"
+#if defined(__unix__) || defined(__APPLE__)
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <stdexcept>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -257,6 +268,55 @@ inline std::vector<uint8_t> tl1_to_i2s(const int8_t* tl1, int64_t N, int64_t K) 
     return out;
 }
 
+// Batched I2_S GEMM for M tokens: out[m * ld_out + r] for rows [row0, row0 + nrows) (nrows even). q is [M][ldq] int8 codes,
+// scale[m] = inv_scale[m] * w_scale. Integer sums are identical to gemv_i2s_rows, so the float results are bit-identical.
+inline void gemm_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t nrows, int64_t K, const int8_t* __restrict__ q,
+                          int64_t ldq, const int32_t* __restrict__ sum_q, const float* __restrict__ scale, int M,
+                          float* __restrict__ out, int64_t ld_out) {
+    const int64_t kb_n = K / 128, row_bytes = K / 4;
+    const __m256i m3 = _mm256_set1_epi8(0x03), ones = _mm256_set1_epi16(1);
+    auto hsum = [](__m256i v) {
+        __m128i x = _mm_add_epi32(_mm256_castsi256_si128(v), _mm256_extracti128_si256(v, 1));
+        x = _mm_add_epi32(x, _mm_shuffle_epi32(x, 0x4E));
+        x = _mm_add_epi32(x, _mm_shuffle_epi32(x, 0xB1));
+        return _mm_cvtsi128_si32(x);
+    };
+    for (int64_t r = 0; r < nrows; r += 2) {
+        const uint8_t* w0 = w + (row0 + r) * row_bytes;
+        const uint8_t* w1 = w0 + row_bytes;
+        for (int m0 = 0; m0 < M; m0 += 4) {
+            const int mt = std::min(4, M - m0);
+            __m256i acc0[4], acc1[4];
+            for (int i = 0; i < 4; ++i) { acc0[i] = _mm256_setzero_si256(); acc1[i] = _mm256_setzero_si256(); }
+            for (int64_t kb = 0; kb < kb_n; ++kb) {
+                const __m256i b0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w0 + kb * 32));
+                const __m256i b1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w1 + kb * 32));
+                const __m256i a0 = _mm256_and_si256(b0, m3), a1 = _mm256_and_si256(_mm256_srli_epi16(b0, 2), m3),
+                              a2 = _mm256_and_si256(_mm256_srli_epi16(b0, 4), m3), a3 = _mm256_and_si256(_mm256_srli_epi16(b0, 6), m3);
+                const __m256i c0 = _mm256_and_si256(b1, m3), c1 = _mm256_and_si256(_mm256_srli_epi16(b1, 2), m3),
+                              c2 = _mm256_and_si256(_mm256_srli_epi16(b1, 4), m3), c3 = _mm256_and_si256(_mm256_srli_epi16(b1, 6), m3);
+                for (int i = 0; i < mt; ++i) {
+                    const int8_t* qb = q + static_cast<int64_t>(m0 + i) * ldq + kb * 128;
+                    const __m256i q0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb));
+                    const __m256i q1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 32));
+                    const __m256i q2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 64));
+                    const __m256i q3 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 96));
+                    __m256i p0 = _mm256_add_epi16(_mm256_add_epi16(_mm256_maddubs_epi16(a0, q0), _mm256_maddubs_epi16(a1, q1)),
+                                                  _mm256_add_epi16(_mm256_maddubs_epi16(a2, q2), _mm256_maddubs_epi16(a3, q3)));
+                    __m256i p1 = _mm256_add_epi16(_mm256_add_epi16(_mm256_maddubs_epi16(c0, q0), _mm256_maddubs_epi16(c1, q1)),
+                                                  _mm256_add_epi16(_mm256_maddubs_epi16(c2, q2), _mm256_maddubs_epi16(c3, q3)));
+                    acc0[i] = _mm256_add_epi32(acc0[i], _mm256_madd_epi16(p0, ones));
+                    acc1[i] = _mm256_add_epi32(acc1[i], _mm256_madd_epi16(p1, ones));
+                }
+            }
+            for (int i = 0; i < mt; ++i) {
+                out[static_cast<int64_t>(m0 + i) * ld_out + r] = static_cast<float>(hsum(acc0[i]) - sum_q[m0 + i]) * scale[m0 + i];
+                out[static_cast<int64_t>(m0 + i) * ld_out + r + 1] = static_cast<float>(hsum(acc1[i]) - sum_q[m0 + i]) * scale[m0 + i];
+            }
+        }
+    }
+}
+
 inline void rms_norm_raw(const float* src, const float* w, float* dst, int dim, float eps = 1e-5f) {
     float sum_sq = 0.0f;
     #pragma omp simd reduction(+:sum_sq)
@@ -308,6 +368,20 @@ FusedKVCache::FusedKVCache(
         tl1_v.resize(total_tl1_bytes);
         tl1_k_scales.resize(total_scales);
         tl1_v_scales.resize(total_scales);
+    } else if (kv_mode == "ternary_rot") {
+        if (head_dim != 128) throw std::invalid_argument("ternary_rot requires head_dim == 128");
+        const size_t lh = static_cast<size_t>(num_layers) * num_kv_heads;
+        tr_k_codes.assign(lh * max_seq_len * (head_dim / 4), 0);
+        tr_v_codes.assign(lh * max_seq_len * (head_dim / 4), 0);
+        tr_k_scales.assign(lh * max_seq_len * (head_dim / 32), 0.0f);
+        tr_v_scales.assign(lh * max_seq_len * (head_dim / 32), 0.0f);
+        tr_k_i8.assign(lh * TR_SLOTS * head_dim, 0);
+        tr_v_i8.assign(lh * TR_SLOTS * head_dim, 0);
+        tr_k_i8_scales.assign(lh * TR_SLOTS, 0.0f);
+        tr_v_i8_scales.assign(lh * TR_SLOTS, 0.0f);
+        if (const char* ap = std::getenv("TENZO_KV_ALPHA")) {
+            if (!load_kv_alpha(ap)) throw std::runtime_error(std::string("TENZO_KV_ALPHA: cannot load ") + ap);
+        }
     } else if (kv_mode == "popcount_fused") {
         // Popcount bitplanes: 32 bytes per token head (contiguous struct)
         size_t total_heads_tokens = static_cast<size_t>(num_layers) * num_kv_heads * max_seq_len;
@@ -324,6 +398,192 @@ FusedKVCache::FusedKVCache(
 
 void FusedKVCache::reset() {
     cur_seq_len = 0;
+}
+
+// Text file: one line per (layer head group): "<layer> <head> <group> <alpha_k> <alpha_v>"; '#' lines ignored. Every
+// (layer, head, group) must appear exactly once, alpha in [0.5, 1.5]. Written by tools/reference/export_kv_alpha.py.
+bool FusedKVCache::load_kv_alpha(const char* path) {
+    std::ifstream f(path);
+    if (!f) return false;
+    const size_t n = static_cast<size_t>(num_layers) * num_kv_heads * (head_dim / 32);
+    std::vector<float> ak(n, 0.0f), av(n, 0.0f);
+    std::vector<char> seen(n, 0);
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        std::istringstream is(line);
+        int l, h, g; float a, b;
+        if (!(is >> l >> h >> g >> a >> b)) return false;
+        if (l < 0 || l >= num_layers || h < 0 || h >= num_kv_heads || g < 0 || g >= head_dim / 32) return false;
+        if (!(a >= 0.5f && a <= 1.5f && b >= 0.5f && b <= 1.5f)) return false;
+        const size_t i = (static_cast<size_t>(l) * num_kv_heads + h) * (head_dim / 32) + g;
+        if (seen[i]) return false;
+        seen[i] = 1; ak[i] = a; av[i] = b;
+    }
+    for (char c : seen) if (!c) return false;
+    tr_alpha_k = std::move(ak); tr_alpha_v = std::move(av);
+    return true;
+}
+
+namespace {
+// Ternary g32 quantization of a rotated vector y[128] -> 32 code bytes (byte j: element 32*g + j in bit pair g, u = w + 1)
+// and 4 scales. Same rule as kv_ptq.ternary(x, 0.7): th = 0.7 * mean|y|, support |y| > th, scale = mean |y| on the support
+// (mean + 1e-6 for an empty support); alpha (optional) multiplies the scale.
+inline void tr_quantize(const float* y, uint8_t* codes, float* scales, const float* alpha) {
+    std::memset(codes, 0, 32);
+    for (int g = 0; g < 4; ++g) {
+        const float* yg = y + 32 * g;
+        float sum = 0.0f;
+        for (int i = 0; i < 32; ++i) sum += std::abs(yg[i]);
+        const float mean = sum / 32.0f, th = 0.7f * mean;
+        float sum_nz = 0.0f; int cnt = 0;
+        for (int i = 0; i < 32; ++i) { const float a = std::abs(yg[i]); if (a > th) { sum_nz += a; ++cnt; } }
+        float s = cnt > 0 ? sum_nz / static_cast<float>(cnt) : mean + 1e-6f;
+        if (alpha) s *= alpha[g];
+        scales[g] = s;
+        for (int i = 0; i < 32; ++i) {
+            const int u = (yg[i] > th) ? 2 : ((yg[i] < -th) ? 0 : 1);
+            codes[i] |= static_cast<uint8_t>(u << (2 * g));
+        }
+    }
+}
+
+// Per-token INT8 (same rule as int8_fused: scale = max|x| / 127, round half away, clamp).
+inline void tr_quantize_i8(const float* x, int8_t* q, float* scale) {
+    float amax = 1e-8f;
+    for (int d = 0; d < 128; ++d) amax = std::max(amax, std::abs(x[d]));
+    const float s = amax / 127.0f;
+    *scale = s;
+    for (int d = 0; d < 128; ++d) q[d] = static_cast<int8_t>(std::clamp(std::round(x[d] / s), -128.0f, 127.0f));
+}
+
+inline float hsum256(__m256 v) {
+    __m128 x = _mm_add_ps(_mm256_castps256_ps128(v), _mm256_extractf128_ps(v, 1));
+    x = _mm_add_ps(x, _mm_movehl_ps(x, x));
+    x = _mm_add_ss(x, _mm_shuffle_ps(x, x, 1));
+    return _mm_cvtss_f32(x);
+}
+
+// u plane g of 32 code bytes as 32 u8 values
+inline __m256i tr_plane(__m256i bytes, int g) {
+    return _mm256_and_si256(_mm256_srl_epi16(bytes, _mm_cvtsi32_si128(2 * g)), _mm256_set1_epi8(3));
+}
+} // namespace
+
+void FusedKVCache::forward_attention_ternary_rot(int layer_idx, int pos, const float* q_ptr, const float* k_ptr,
+                                                 const float* v_ptr, float* out_ptr) {
+    const int D = 128;
+    // ---- append token `pos` (k_ptr / v_ptr are post-RoPE for K) ----
+    for (int h = 0; h < num_kv_heads; ++h) {
+        const size_t hl = static_cast<size_t>(layer_idx) * num_kv_heads + h;
+        const float* k_src = k_ptr + h * D;
+        const float* v_src = v_ptr + h * D;
+        alignas(32) float yk[128], yv[128];
+        hadamard::rotate(k_src, yk);
+        hadamard::rotate(v_src, yv);
+        const size_t cb = (hl * max_seq_len + pos) * (D / 4), sb = (hl * max_seq_len + pos) * (D / 32);
+        tr_quantize(yk, tr_k_codes.data() + cb, tr_k_scales.data() + sb, tr_alpha_k.empty() ? nullptr : tr_alpha_k.data() + hl * 4);
+        tr_quantize(yv, tr_v_codes.data() + cb, tr_v_scales.data() + sb, tr_alpha_v.empty() ? nullptr : tr_alpha_v.data() + hl * 4);
+        const int slot = pos < TR_SINKS ? pos : TR_SINKS + (pos % TR_RECENT);
+        tr_quantize_i8(k_src, tr_k_i8.data() + (hl * TR_SLOTS + slot) * D, tr_k_i8_scales.data() + hl * TR_SLOTS + slot);
+        tr_quantize_i8(v_src, tr_v_i8.data() + (hl * TR_SLOTS + slot) * D, tr_v_i8_scales.data() + hl * TR_SLOTS + slot);
+    }
+
+    // ---- attention over [0, pos] ----
+    const int seq_len = pos + 1;
+    const int gqa_ratio = num_q_heads / num_kv_heads;
+    const float scale_factor = 1.0f / std::sqrt(static_cast<float>(D));
+
+    #pragma omp parallel for schedule(dynamic, 2)
+    for (int qh = 0; qh < num_q_heads; ++qh) {
+        const int kv_h = qh / gqa_ratio;
+        const size_t hl = static_cast<size_t>(layer_idx) * num_kv_heads + kv_h;
+        const float* q_vec = q_ptr + qh * D;
+        float* out_vec = out_ptr + qh * D;
+        alignas(32) float qr[128];
+        hadamard::rotate(q_vec, qr);
+        float qsum[4];
+        for (int g = 0; g < 4; ++g) { float s = 0.0f; for (int i = 0; i < 32; ++i) s += qr[32 * g + i]; qsum[g] = s; }
+
+        alignas(32) float scores_buf[8192];
+        float* scores = (seq_len <= 8192) ? scores_buf : new float[seq_len];
+        float max_score = -1e30f;
+        const uint8_t* kc = tr_k_codes.data() + hl * max_seq_len * (D / 4);
+        const float* ks = tr_k_scales.data() + hl * max_seq_len * (D / 32);
+        for (int t = 0; t < seq_len; ++t) {
+            float dot;
+            if (t < TR_SINKS || pos - t < TR_RECENT) {
+                const int slot = t < TR_SINKS ? t : TR_SINKS + (t % TR_RECENT);
+                const int8_t* kq = tr_k_i8.data() + (hl * TR_SLOTS + slot) * D;
+                __m256 acc = _mm256_setzero_ps();
+                for (int d = 0; d < D; d += 8) {
+                    __m256 kf = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(kq + d))));
+                    acc = _mm256_fmadd_ps(_mm256_loadu_ps(q_vec + d), kf, acc);
+                }
+                dot = hsum256(acc) * tr_k_i8_scales[hl * TR_SLOTS + slot];
+            } else {
+                const __m256i bytes = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(kc + static_cast<size_t>(t) * (D / 4)));
+                dot = 0.0f;
+                for (int g = 0; g < 4; ++g) {
+                    alignas(32) uint8_t u[32];
+                    _mm256_store_si256(reinterpret_cast<__m256i*>(u), tr_plane(bytes, g));
+                    __m256 acc = _mm256_setzero_ps();
+                    for (int j = 0; j < 4; ++j) {
+                        __m256 uf = _mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(u + 8 * j))));
+                        acc = _mm256_fmadd_ps(_mm256_loadu_ps(qr + 32 * g + 8 * j), uf, acc);
+                    }
+                    dot += ks[static_cast<size_t>(t) * 4 + g] * (hsum256(acc) - qsum[g]);   // sum q * (u - 1)
+                }
+            }
+            dot *= scale_factor;
+            scores[t] = dot;
+            if (dot > max_score) max_score = dot;
+        }
+
+        float sum_exp = 0.0f;
+        for (int t = 0; t < seq_len; ++t) { scores[t] = std::exp(scores[t] - max_score); sum_exp += scores[t]; }
+        const float inv_sum = 1.0f / sum_exp;
+        for (int t = 0; t < seq_len; ++t) scores[t] *= inv_sum;
+
+        // Weighted sum of V: INT8 tokens accumulate in the original domain (accP), ternary tokens in the rotated domain
+        // (accU = sum p * scale_g * u, minus wsum_g to turn u into u - 1), then one inverse rotation.
+        alignas(32) float accP[128] = {0}, accU[128] = {0};
+        float wsum[4] = {0, 0, 0, 0};
+        const uint8_t* vc = tr_v_codes.data() + hl * max_seq_len * (D / 4);
+        const float* vs = tr_v_scales.data() + hl * max_seq_len * (D / 32);
+        for (int t = 0; t < seq_len; ++t) {
+            const float p = scores[t];
+            if (t < TR_SINKS || pos - t < TR_RECENT) {
+                const int slot = t < TR_SINKS ? t : TR_SINKS + (t % TR_RECENT);
+                const int8_t* vq = tr_v_i8.data() + (hl * TR_SLOTS + slot) * D;
+                const __m256 w = _mm256_set1_ps(p * tr_v_i8_scales[hl * TR_SLOTS + slot]);
+                for (int d = 0; d < D; d += 8) {
+                    __m256 vf = _mm256_cvtepi32_ps(_mm256_cvtepi8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(vq + d))));
+                    _mm256_store_ps(accP + d, _mm256_fmadd_ps(vf, w, _mm256_load_ps(accP + d)));
+                }
+            } else {
+                const __m256i bytes = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(vc + static_cast<size_t>(t) * (D / 4)));
+                for (int g = 0; g < 4; ++g) {
+                    const float wg = p * vs[static_cast<size_t>(t) * 4 + g];
+                    wsum[g] += wg;
+                    const __m256 w = _mm256_set1_ps(wg);
+                    alignas(32) uint8_t u[32];
+                    _mm256_store_si256(reinterpret_cast<__m256i*>(u), tr_plane(bytes, g));
+                    for (int j = 0; j < 4; ++j) {
+                        __m256 uf = _mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(u + 8 * j))));
+                        float* a = accU + 32 * g + 8 * j;
+                        _mm256_store_ps(a, _mm256_fmadd_ps(uf, w, _mm256_load_ps(a)));
+                    }
+                }
+            }
+        }
+        for (int g = 0; g < 4; ++g) for (int i = 0; i < 32; ++i) accU[32 * g + i] -= wsum[g];
+        alignas(32) float back[128];
+        hadamard::unrotate(accU, back);
+        for (int d = 0; d < D; d += 8)
+            _mm256_storeu_ps(out_vec + d, _mm256_add_ps(_mm256_load_ps(accP + d), _mm256_load_ps(back + d)));
+        if (scores != scores_buf) delete[] scores;
+    }
 }
 
 //===----------------------------------------------------------------------===//
@@ -617,6 +877,11 @@ void FusedKVCache::forward_attention_raw(
             _mm256_storeu_ps(k_head + i, r0);
             _mm256_storeu_ps(k_head + i + half_dim, r1);
         }
+    }
+
+    if (kv_mode == "ternary_rot") {
+        forward_attention_ternary_rot(layer_idx, pos, q_ptr, k_ptr, v_ptr, out_ptr);
+        return;
     }
 
     // 3. Append to KV-Cache in contiguous [layer][head][time][dim] layout
@@ -1403,14 +1668,14 @@ void TenzoEngineImpl::set_layer_weights(int layer_idx, const tenzo_layer_weights
 void TenzoEngineImpl::build_i2s_layer(int layer_idx) {
     auto& lw = layers[layer_idx];
     const int h = config.hidden_size;
-    auto conv = [](const int8_t* p, int64_t N, int64_t K) { return p ? tl1_to_i2s(p, N, K) : std::vector<uint8_t>(); };
-    lw.q_i2 = conv(lw.q_w_ptr, q_dim, h);
-    lw.k_i2 = conv(lw.k_w_ptr, kv_dim, h);
-    lw.v_i2 = conv(lw.v_w_ptr, kv_dim, h);
-    lw.out_i2 = conv(lw.out_w_ptr, h, q_dim);
-    lw.gate_i2 = conv(lw.gate_w_ptr, ffn_dim, h);
-    lw.up_i2 = conv(lw.up_w_ptr, ffn_dim, h);
-    lw.down_i2 = conv(lw.down_w_ptr, h, ffn_dim);
+    auto conv = [](std::vector<uint8_t>& dst, const int8_t* p, int64_t N, int64_t K) { if (p) dst = tl1_to_i2s(p, N, K); };
+    conv(lw.q_i2, lw.q_w_ptr, q_dim, h);
+    conv(lw.k_i2, lw.k_w_ptr, kv_dim, h);
+    conv(lw.v_i2, lw.v_w_ptr, kv_dim, h);
+    conv(lw.out_i2, lw.out_w_ptr, h, q_dim);
+    conv(lw.gate_i2, lw.gate_w_ptr, ffn_dim, h);
+    conv(lw.up_i2, lw.up_w_ptr, ffn_dim, h);
+    conv(lw.down_i2, lw.down_w_ptr, h, ffn_dim);
 }
 
 void TenzoEngineImpl::set_final_norm(const float* norm_w) {
@@ -1879,6 +2144,77 @@ void TenzoEngineImpl::forward_layer_i2s(int layer_idx, int dpos, bool dmp) {
 #undef TENZO_DUMP
 }
 
+// ---- batched prefill (see results/2026-11-20_overnight/part2/design_batched_prefill.md) ----
+bool TenzoEngineImpl::prefill_tokens_batched(const int* tokens, int n, int chunk) {
+    const std::string dev = config.device ? config.device : "cpu";
+    if (chunk <= 1 || !use_i2s || use_paged_kv || dev != "cpu" || n <= 0) return false;
+    const int h = config.hidden_size, F = ffn_dim, QD = q_dim, KD = kv_dim;
+    const int C = std::min(chunk, n);
+    const int LDQ = std::max(h, std::max(QD, F));
+    std::vector<float> X(size_t(C) * h), Xn(size_t(C) * h), Qb(size_t(C) * QD), Kb(size_t(C) * KD), Vb(size_t(C) * KD),
+        Ab(size_t(C) * QD), An(size_t(C) * QD), Ob(size_t(C) * h), H1(size_t(C) * h), Pn(size_t(C) * h), G(size_t(C) * F),
+        U(size_t(C) * F), Act(size_t(C) * F), Fn(size_t(C) * F), Dn(size_t(C) * h), Sc(C);
+    std::vector<int8_t> Q8(size_t(C) * LDQ);
+    std::vector<int32_t> sq(C);
+    std::vector<float> inv(C), sc(C);
+
+    auto quantize_rows = [&](const std::vector<float>& src, int ld, int K, int M) {
+        #pragma omp parallel for schedule(static)
+        for (int m = 0; m < M; ++m) inv[m] = quantize_act_i8(src.data() + size_t(m) * ld, K, Q8.data() + size_t(m) * LDQ, sq[m]);
+    };
+    auto set_scales = [&](int M, float w_scale) { for (int m = 0; m < M; ++m) sc[m] = inv[m] * w_scale; };
+    auto gemm = [&](const std::vector<uint8_t>& w, int N, int K, int M, std::vector<float>& out, int ld_out) {
+        #pragma omp parallel for schedule(dynamic, 2)
+        for (int b = 0; b < N / 64; ++b)
+            gemm_i2s_rows(w.data(), int64_t(b) * 64, 64, K, Q8.data(), LDQ, sq.data(), sc.data(), M, out.data() + size_t(b) * 64, ld_out);
+    };
+
+    for (int base = 0; base < n; base += C) {
+        const int M = std::min(C, n - base);
+        const int pos0 = kv_cache.get_seq_len();
+        for (int m = 0; m < M; ++m) {
+            embedding_lookup(tokens[base + m]);
+            std::memcpy(X.data() + size_t(m) * h, buf_x.data(), size_t(h) * sizeof(float));
+        }
+        for (int l = 0; l < config.num_layers; ++l) {
+            const auto& lw = layers[l];
+            #pragma omp parallel for schedule(static)
+            for (int m = 0; m < M; ++m) rms_norm_raw(X.data() + size_t(m) * h, lw.in_norm_ptr, Xn.data() + size_t(m) * h, h);
+            quantize_rows(Xn, h, h, M);
+            set_scales(M, lw.q_scale); gemm(lw.q_i2, QD, h, M, Qb, QD);
+            set_scales(M, lw.k_scale); gemm(lw.k_i2, KD, h, M, Kb, KD);
+            set_scales(M, lw.v_scale); gemm(lw.v_i2, KD, h, M, Vb, KD);
+            for (int m = 0; m < M; ++m) {   // causal attention in token order: token m sees the cache entries of tokens < m
+                kv_cache.cur_seq_len = pos0 + m;
+                kv_cache.forward_attention_raw(l, Qb.data() + size_t(m) * QD, Kb.data() + size_t(m) * KD, Vb.data() + size_t(m) * KD,
+                                               Ab.data() + size_t(m) * QD);
+            }
+            #pragma omp parallel for schedule(static)
+            for (int m = 0; m < M; ++m) rms_norm_raw(Ab.data() + size_t(m) * QD, lw.attn_sub_norm_ptr, An.data() + size_t(m) * QD, h);
+            quantize_rows(An, QD, QD, M);
+            set_scales(M, lw.out_scale); gemm(lw.out_i2, h, QD, M, Ob, h);
+            for (size_t i = 0; i < size_t(M) * h; ++i) H1[i] = X[i] + Ob[i];
+            if (!lw.gate_i2.empty() && !lw.up_i2.empty() && !lw.down_i2.empty()) {
+                #pragma omp parallel for schedule(static)
+                for (int m = 0; m < M; ++m) rms_norm_raw(H1.data() + size_t(m) * h, lw.post_norm_ptr, Pn.data() + size_t(m) * h, h);
+                quantize_rows(Pn, h, h, M);
+                set_scales(M, lw.gate_scale); gemm(lw.gate_i2, F, h, M, G, F);
+                set_scales(M, lw.up_scale); gemm(lw.up_i2, F, h, M, U, F);
+                for (size_t i = 0; i < size_t(M) * F; ++i) { float r = std::max(0.0f, G[i]); Act[i] = (r * r) * U[i]; }
+                #pragma omp parallel for schedule(static)
+                for (int m = 0; m < M; ++m) rms_norm_raw(Act.data() + size_t(m) * F, lw.ffn_sub_norm_ptr, Fn.data() + size_t(m) * F, F);
+                quantize_rows(Fn, F, F, M);
+                set_scales(M, lw.down_scale); gemm(lw.down_i2, h, F, M, Dn, h);
+                for (size_t i = 0; i < size_t(M) * h; ++i) X[i] = H1[i] + Dn[i];
+            } else {
+                std::memcpy(X.data(), H1.data(), size_t(M) * h * sizeof(float));
+            }
+        }
+        kv_cache.cur_seq_len = pos0 + M;
+    }
+    return true;
+}
+
 void TenzoEngineImpl::compute_logits() {
     const int h_dim = config.hidden_size;
     const int vocab_size = config.vocab_size;
@@ -2193,6 +2529,54 @@ std::vector<int8_t> pack_ternary_weights_raw(const uint8_t* raw_bytes, int64_t N
 }
 } // namespace
 
+namespace {
+// Read-only view of the weights file. On POSIX it is a private mmap: pages are clean, so release() can drop them from the resident
+// set as soon as they have been converted. This keeps the load-time peak near the steady-state size instead of the file size
+// (1.8 GB for BitNet-2B-4T, 1.3 GB of which are the fp32 embeddings that are only needed to build the INT8 table).
+class WeightsFile {
+public:
+    WeightsFile(const char* path, size_t size) {
+#if defined(__unix__) || defined(__APPLE__)
+        int fd = ::open(path, O_RDONLY);
+        if (fd >= 0) {
+            void* m = ::mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
+            ::close(fd);
+            if (m != MAP_FAILED) { p_ = static_cast<const uint8_t*>(m); n_ = size; mapped_ = true; ok_ = true; return; }
+        }
+#endif
+        std::ifstream f(path, std::ios::binary);
+        fallback_.resize(size);
+        if (f.read(reinterpret_cast<char*>(fallback_.data()), static_cast<std::streamsize>(size))) { p_ = fallback_.data(); n_ = size; ok_ = true; }
+    }
+    ~WeightsFile() {
+#if defined(__unix__) || defined(__APPLE__)
+        if (mapped_) ::munmap(const_cast<uint8_t*>(p_), n_);
+#endif
+    }
+    WeightsFile(const WeightsFile&) = delete;
+    WeightsFile& operator=(const WeightsFile&) = delete;
+    bool ok() const { return ok_; }
+    const uint8_t* data() const { return p_; }
+    size_t size() const { return n_; }
+    // Drop the fully covered pages of [off, off + len) from the resident set (no-op for the read fallback).
+    void release(size_t off, size_t len) const {
+#if defined(__unix__) || defined(__APPLE__)
+        if (!mapped_ || len == 0) return;
+        const size_t ps = static_cast<size_t>(::sysconf(_SC_PAGESIZE));
+        const size_t a = (off + ps - 1) / ps * ps, b = (off + len) / ps * ps;
+        if (b > a) ::madvise(const_cast<uint8_t*>(p_) + a, b - a, MADV_DONTNEED);
+#else
+        (void)off; (void)len;
+#endif
+    }
+private:
+    const uint8_t* p_ = nullptr;
+    size_t n_ = 0;
+    bool mapped_ = false, ok_ = false;
+    std::vector<uint8_t> fallback_;
+};
+} // namespace
+
 tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, const char* mlir_path) {
     if (!weights_path || !mlir_path) {
         std::cerr << "❌ [Tenzo Error] Invalid arguments: weights_path and mlir_path must not be null." << std::endl;
@@ -2221,9 +2605,9 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         std::cerr << "❌ [Tenzo Error] Binary weights file is empty (0 bytes): " << weights_path << std::endl;
         return TENZO_ERROR_MODEL_PARSE;
     }
-    wf.seekg(0, std::ios::beg);
-    std::vector<uint8_t> raw_bytes(fsize);
-    if (!wf.read(reinterpret_cast<char*>(raw_bytes.data()), fsize)) {
+    wf.close();
+    WeightsFile raw_bytes(weights_path, static_cast<size_t>(fsize));
+    if (!raw_bytes.ok()) {
         std::cerr << "❌ [Tenzo Error] Failed to read " << fsize << " bytes from binary weights file: " << weights_path << std::endl;
         return TENZO_ERROR_IO;
     }
@@ -2309,6 +2693,8 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
 
     }
 
+    raw_bytes.release(0, embed_bytes);   // fp32 embedding pages are no longer needed (INT8 table / fp32 copy built)
+
     // 2. Parse views and scales from MLIR
     std::regex view_regex(R"((%\w+)\s*=\s*arith\.constant\s+(\d+)\s*:\s*index\s*\r?\n\s*(%\w+)\s*=\s*memref\.view\s+%\w+\[\1\]\[\]\s*:\s*memref<\?xi8>\s+to\s+memref<([^>]+)>)");
     std::vector<size_t> all_views;
@@ -2390,6 +2776,7 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
     for (int l = 0; l < num_layers; ++l) {
         if (load_failed) break;
         auto& lw = layers[l];
+        size_t layer_lo = SIZE_MAX, layer_hi = 0;   // file range of this layer, released once its tensors are converted
 
         auto get_offset = [&](size_t sz_bytes, const char* name) -> size_t {
             if (load_failed) return 0;
@@ -2407,6 +2794,8 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
                 return 0;
             }
             seq_offset += sz_bytes;
+            layer_lo = std::min(layer_lo, off);
+            layer_hi = std::max(layer_hi, off + sz_bytes);
             return off;
         };
 
@@ -2471,6 +2860,18 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         lw.down_w = strict_pack_ternary(off, hidden_size, ff_dim, "down_proj", l);
         lw.down_w_ptr = lw.down_w.data();
         lw.down_scale = strict_get_scale("down_proj", l);
+
+        if (!load_failed && layer_lo < layer_hi) raw_bytes.release(layer_lo, layer_hi - layer_lo);
+        if (!load_failed && use_i2s) {
+            // Build the I2_S rows now and (CPU) drop the TL1 copy right away, so the two layouts never coexist for all layers.
+            build_i2s_layer(l);
+            const bool cpu = !config.device || std::string(config.device) == "cpu";
+            if (cpu) {
+                for (auto* v : {&lw.q_w, &lw.k_w, &lw.v_w, &lw.out_w, &lw.gate_w, &lw.up_w, &lw.down_w}) { v->clear(); v->shrink_to_fit(); }
+                lw.q_w_ptr = lw.k_w_ptr = lw.v_w_ptr = lw.out_w_ptr = nullptr;
+                lw.gate_w_ptr = lw.up_w_ptr = lw.down_w_ptr = nullptr;
+            }
+        }
     }
 
     if (load_failed) {
@@ -2500,6 +2901,7 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
         // GPU/RVV backends read the TL1 buffers, so they are kept for any non-CPU device.
         const bool cpu = !config.device || std::string(config.device) == "cpu";
         for (int l = 0; l < num_layers; ++l) {
+            if (!layers[l].q_i2.empty()) continue;   // already built (and its TL1 copy dropped) in the layer loop
             build_i2s_layer(l);
             if (cpu) {
                 auto& lw = layers[l];
@@ -2567,9 +2969,9 @@ tenzo_engine_t tenzo_create_engine(const tenzo_config_t* config) {
     }
     {
         const std::string km = cfg.kv_mode ? cfg.kv_mode : "int8_fused";
-        if (km != "fp32" && km != "int8_fused" && km != "tl1_fused" && km != "popcount_fused" && km != "paged_int8") {
+        if (km != "fp32" && km != "int8_fused" && km != "tl1_fused" && km != "popcount_fused" && km != "paged_int8" && km != "ternary_rot") {
             std::cerr << "❌ [Tenzo Error] unknown kv_mode '" << km
-                      << "' (expected fp32 | int8_fused | tl1_fused | popcount_fused | paged_int8)\n";
+                      << "' (expected fp32 | int8_fused | tl1_fused | popcount_fused | paged_int8 | ternary_rot)\n";
             return nullptr;
         }
     }
@@ -2578,7 +2980,13 @@ tenzo_engine_t tenzo_create_engine(const tenzo_config_t* config) {
         return nullptr;
     }
     auto handle = new tenzo_engine_opaque();
-    handle->impl = std::make_unique<tenzo::TenzoEngineImpl>(cfg);
+    try {
+        handle->impl = std::make_unique<tenzo::TenzoEngineImpl>(cfg);
+    } catch (const std::exception& e) {
+        std::cerr << "❌ [Tenzo Error] engine construction failed: " << e.what() << "\n";
+        delete handle;
+        return nullptr;
+    }
     return handle;
 }
 
@@ -2644,6 +3052,14 @@ tenzo_status_t tenzo_load_model(
 ) {
     if (!engine || !engine->impl || !weights_path || !mlir_path) return TENZO_ERROR_INVALID_ARGUMENT;
     return engine->impl->load_model_from_files(weights_path, mlir_path);
+}
+
+tenzo_status_t tenzo_prefill_tokens(tenzo_engine_t engine, const int* tokens, int n_tokens, int chunk) {
+    if (!engine || !engine->impl || (!tokens && n_tokens > 0) || n_tokens < 0) return TENZO_ERROR_INVALID_ARGUMENT;
+    if (chunk > 1 && engine->impl->prefill_tokens_batched(tokens, n_tokens, chunk)) return TENZO_SUCCESS;
+    if (chunk > 1) return TENZO_ERROR_UNSUPPORTED;   // batched requested, configuration not supported: nothing was done
+    for (int i = 0; i < n_tokens; ++i) engine->impl->prefill_token(tokens[i]);
+    return TENZO_SUCCESS;
 }
 
 tenzo_status_t tenzo_prefill_token(tenzo_engine_t engine, int token_id) {

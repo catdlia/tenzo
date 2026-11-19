@@ -1,0 +1,6 @@
+2026-11-19T11:23:43+02:00 calibrate en MemAvailable=13899976kB
+2026-11-19T12:02:41+02:00 eval en eval_en16 MemAvailable=6441852kB
+eval en eval_en16 exit=0 12:16:07
+2026-11-19T12:16:07+02:00 eval en eval_uk32 MemAvailable=6168960kB
+eval en eval_uk32 exit=0 12:41:22
+2026-11-19T12:41:22+02:00 calibrate uk MemAvailable=5908132kB
