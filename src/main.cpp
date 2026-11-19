@@ -18,6 +18,7 @@
 namespace tenzo {
 bool runTestTL1(mlir::MLIRContext& context, const std::string& custom_weights_path = "");
 bool runHFSemanticsTests(mlir::MLIRContext& context);
+bool runEngineAPITests();
 }
 
 void printUsage() {
@@ -44,6 +45,7 @@ void printUsage() {
     llvm::outs() << "  gpu-bench Run GPU vs CPU benchmark\n";
     llvm::outs() << "  gpu-nan-test Run GPU NaN/Inf detection regression test\n";
     llvm::outs() << "  tl1 [path] Run TL1 fixture test (optional custom weights fixture path)\n";
+    llvm::outs() << "  engine-api  Engine C API argument validation (kv_mode, TENZO_GEMV, rope_theta)\n";
     llvm::outs() << "  hf-semantics Regression: rope_theta and 8-bit ActQuant vs HF (compiler + runtime)\n";
     llvm::outs() << "  packing   Run packing kernels bandwidth benchmark\n";
     llvm::outs() << "  gemm      Run GotoBLAS 5-loop GEMM benchmark\n";
@@ -137,6 +139,8 @@ int main(int argc, char* argv[]) {
         tenzo::runDynamicInferenceTest(context);
     } else if (strcmp(mode, "bridge") == 0) {
         tenzo::runZeroCopyBridgeTest(context);
+    } else if (strcmp(mode, "engine-api") == 0) {
+        if (!tenzo::runEngineAPITests()) return 1;
     } else if (strcmp(mode, "hf-semantics") == 0) {
         if (!tenzo::runHFSemanticsTests(context)) return 1;
     } else if (strcmp(mode, "tl1") == 0) {
@@ -245,6 +249,8 @@ int main(int argc, char* argv[]) {
 
         llvm::outs() << "\n[7/7] HF semantics (rope_theta, 8-bit ActQuant)... \n";
         if (!tenzo::runHFSemanticsTests(context)) allPassed = false;
+        llvm::outs() << "\n[+] Engine API validation... \n";
+        if (!tenzo::runEngineAPITests()) allPassed = false;
 
         llvm::outs() << "\n--- All Tests Complete ---\n";
         return allPassed ? 0 : 1;
@@ -265,6 +271,8 @@ int main(int argc, char* argv[]) {
         if (!tenzo::runAuditJITTests(context)) allPassed = false;
         llvm::outs() << "\n=== HF Semantics Tests ===\n";
         if (!tenzo::runHFSemanticsTests(context)) allPassed = false;
+        llvm::outs() << "\n=== Engine API Tests ===\n";
+        if (!tenzo::runEngineAPITests()) allPassed = false;
         return allPassed ? 0 : 1;
     } else if (strcmp(mode, "help") == 0 || strcmp(mode, "-h") == 0 || strcmp(mode, "--help") == 0) {
         printUsage();

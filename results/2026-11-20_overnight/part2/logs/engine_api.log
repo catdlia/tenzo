@@ -1,0 +1,19 @@
+ Container untitled-dev-run-9f9a465e006f Creating 
+ Container untitled-dev-run-9f9a465e006f Created 
+❌ [Tenzo Error] unknown kv_mode 'bogus' (expected fp32 | int8_fused | tl1_fused | popcount_fused | paged_int8)
+❌ [Tenzo Error] unknown kv_mode 'int8' (expected fp32 | int8_fused | tl1_fused | popcount_fused | paged_int8)
+❌ [Tenzo Error] unknown kv_mode '' (expected fp32 | int8_fused | tl1_fused | popcount_fused | paged_int8)
+❌ [Tenzo Error] tenzo_config_t.rope_theta must be > 0 (start from tenzo_default_config())
+❌ [Tenzo Error] TENZO_GEMV must be 'i2s' or 'lut' (got 'bogus')
+--- Engine API validation ---
+  kv_mode=fp32: accepted
+  kv_mode=int8_fused: accepted
+  kv_mode=tl1_fused: accepted
+  kv_mode=popcount_fused: accepted
+  kv_mode=paged_int8: accepted
+  kv_mode='bogus': rejected
+  kv_mode='int8': rejected
+  kv_mode='': rejected
+  rope_theta=0: rejected
+  TENZO_GEMV=bogus: rejected
+✅ [PASS] Engine API validation

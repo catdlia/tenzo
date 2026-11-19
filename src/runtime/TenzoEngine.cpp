@@ -2565,6 +2565,14 @@ tenzo_engine_t tenzo_create_engine(const tenzo_config_t* config) {
             return nullptr;
         }
     }
+    {
+        const std::string km = cfg.kv_mode ? cfg.kv_mode : "int8_fused";
+        if (km != "fp32" && km != "int8_fused" && km != "tl1_fused" && km != "popcount_fused" && km != "paged_int8") {
+            std::cerr << "❌ [Tenzo Error] unknown kv_mode '" << km
+                      << "' (expected fp32 | int8_fused | tl1_fused | popcount_fused | paged_int8)\n";
+            return nullptr;
+        }
+    }
     if (!(cfg.rope_theta > 0.0f)) {
         std::cerr << "❌ [Tenzo Error] tenzo_config_t.rope_theta must be > 0 (start from tenzo_default_config())\n";
         return nullptr;

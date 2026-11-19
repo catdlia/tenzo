@@ -1,0 +1,16 @@
+ Container untitled-dev-run-eae4b0d30b04 Creating 
+ Container untitled-dev-run-eae4b0d30b04 Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/6] Building CXX object CMakeFiles/tenzo_runtime_shared.dir/src/runtime/TenzoEngine.cpp.o
+/app/src/runtime/TenzoEngine.cpp: In function 'void tenzo::{anonymous}::gemv_i2s_rows(const uint8_t*, int64_t, int64_t, int64_t, const int8_t*, int32_t, float, float*)':
+/app/src/runtime/TenzoEngine.cpp:226:39: warning: iteration 274877906883 invokes undefined behavior [-Waggressive-loop-optimizations]
+  226 |         const uint8_t* wr = w + (row0 + r) * row_bytes;
+      |                                 ~~~~~~^~~~
+/app/src/runtime/TenzoEngine.cpp:225:14: note: within this loop
+  225 |     for (; r < nrows; ++r) {
+      |            ~~^~~~~~~
+[2/6] Linking CXX shared library libtenzo_runtime.so
+[3/6] Building CXX object CMakeFiles/tenzo_basic_inference.dir/examples/basic_inference.cpp.o
+[4/6] Linking CXX executable tenzo_basic_inference
+[5/6] Building CXX object CMakeFiles/tenzo-diag.dir/src/tests/DeviceDiagnosticTest.cpp.o
+[6/6] Linking CXX executable tenzo-diag

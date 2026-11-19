@@ -176,6 +176,7 @@ if(TENZO_HAS_MLIR_COMPILER)
             src/tests/ZeroCopyBridgeTest.cpp
             src/tests/EndToEndMathTest.cpp src/tests/TestTL1.cpp
             src/tests/TestHFSemantics.cpp
+            src/tests/TestEngineAPI.cpp
             src/tests/GenerationTest.cpp
             src/tests/HeteroTests.cpp
             src/tests/TernaryPackTest.cpp

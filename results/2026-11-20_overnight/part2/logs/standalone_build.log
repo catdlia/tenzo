@@ -1,0 +1,18 @@
+ Container untitled-dev-run-ddb301102466 Creating 
+ Container untitled-dev-run-ddb301102466 Created 
+cfg=0
+[5/19] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/CUDARuntime.cpp.o
+[6/19] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/ROCmRuntime.cpp.o
+[7/19] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/MicroarchProfiler.cpp.o
+[8/19] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/ThreadPool.cpp.o
+[9/19] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/Sampler.cpp.o
+[10/19] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/Tokenizer.cpp.o
+[11/19] Linking CXX static library libtenzo_runtime.a
+[12/19] Building CXX object CMakeFiles/tenzo_basic_inference.dir/examples/basic_inference.cpp.o
+[13/19] Linking CXX executable tenzo_basic_inference
+[14/19] Building CXX object CMakeFiles/tenzo-inference.dir/src/main_inference.cpp.o
+[15/19] Linking CXX executable tenzo-inference
+[16/19] Building CXX object CMakeFiles/tenzo-diag.dir/src/tests/DeviceDiagnosticTest.cpp.o
+[17/19] Linking CXX executable tenzo-diag
+[18/19] Building CXX object CMakeFiles/paper_benchmark.dir/src/tests/PaperMicroBenchmark.cpp.o
+[19/19] Linking CXX executable paper_benchmark
