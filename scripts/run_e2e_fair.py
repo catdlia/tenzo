@@ -60,7 +60,7 @@ def run_llama(kind, pp, tg, ctk, extra):
             except OSError: pass
             time.sleep(0.2)
         fo.seek(0); fe.seek(0); out, err = fo.read(), fe.read()
-    rss = hwm if hwm > 0 else None
+    rss = hwm if (hwm > 0 and not BENCH_IN_CONTAINER) else None  # in-container: hwm would be the docker CLI's
     if p.returncode != 0: raise RuntimeError(f"llama-bench failed ({p.returncode}): {err[-300:]}")
     rows = json.loads(out[out.index("["):]) if BENCH_IN_CONTAINER else json.loads(out)
     return rows[0]["avg_ts"], rss
