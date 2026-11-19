@@ -1,0 +1,18 @@
+part2 start: 2026-11-19T02:26:46+02:00
+load: 3.69 5.44 8.78 1/1537 795284
+               total        used        free      shared  buff/cache   available
+Mem:           19679        5417        6524         856        8984       14262
+Swap:           9839        1709        8129
+    PID %CPU   RSS COMMAND
+ 794243 43.4 541408 zen-bin
+ 792361 19.2 651320 claude-desktop
+ 794710 12.7 254588 Isolated Web Co
+ 794759 10.0 266456 Isolated Web Co
+ 379028  8.4 400820 claude
+ 122931  6.9 45860 Hyprland
+ 794581  6.9 216060 WebExtensions
+ 792160  4.5 354364 claude-desktop
+ 792219  4.4 156580 claude-desktop
+ 794543  2.5 161532 Isolated Web Co
+HEAD: 00fe9e3cb63cef26bf2197d2cac4b5a789886dd5
+governor: powersave

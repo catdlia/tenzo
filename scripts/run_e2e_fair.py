@@ -16,7 +16,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 BENCH = ROOT / "BitNet/build/bin/llama-bench"
 GGUF = ROOT / "BitNet/models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf"
-FIELDS = ["engine", "kv", "prompt_len", "gen_len", "rep", "pp_tps", "tg_tps", "pg_tps", "rss_mb", "threads", "cpus", "governor", "note"]
+FIELDS = ["engine", "kv", "prompt_len", "gen_len", "rep", "pp_tps", "tg_tps", "pg_tps", "rss_mb", "threads", "cpus", "governor", "load1", "note"]
+BENCH_IN_CONTAINER = False
 
 
 def governor():
@@ -38,7 +39,13 @@ def run_tenzo(kv, pp, tg, ids_file, ctx, model="models/bitnet-1.58b"):
 
 def run_llama(kind, pp, tg, ctk, extra):
     env = dict(os.environ, LD_LIBRARY_PATH=str(BENCH.parent))
-    args = ["taskset", "-c", "0-3", str(BENCH), "-m", str(GGUF), "-t", "4", "-r", "1", "-o", "json", "-ctk", ctk, "-ctv", ctk] + extra
+    if BENCH_IN_CONTAINER:  # binary built inside the dev container (e.g. ~/tenzo-refs/BitNet): run it there, cpuset 0-3
+        refs = str(BENCH).split("/BitNet/")[0]
+        bench = "/refs/BitNet/" + str(BENCH).split("/BitNet/")[1]
+        args = ["docker", "compose", "-f", str(ROOT / "docker-compose.yml"), "run", "--rm", "-v", refs + ":/refs", "dev", bench,
+                "-m", "/app/BitNet/models/BitNet-b1.58-2B-4T/ggml-model-i2_s.gguf", "-t", "4", "-r", "1", "-o", "json", "-ctk", ctk, "-ctv", ctk] + extra
+    else:
+        args = ["taskset", "-c", "0-3", str(BENCH), "-m", str(GGUF), "-t", "4", "-r", "1", "-o", "json", "-ctk", ctk, "-ctv", ctk] + extra
     if kind == "pp": args += ["-p", str(pp), "-n", "0"]
     elif kind == "tg": args += ["-p", "0", "-n", str(tg)]
     else: args += ["-p", "0", "-n", "0", "-pg", f"{pp},{tg}"]
@@ -55,7 +62,7 @@ def run_llama(kind, pp, tg, ctk, extra):
         fo.seek(0); fe.seek(0); out, err = fo.read(), fe.read()
     rss = hwm if hwm > 0 else None
     if p.returncode != 0: raise RuntimeError(f"llama-bench failed ({p.returncode}): {err[-300:]}")
-    rows = json.loads(out)
+    rows = json.loads(out[out.index("["):]) if BENCH_IN_CONTAINER else json.loads(out)
     return rows[0]["avg_ts"], rss
 
 
@@ -67,12 +74,17 @@ def main():
     ap.add_argument("--model", default="models/bitnet-1.58b", help="Tenzo model dir (relative to repo)")
     ap.add_argument("--llama-prompts", default=None, help="prompt lengths for bitnet.cpp (default: same as --prompts)")
     ap.add_argument("--llama-ctk", default="f16,q8_0", help="bitnet.cpp KV types")
+    ap.add_argument("--bench", default=None, help="llama-bench binary (default BitNet/build/bin/llama-bench)")
+    ap.add_argument("--bench-in-container", action="store_true", help="run --bench inside the dev container (RSS then not measured)")
     a = ap.parse_args()
+    global BENCH, BENCH_IN_CONTAINER
+    if a.bench: BENCH = Path(os.path.expanduser(a.bench))
+    BENCH_IN_CONTAINER = a.bench_in_container
     gov = governor(); rows = []
     prompts = [int(x) for x in a.prompts.split(",")]
     w = csv.DictWriter(open(a.out, "w", newline=""), fieldnames=FIELDS); w.writeheader()
     def emit(r):
-        r.update(threads=4, cpus="0-3", governor=gov); w.writerow(r); sys.stdout.flush()
+        r.update(threads=4, cpus="0-3", governor=gov, load1=open("/proc/loadavg").read().split()[0]); w.writerow(r); sys.stdout.flush()
     for pp in prompts:
         for kv in [k for k in a.tenzo_kv.split(",") if k]:
             for rep in range(a.reps):

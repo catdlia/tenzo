@@ -18,3 +18,8 @@
   Eddie-Wang1120/llama.cpp@5eb47b7, clang 21 in the dev container, setup_env.py codegen recipe. First approach
   worked (greedy == HF, PPL 19.059 EN / 141.8 UK, within CI of golden), so the second approach (upstream HEAD) was
   not needed. tools/reference/bitnet_ref_dump.cpp gained a TENZO_LEGACY_LLAMA_API shim (old libllama names).
+- **D7 (02:27) Part 2 starts.** Quiet mode ON: steam/steamwebhelper appeared (12 processes) at 02:27 while firefox/neko
+  closed -> the owner may be back. Quiet-mode limits applied: nice -n 19 ionice -c3 for heavy work, Python MemoryMax=3G,
+  builds -j1, nothing > 4 GB, speed runs only queued (scripts/pending_benchmarks.sh).
+- **D8** Only 8 UK eval windows exist (39 Kobza first-rows documents). Part 2 asks for 32 UK eval windows plus 8
+  disjoint UK calibration windows: more Kobza text is fetched from the datasets-server rows API (text, < 50 MB).
