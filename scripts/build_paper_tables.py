@@ -98,9 +98,23 @@ def t_ppl_v2():
         rows.append([m, f3(e["ppl"], 2), "%s [%s, %s]" % (f3(e["ratio_vs_golden"], 3), f3(e["ratio_vs_golden_ci_lo"], 3), f3(e["ratio_vs_golden_ci_hi"], 3)),
                      f3(u["ppl"], 1) if u else "-",
                      "%s [%s, %s]" % (f3(u["ratio_vs_golden"], 3), f3(u["ratio_vs_golden_ci_lo"], 3), f3(u["ratio_vs_golden_ci_hi"], 3)) if u else "-"])
+    # ternary_rot (engine, part 2): same protocol, computed from the score files
+    tr_en, tr_uk = P2 / "ppl_ternary_rot/ternary_rot.txt", P2 / "ppl_ternary_rot_uk/ternary_rot.txt"
+    g_en, g_uk = ROOT / "results/reference/golden/nll_golden_float32.txt", ROOT / "results/reference/golden/nll_golden_float32_uk.txt"
+    if tr_en.exists() and tr_uk.exists():
+        def rc(T, G):
+            T, G = rd_scores(T), rd_scores(G); ids = sorted(set(T) & set(G))
+            tn = np.array([T[i][0] for i in ids], float); tl = np.array([T[i][1] for i in ids]); gn = np.array([G[i][0] for i in ids], float); gl = np.array([G[i][1] for i in ids])
+            rs = np.random.RandomState(0); d = []
+            for _ in range(10000):
+                x = rs.randint(0, len(ids), len(ids)); d.append(math.exp(tl[x].sum() / tn[x].sum()) / math.exp(gl[x].sum() / gn[x].sum()))
+            return math.exp(tl.sum() / tn.sum()), math.exp(tl.sum() / tn.sum()) / math.exp(gl.sum() / gn.sum()), np.percentile(d, 2.5), np.percentile(d, 97.5)
+        e, u = rc(tr_en, g_en), rc(tr_uk, g_uk)
+        rows.append(["ternary_rot (S3+s4r32 in the engine)", f3(e[0], 2), "%s [%s, %s]" % (f3(e[1], 3), f3(e[2], 3), f3(e[3], 3)),
+                     f3(u[0], 1), "%s [%s, %s]" % (f3(u[1], 3), f3(u[2], 3), f3(u[3], 3))])
     meta = (R19 / "meta.txt")
     return Table("Perplexity of the KV modes, ratio to the fp32 golden reference (BitNet-b1.58-2B-4T)",
-                 ["KV mode", "WikiText-2 PPL", "ratio to golden [95% CI]", "Kobza-UK PPL", "ratio to golden [95% CI]"], rows, [en, uk],
+                 ["KV mode", "WikiText-2 PPL", "ratio to golden [95% CI]", "Kobza-UK PPL", "ratio to golden [95% CI]"], rows, [en, uk, tr_en, tr_uk],
                  "WikiText-2: 16 x 511 scored tokens; Kobza Ukrainian: 8 x 511. Golden fp32 PPL: %s (EN), %s (UK). Deterministic (load-independent); computed in session with %s."
                  % (f3(E[next(iter(E))]["golden_fp32_ppl"], 2), f3(U[next(iter(U))]["golden_fp32_ppl"], 1), os.path.relpath(meta, ROOT)))
 

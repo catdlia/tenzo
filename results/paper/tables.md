@@ -8,10 +8,11 @@
 | int8_fused | 19.14 | 1.004 [1.001, 1.007] | 142.2 | 1.002 [0.996, 1.008] |
 | tl1_fused | 54.93 | 2.881 [2.700, 3.099] | 1258.5 | 8.868 [7.527, 10.611] |
 | popcount_fused | 207.71 | 10.894 [9.280, 12.908] | 4162.5 | 29.332 [25.129, 34.025] |
+| ternary_rot (S3+s4r32 in the engine) | 20.50 | 1.075 [1.059, 1.092] | 165.6 | 1.167 [1.126, 1.210] |
 
 WikiText-2: 16 x 511 scored tokens; Kobza Ukrainian: 8 x 511. Golden fp32 PPL: 19.07 (EN), 141.9 (UK). Deterministic (load-independent); computed in session with results/2026-11-19_overnight/meta.txt.
 
-<sub>Source: `results/2026-11-19_overnight/ppl_kv_v2.csv`, `results/2026-11-19_overnight/ppl_kv_v2_uk.csv`. Commit a96667d (+uncommitted changes), generated 2026-11-19 11:37 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 9.31 5.68 3.30.</sub>
+<sub>Source: `results/2026-11-19_overnight/ppl_kv_v2.csv`, `results/2026-11-19_overnight/ppl_kv_v2_uk.csv`, `results/2026-11-20_overnight/part2/ppl_ternary_rot/ternary_rot.txt`, `results/2026-11-20_overnight/part2/ppl_ternary_rot_uk/ternary_rot.txt`. Commit e87d0c1 (+uncommitted changes), generated 2026-11-19 15:27 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 8.69 8.75 8.48.</sub>
 
 ### Ternary-KV post-training quantization, screening on 4 windows per language (rounds r1, r2)
 
@@ -38,19 +39,33 @@ WikiText-2: 16 x 511 scored tokens; Kobza Ukrainian: 8 x 511. Golden fp32 PPL: 1
 
 dPPL is relative to golden fp32-KV on the same 4 windows (no CI at 4 windows; full-set results in the next table). Bits include fp16 scales and the INT8 windows (tools/reference/kv_ptq.py).
 
-<sub>Source: `results/2026-11-19_overnight/kv_ptq/screen4`, `results/2026-11-19_overnight/kv_ptq/final_uk8`, `results/2026-11-20_overnight/kv_ptq2/screen_en4`, `results/2026-11-20_overnight/kv_ptq2/screen_uk4`, `results/reference/golden/nll_golden_float32.txt`. Commit a96667d (+uncommitted changes), generated 2026-11-19 11:37 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 9.31 5.68 3.30.</sub>
+<sub>Source: `results/2026-11-19_overnight/kv_ptq/screen4`, `results/2026-11-19_overnight/kv_ptq/final_uk8`, `results/2026-11-20_overnight/kv_ptq2/screen_en4`, `results/2026-11-20_overnight/kv_ptq2/screen_uk4`, `results/reference/golden/nll_golden_float32.txt`. Commit e87d0c1 (+uncommitted changes), generated 2026-11-19 15:27 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 8.69 8.75 8.48.</sub>
 
 ### Full-set results of the best ternary-KV schemes (16 EN + 32 UK windows), incl. calibration
 
-*Not available: Source rows are produced by scripts/analyze_kv_calib.py (paired bootstrap over windows).*
+| scheme | EN PPL ratio to golden [CI] | UK PPL ratio to golden [CI] | EN dNLL (nats/token) | UK dNLL |
+|---|---|---|---|---|
+| S3+s4r32 (no calibration) | 1.071 [1.055, 1.088] | 1.151 [1.128, 1.175] | +0.0685 | +0.1408 |
+| S3+s4r32 calibrated on EN | 1.040 [1.029, 1.051] | 1.126 [1.108, 1.146] | +0.0392 | +0.1188 |
+| S3+s4r32 calibrated on UK | 1.049 [1.037, 1.062] | 1.117 [1.097, 1.136] | +0.0476 | +0.1103 |
+| S13+s4r32 (K INT4, V ternary) | 1.010 [1.001, 1.020] | 1.096 [1.079, 1.114] | +0.0103 | +0.0917 |
 
-<sub>Source: `results/2026-11-20_overnight/part2/kv_calib.csv`. Commit a96667d (+uncommitted changes), generated 2026-11-19 11:37 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 9.31 5.68 3.30.</sub>
+Source rows are produced by scripts/analyze_kv_calib.py (paired bootstrap over windows).
+
+<sub>Source: `results/2026-11-20_overnight/part2/kv_calib.csv`. Commit e87d0c1 (+uncommitted changes), generated 2026-11-19 15:27 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 8.69 8.75 8.48.</sub>
 
 ### Language disparity of KV quantization: dNLL per token and the difficulty-adjusted Ukrainian effect
 
-*Not available: c_UK: coefficient of the UK indicator in dNLL = a + b*NLL0 + c*UK over windows of both languages (scripts/analyze_kv_calib.py). The base NLL ranges of the two languages hardly overlap, so c_UK is an adjusted group difference, not a per-window causal effect.*
+| model | scheme | EN dNLL | UK dNLL | base NLL UK vs EN | c_UK at equal difficulty [95% CI] |
+|---|---|---|---|---|---|
+| BitNet-b1.58-2B-4T | S3+s4r32 (no calibration) | 0.0685 | 0.1408 | 4.77 vs 2.95 | +0.1126 [+0.0476, +0.1901] |
+| BitNet-b1.58-2B-4T | S3+s4r32 calibrated on EN | 0.0392 | 0.1188 | 4.77 vs 2.95 | +0.1070 [+0.0505, +0.1637] |
+| BitNet-b1.58-2B-4T | S3+s4r32 calibrated on UK | 0.0476 | 0.1103 | 4.77 vs 2.95 | +0.1096 [+0.0550, +0.1676] |
+| BitNet-b1.58-2B-4T | S13+s4r32 (K INT4, V ternary) | 0.0103 | 0.0917 | 4.77 vs 2.95 | +0.0809 [+0.0255, +0.1449] |
 
-<sub>Source: . Commit a96667d (+uncommitted changes), generated 2026-11-19 11:37 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 9.31 5.68 3.30.</sub>
+c_UK: coefficient of the UK indicator in dNLL = a + b*NLL0 + c*UK over windows of both languages (scripts/analyze_kv_calib.py). The base NLL ranges of the two languages hardly overlap, so c_UK is an adjusted group difference, not a per-window causal effect.
+
+<sub>Source: `results/2026-11-20_overnight/part2/kv_calib.csv`. Commit e87d0c1 (+uncommitted changes), generated 2026-11-19 15:27 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 8.69 8.75 8.48.</sub>
 
 ### First-step logit parity of the engine (7 prompts); gates: cosine > 0.999 and max_abs <= 0.25
 
@@ -66,10 +81,10 @@ dPPL is relative to golden fp32-KV on the same 4 windows (no CI at 4 windows; fu
 
 The last row compares the two references with each other: the max_abs gate is not met even there.
 
-<sub>Source: `results/2026-11-19_overnight/parity_v2/parity_fp32.json`, `results/2026-11-19_overnight/parity_v2/parity_int8_fused.json`, `results/2026-11-19_overnight/parity_v2/parity_tl1_fused.json`, `results/reference/golden`, `results/reference/hf`. Commit a96667d (+uncommitted changes), generated 2026-11-19 11:37 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 9.31 5.68 3.30.</sub>
+<sub>Source: `results/2026-11-19_overnight/parity_v2/parity_fp32.json`, `results/2026-11-19_overnight/parity_v2/parity_int8_fused.json`, `results/2026-11-19_overnight/parity_v2/parity_tl1_fused.json`, `results/reference/golden`, `results/reference/hf`. Commit e87d0c1 (+uncommitted changes), generated 2026-11-19 15:27 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 8.69 8.75 8.48.</sub>
 
 ### Speed
 
 *Not available: no clean-machine measurements yet (queue: scripts/pending_benchmarks.sh)*
 
-<sub>Source: . Commit a96667d (+uncommitted changes), generated 2026-11-19 11:37 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 9.31 5.68 3.30.</sub>
+<sub>Source: . Commit e87d0c1 (+uncommitted changes), generated 2026-11-19 15:27 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 8.69 8.75 8.48.</sub>
