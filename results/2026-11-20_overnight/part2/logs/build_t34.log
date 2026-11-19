@@ -1,0 +1,46 @@
+ Container untitled-dev-run-f667473052f2 Creating 
+ Container untitled-dev-run-f667473052f2 Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[0/1] Re-running CMake...
+-- 🚀 Using CCache: /usr/bin/ccache
+-- 🚀 Using LLD linker: /usr/lib/llvm-21/bin/lld
+-- 🚀 Target Architecture: x86_64 (AVX2 / FMA / F16C)
+-- 🚀 Vulkan GPU runtime enabled: /usr/lib/x86_64-linux-gnu/libvulkan.so
+-- 🚀 Full MLIR Compiler Pipeline Enabled
+-- 🚀 OpenMP found: 4.5
+-- pybind11 v2.11.1 
+-- Configuring done (0.3s)
+CMake Warning at CMakeLists.txt:131 (add_executable):
+  Cannot generate a safe runtime search path for target tenzo-cli because
+  files in some directories may conflict with libraries in implicit
+  directories:
+
+    runtime library [libgomp.so.1] in /usr/lib/gcc/x86_64-linux-gnu/13 may be hidden by files in:
+      /usr/lib/llvm-21/lib
+
+  Some of these libraries may not be found correctly.
+
+
+-- Generating done (0.0s)
+-- Build files have been written to: /app/cmake-build-debug
+[1/7] Building CXX object CMakeFiles/tenzo-cli.dir/src/main.cpp.o
+[2/7] Building CXX object CMakeFiles/tenzo-cli.dir/src/runtime/TenzoEngine.cpp.o
+/app/src/runtime/TenzoEngine.cpp: In function 'void tenzo::{anonymous}::gemv_i2s_rows(const uint8_t*, int64_t, int64_t, int64_t, const int8_t*, int32_t, float, float*)':
+/app/src/runtime/TenzoEngine.cpp:226:39: warning: iteration 274877906883 invokes undefined behavior [-Waggressive-loop-optimizations]
+  226 |         const uint8_t* wr = w + (row0 + r) * row_bytes;
+      |                                 ~~~~~~^~~~
+/app/src/runtime/TenzoEngine.cpp:225:14: note: within this loop
+  225 |     for (; r < nrows; ++r) {
+      |            ~~^~~~~~~
+[3/7] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TestEngineAPI.cpp.o
+[4/7] Linking CXX executable tenzo-cli
+[5/7] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/TenzoEngine.cpp.o
+/app/src/runtime/TenzoEngine.cpp: In function 'void tenzo::{anonymous}::gemv_i2s_rows(const uint8_t*, int64_t, int64_t, int64_t, const int8_t*, int32_t, float, float*)':
+/app/src/runtime/TenzoEngine.cpp:226:39: warning: iteration 274877906883 invokes undefined behavior [-Waggressive-loop-optimizations]
+  226 |         const uint8_t* wr = w + (row0 + r) * row_bytes;
+      |                                 ~~~~~~^~~~
+/app/src/runtime/TenzoEngine.cpp:225:14: note: within this loop
+  225 |     for (; r < nrows; ++r) {
+      |            ~~^~~~~~~
+[6/7] Linking CXX static library libtenzo_runtime.a
+[7/7] Linking CXX executable tenzo-inference

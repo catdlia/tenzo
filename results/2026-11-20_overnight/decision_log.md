@@ -23,3 +23,14 @@
   builds -j1, nothing > 4 GB, speed runs only queued (scripts/pending_benchmarks.sh).
 - **D8** Only 8 UK eval windows exist (39 Kobza first-rows documents). Part 2 asks for 32 UK eval windows plus 8
   disjoint UK calibration windows: more Kobza text is fetched from the datasets-server rows API (text, < 50 MB).
+- **D9 (part 2, 11:18) Time accounting.** Part 2 was active 02:26-03:15 (49 min); then the session sat idle until the owner
+  typed "Продовжуй" at ~11:18 (about 8 h of wall clock). The idle gap is NOT counted against the 8 h active budget
+  (active so far: ~1 h 10 min at 11:25). Quiet mode stays ON: zen-bin and steam are running (12 processes) and the owner
+  is at the machine; heavy jobs run niced, Python MemoryMax=3G, builds -j1, speed runs only queued.
+- **D10 (11:22) Calibration pipeline** (`scripts/run_kv_calib.sh`): steps=100 (limit 300), minibatch 2 windows, Adam lr 0.02,
+  alphas clamped to [0.5, 1.5] per layer x KV head x 32-group, K and V separately. The ternary codes and group scales are
+  recomputed from the data at every forward (constants for autograd), so gradients reach alpha only (straight-through
+  as in the spec); rounding-free ternary thresholds are not learned. Cayley rotation (optional) is only attempted if time allows.
+- **D11** For `ternary_rot` the ternary encoding of a token is computed at APPEND time from the exact fp32 k/v (so it matches the
+  simulator, which quantizes the original vectors); the INT8 copy lives in the 32-token ring and 4 sink slots. The spec's
+  "token leaving the window is quantized to ternary" cannot be done from the INT8 copy without changing the numbers.

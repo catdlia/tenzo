@@ -278,8 +278,12 @@ def main():
     EMULATE_ACT_QP, EMULATE_ROPE_THETA = a.emulate_act_qp, a.emulate_rope_theta
     if a.kv_scheme:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        import kv_ptq
-        kv_ptq.install(a.kv_scheme, sys.modules[__name__])
+        if a.kv_scheme.startswith("calib:"):
+            import kv_calib
+            kv_calib.install(a.kv_scheme[len("calib:"):], sys.modules[__name__])
+        else:
+            import kv_ptq
+            kv_ptq.install(a.kv_scheme, sys.modules[__name__])
     dt = getattr(torch, a.dtype)
     g = Golden(SNAP, dt, a.threads)
     dump = Dumper(a.dump_dir, a.dump_seq, [int(x) for x in a.dump_layers.split(",") if x],

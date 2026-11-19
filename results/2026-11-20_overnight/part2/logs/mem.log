@@ -1,0 +1,3 @@
+2026-11-19T02:29:17+02:00 0c start MemAvailable=15681112kB load=1.13
+2026-11-19T11:18:45+02:00 build T34/T37 MemAvailable=14487476kB quiet
+2026-11-19T11:21:46+02:00 calib smoke MemAvailable=14717760kB quiet
