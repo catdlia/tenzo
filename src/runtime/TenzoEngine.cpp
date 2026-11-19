@@ -317,7 +317,9 @@ inline void gemm_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
     }
 }
 
-inline void rms_norm_raw(const float* src, const float* w, float* dst, int dim, float eps = 1e-5f) {
+// noinline on purpose: with -ffast-math the SIMD reduction / association order of an inlined copy depends on the call site, so
+// the token-by-token and the batched prefill paths would differ in the last bits. One compiled body = identical results.
+__attribute__((noinline)) void rms_norm_raw(const float* src, const float* w, float* dst, int dim, float eps = 1e-5f) {
     float sum_sq = 0.0f;
     #pragma omp simd reduction(+:sum_sq)
     for (int i = 0; i < dim; ++i) {

@@ -480,7 +480,8 @@ int main(int argc, char** argv) {
             const std::vector<int>& ids = seqs[0];
             if ((int)ids.size() + opt.greedy_steps >= opt.ctx_size) { std::cerr << "error: ids + greedy_steps exceed --ctx-size\n"; return 2; }
             engine.reset();
-            for (int id : ids) engine.forward_logits(id, logits);
+            prefill_prompt(ids.data(), static_cast<int>(ids.size()) - 1);   // --prefill sequential|batched
+            engine.forward_logits(ids.back(), logits);                      // last prompt token: logits of the next-token distribution
             {
                 std::ofstream lf(opt.dump_prefix + ".logits.f32", std::ios::binary);
                 lf.write(reinterpret_cast<const char*>(logits.data()), sizeof(float) * V);
