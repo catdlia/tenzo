@@ -1,0 +1,106 @@
+{
+ "kobza_first_rows_sha256": "03c155fd6c823ce5288613feba260859d50f0a1f0e09d4f15c0d32bbadb9bd19",
+ "kobza_rows_100_199_sha256": "ea0671dd15a9a989c06b8121b68a81c9c8fd3ded728170fe6bccf4e07bb59013",
+ "wt2_train_rows_sha256": {
+  "wt2_train_0.json": "3f669a81cdf8d182a602aa4a544bd7ead9ca72424cd55e473deb436bd436420b",
+  "wt2_train_100.json": "0b8c7a4211af1fe2b5684d2b1a209b3a24aac7012ac114a6cfe5e8764eaa295a",
+  "wt2_train_200.json": "8d3169a76f03e934081ccca56d26bad2eb8e7d56a0f670030d454959857e5751",
+  "wt2_train_300.json": "6e8d59913da48735e7a725c2d4e0d4278bbbdb7be1afad6f3a0b5b55e8b3d7af",
+  "wt2_train_400.json": "bf8956f9fc2a23050cf3121a4db8f53dc94e028ca188b5a6dac9cd295b9b685a",
+  "wt2_train_500.json": "07a822c3d1b52ff61ec48d4536e84d49eec2cad0ae6ce3c17de835137698006e"
+ },
+ "uk_eval_text_tokens": 30771,
+ "uk32_first8_equal_windows_uk": true,
+ "files_sha256": {
+  "windows.ids": "11bc6a3f810af8304c915772642107d0e6c9528e4b5380a735bef1c8aff25a06",
+  "windows_uk.ids": "904f9135f4fbc6387c6213603de5c22af2335db6cc578ad58e1b484ef1fcb71d",
+  "windows_uk32.ids": "244b3d9297b2973a4b7d7e574aad5c1ced79745cf077d63d38c60d227a5b2e4b",
+  "calib_en8.ids": "b0e0363b82ef219bbe4c13b79134e8a0e50f8fd3b266bf4d16db688496047677",
+  "calib_uk8.ids": "386841060e34a716c3ceed1dcf58129b36ba1dd66baab443565f8f5583b1144a"
+ },
+ "window_sha16": {
+  "EN16": [
+   "4c74925047de3c0e",
+   "dc85a189a7e6ab13",
+   "70b364b219bdd9c9",
+   "dfa8003f06e2ed01",
+   "6bc4f1d0188a592e",
+   "f4f159a7141d6957",
+   "f660d52775750749",
+   "f9b2bc06ad7f2650",
+   "af373b59e42562ad",
+   "a55aa8b5c9f537de",
+   "1aca31c07d535a0f",
+   "671d2270686cb798",
+   "5e6e63d1f8166864",
+   "e4a295e97c65b4f5",
+   "c239e6aee41cbfbc",
+   "9c8974d09b264ee5"
+  ],
+  "UK32": [
+   "76cd096dac619955",
+   "b6480c644a4ebe5c",
+   "07c3790ddb7d6b7b",
+   "b16422808c3eb00a",
+   "e245e2e44b1fa4bd",
+   "86a4a01c42dac544",
+   "ee6f2ee459978bae",
+   "2863285b9e047466",
+   "b84669a1c309d7c4",
+   "23e3e302fab90071",
+   "e82fd8a736cb6ab2",
+   "b60f9e48976e85f0",
+   "5abed32aad747099",
+   "e3df5de5b9a68acf",
+   "961abf3b92da2737",
+   "d3ebfda8a0df9e8d",
+   "8c81ef69d4b814d6",
+   "9836160765eb538b",
+   "dd1bc60bd56926b4",
+   "f44f61ed68d02073",
+   "cd1d3eb86caf1b0f",
+   "b3abfdd534f43262",
+   "12053ba8e0cfef10",
+   "709546e18be958b3",
+   "b0515895bf85ca21",
+   "ba3b6e5f83b81892",
+   "8b130eac04eb463e",
+   "349ec163e27e81aa",
+   "46fcb4e9dbbe3f4d",
+   "b7c66eb466fd8832",
+   "350d040af9aa82ef",
+   "474cad7e77a41ba0"
+  ],
+  "CAL_EN8": [
+   "874101568d466813",
+   "2dde2078b75f548c",
+   "67e6c4dfb79bb6db",
+   "d5c5264ff2731762",
+   "9207532808b9ec3c",
+   "49352fea8aa23f3d",
+   "38780a1ef232d6a8",
+   "8239a379e0396fa6"
+  ],
+  "CAL_UK8": [
+   "a33000d89d16a1e9",
+   "baea21039be2e82f",
+   "0d4bebc31689bdb9",
+   "70b7d605e28b8229",
+   "3f2ef27fd8ec3d67",
+   "a682407585140031",
+   "ad36b73751b5b1da",
+   "1c85f4eb9208db48"
+  ]
+ },
+ "shared_32gram_counts": {
+  "calib_en8.ids": {
+   "windows.ids(EN16)": 0,
+   "windows_uk32.ids(UK32)": 0
+  },
+  "calib_uk8.ids": {
+   "windows.ids(EN16)": 0,
+   "windows_uk32.ids(UK32)": 0
+  }
+ },
+ "all_window_hashes_distinct": true
+}
