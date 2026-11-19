@@ -294,8 +294,7 @@ add_library(tenzo_runtime_static STATIC
     src/runtime/ROCmRuntime.cpp
     src/runtime/MicroarchProfiler.cpp
     src/runtime/ThreadPool.cpp
-    src/runtime/ExecutionContext.cpp
-    src/runtime/KVCacheManager.cpp
+    # ExecutionContext.cpp / KVCacheManager.cpp are the MLIR-JIT executor; tenzo-cli compiles them itself.
     src/runtime/Sampler.cpp
     src/runtime/Tokenizer.cpp
 )
@@ -330,8 +329,7 @@ add_library(tenzo_runtime_shared SHARED
     src/runtime/ROCmRuntime.cpp
     src/runtime/MicroarchProfiler.cpp
     src/runtime/ThreadPool.cpp
-    src/runtime/ExecutionContext.cpp
-    src/runtime/KVCacheManager.cpp
+    # ExecutionContext.cpp / KVCacheManager.cpp are the MLIR-JIT executor; tenzo-cli compiles them itself.
     src/runtime/Sampler.cpp
     src/runtime/Tokenizer.cpp
 )
