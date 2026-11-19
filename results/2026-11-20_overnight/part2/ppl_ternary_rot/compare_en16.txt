@@ -1,0 +1,4 @@
+windows 16 | engine 20.502 sim 20.419 engine-base 19.141 golden 19.066
+(1) raw ratio engine/sim        : 1.0041  95% CI [1.0007, 1.0077]  contains 1: False
+(2) baseline-adjusted ratio     : 1.0002  95% CI [0.9957, 1.0046]  contains 1: True
+    KV-induced degradation: engine 1.0711  simulator 1.0709

@@ -1,0 +1,4 @@
+windows 8 | engine 165.634 sim 164.766 engine-base 142.196 golden 141.911
+(1) raw ratio engine/sim        : 1.0053  95% CI [0.9966, 1.0144]  contains 1: True
+(2) baseline-adjusted ratio     : 1.0033  95% CI [0.9930, 1.0124]  contains 1: True
+    KV-induced degradation: engine 1.1648  simulator 1.1611
