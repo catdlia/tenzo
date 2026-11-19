@@ -2496,7 +2496,20 @@ tenzo_status_t TenzoEngineImpl::load_model_from_files(const char* weights_path, 
     }
     final_norm_ptr = final_norm_w.data();
     if (use_i2s) {
-        for (int l = 0; l < num_layers; ++l) build_i2s_layer(l);
+        // On the CPU path the TL1 copies are dead after the I2_S re-pack: free them (about 0.6 GB for 2B-4T).
+        // GPU/RVV backends read the TL1 buffers, so they are kept for any non-CPU device.
+        const bool cpu = !config.device || std::string(config.device) == "cpu";
+        for (int l = 0; l < num_layers; ++l) {
+            build_i2s_layer(l);
+            if (cpu) {
+                auto& lw = layers[l];
+                for (auto* v : {&lw.q_w, &lw.k_w, &lw.v_w, &lw.out_w, &lw.gate_w, &lw.up_w, &lw.down_w}) {
+                    v->clear(); v->shrink_to_fit();
+                }
+                lw.q_w_ptr = lw.k_w_ptr = lw.v_w_ptr = lw.out_w_ptr = nullptr;
+                lw.gate_w_ptr = lw.up_w_ptr = lw.down_w_ptr = nullptr;
+            }
+        }
     }
 
     return TENZO_SUCCESS;

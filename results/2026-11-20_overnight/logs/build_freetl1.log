@@ -1,0 +1,13 @@
+ Container untitled-dev-run-f71435348c53 Creating 
+ Container untitled-dev-run-f71435348c53 Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/3] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/TenzoEngine.cpp.o
+/app/src/runtime/TenzoEngine.cpp: In function 'void tenzo::{anonymous}::gemv_i2s_rows(const uint8_t*, int64_t, int64_t, int64_t, const int8_t*, int32_t, float, float*)':
+/app/src/runtime/TenzoEngine.cpp:226:39: warning: iteration 274877906883 invokes undefined behavior [-Waggressive-loop-optimizations]
+  226 |         const uint8_t* wr = w + (row0 + r) * row_bytes;
+      |                                 ~~~~~~^~~~
+/app/src/runtime/TenzoEngine.cpp:225:14: note: within this loop
+  225 |     for (; r < nrows; ++r) {
+      |            ~~^~~~~~~
+[2/3] Linking CXX static library libtenzo_runtime.a
+[3/3] Linking CXX executable tenzo-inference

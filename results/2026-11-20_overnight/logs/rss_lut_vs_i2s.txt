@@ -1,0 +1,3 @@
+lut: PROC_RSS_KB=900048 PROC_HWM_KB=2691656
+i2s: PROC_RSS_KB=899652 PROC_HWM_KB=2708812
+score identical to earlier lut run
