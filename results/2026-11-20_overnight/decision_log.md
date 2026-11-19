@@ -34,3 +34,11 @@
 - **D11** For `ternary_rot` the ternary encoding of a token is computed at APPEND time from the exact fp32 k/v (so it matches the
   simulator, which quantizes the original vectors); the INT8 copy lives in the 32-token ring and 4 sink slots. The spec's
   "token leaving the window is quantized to ternary" cannot be done from the INT8 copy without changing the numbers.
+- **D12 (11:45) Second model.** The offline HF cache holds only BitNet models and TinyLlama (English-centric; unsuitable for a Ukrainian
+  comparison). The one permitted download, Qwen/Qwen2.5-1.5B (model.safetensors 3.1 GB + tokenizer/config), goes to /tmp/qwen2.5-1.5b
+  (tmpfs = RAM) instead of ~/.cache because / has only 6.9 GB free (99% full); it disappears on reboot.
+- **D13 (12:55) Time plan.** The owner is gaming (War Thunder, load 8), so calibration/eval jobs run at roughly half the unloaded
+  speed (~90 s/layer, ~40 min for one calibrated scheme's EN16 + UK32 evals). To keep the engine deliverables (ternary_rot,
+  batched prefill, RSS) inside the 8 h active budget, the calibration pipeline is paused automatically after the UK-calibrated
+  evals (a watcher kills the script before "calibrate mix"); the EN+UK mix calibration (cal. (iii)) resumes afterwards if time allows
+  (the script skips finished steps). Evals of (i) EN-only and (ii) UK-only are complete first.
