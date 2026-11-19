@@ -16,14 +16,14 @@ Modern quantized LLMs (1-bit, 3-bit, 4-bit) require specialized memory represent
 **Tenzo** bridges this divide by providing:
 1. **Universal Quantization Matrix:** Native MLIR dialect operations and micro-kernels for **BitNet 1.58b (TL1)**, **GGUF (Q4_0 / Q8_0)**, **AutoGPTQ**, **AutoAWQ**, **ExLlamaV2 (EXL2)**, **INT4**, and **INT3**.
 2. **Zero-Allocation Execution:** The entire autoregressive decode loop across all transformer layers runs in pure C++ with zero intermediate heap allocations.
-3. **Official Reference Outperformance (UNVERIFIED, historical):** an earlier run reported **20.32 tok/sec** on an Intel Core i3-1215U (15W TDP) and **1.65x** over Microsoft BitNet.cpp. It was not reproduced under controlled conditions and the BitNet.cpp build used for comparison is not numerically trustworthy; see [Measured (2026-11-18)](#measured-2026-11-18) for the like-for-like numbers.
+3. **Official Reference Outperformance (UNVERIFIED, historical):** an earlier run reported **20.32 tok/sec** on an Intel Core i3-1215U (15W TDP) and **1.65x** over Microsoft BitNet.cpp. It was not reproduced under controlled conditions and the BitNet.cpp build used for comparison is not numerically trustworthy; see [Measured (2026-11-19/20)](#measured-2026-11-1920) for verified numbers (no clean speed comparison yet).
 4. **Heterogeneous Multi-Backend Runtime:** Compiles and runs natively on x86_64 (AVX2/VNNI), ARM64 (NEON/DotProd/SVE2/I8MM), RISC-V (RVV), with GPU acceleration via Vulkan compute, CUDA, and ROCm translation layers.
 
 ---
 
 ## 🏆 Benchmark: Tenzo Native Engine vs Microsoft BitNet.cpp
 
-> **UNVERIFIED / historical.** The block below is a pre-recovery measurement with no raw logs; do not cite it. Re-measured numbers: [Measured (2026-11-18)](#measured-2026-11-18).
+> **UNVERIFIED / historical.** The block below is a pre-recovery measurement with no raw logs; do not cite it. Verified numbers: [Measured (2026-11-19/20)](#measured-2026-11-1920).
 
 *Benchmarked on an ultra-low-power consumer CPU: **Intel Core i3-1215U** (2 P-Cores + 4 E-Cores, 15W TDP).*  
 *Model:* `BitNet-b1.58-2B-4T` *(30 Layers, Hidden Size 2560, Vocab Size 128,256).*
@@ -60,7 +60,7 @@ Effective Memory Bandwidth     | ~10.5 GB/s           | ~17.3 GB/s
 
 | Format / Scheme | Bit Width | Description | Status |
 | :--- | :--- | :--- | :--- |
-| **BitNet TL1** | **1.58-bit** | Ternary weights $\{-1, 0, 1\}$ with dual-element 4-bit LUT packing | ⚠️ Runs end-to-end; parity vs HF reference not met (see Measured) |
+| **BitNet TL1** | **1.58-bit** | Ternary weights $\{-1, 0, 1\}$ with dual-element 4-bit LUT packing | ⚠️ Runs end-to-end; PPL within 0.4% of an fp32 HF-semantics reference; strict logit parity gate not met (see Measured 2026-11-19/20) |
 | **GGUF (llama.cpp)** | **4-bit / 8-bit** | Block quantization (`Q4_0`, `Q8_0`) with FP16 scale factors | ⚠️ Unverified (no end-to-end test) |
 | **AutoGPTQ** | **4-bit** | Groupwise symmetric/asymmetric quantization with `qzeros` | ⚠️ Unverified (no end-to-end test) |
 | **AutoAWQ** | **4-bit** | Activation-aware column-interleaved salient channel packing | ⚠️ Unverified (no end-to-end test) |
@@ -180,7 +180,31 @@ The `MicroarchProfiler` automatically detects all available backends and SIMD ca
 ---
 
 <a id="measured-2026-11-18"></a>
-## Measured (2026-11-18)
+## Measured (2026-11-19/20)
+
+Verified numbers only, after the semantic fixes listed in [CHANGELOG.md](CHANGELOG.md) (RoPE base from the model config,
+8-bit HF ActQuant activations; commits `c0db56f`, `5012150`, `5b100cc`, `1fd1aa2`). One laptop (Intel Core i3-1215U, governor `powersave`).
+Quality ground truth: an independent fp32 "golden" PyTorch forward written from the HF code
+(`tools/reference/golden_bitnet.py`; bit-identical to HF transformers in bf16) and HF transformers bf16 itself.
+
+| What | Result | Source |
+|---|---|---|
+| WikiText-2 PPL (16 x 511 tokens), ratio to golden fp32 (19.066) | fp32 KV 19.124 (1.0030); int8_fused 19.141 (1.0039); tl1_fused 54.94 (2.88); popcount_fused 207.7 (10.9) | [ppl_kv_v2.md](results/2026-11-19_overnight/ppl_kv_v2.md) |
+| Kobza Ukrainian PPL (8 x 511), ratio to golden fp32 (141.9) | fp32 KV 142.0 (1.0007); int8_fused 142.2 (1.0020); tl1_fused 1258 (8.87); popcount_fused 4162 (29.3) | [ppl_kv_v2_uk.md](results/2026-11-19_overnight/ppl_kv_v2_uk.md) |
+| Valid bitnet.cpp reference (microsoft/BitNet@c17d1c5) | PPL 19.059 EN / 141.8 UK, greedy equal to HF | [bitnet_ref.md](results/2026-11-20_overnight/bitnet_ref.md) |
+| Best ternary-KV PTQ scheme (no retraining, simulated) | ternary g32 + Hadamard + 4 sink + 32 recent tokens in INT8: +7.1% EN / +16.1% UK at 2.9 bits/element; no scheme <= 2.5 bits within 5% | [kv_ptq.md](results/2026-11-19_overnight/kv_ptq.md), [kv_ptq2.md](results/2026-11-20_overnight/kv_ptq2.md) |
+| Parity, first-step logits, 7 prompts (gates cos > 0.999 and max_abs <= 0.25, unchanged) | vs golden fp32: cos gate 6/7, top-1 6/7 (fp32 KV) and 7/7 (int8), **max_abs gate 0/7** (0.54-2.27). The two references fail the same gate against each other: golden vs HF max_abs 0.53-1.63 | [parity_v2.md](results/2026-11-19_overnight/parity_v2.md), [golden_vs_hf_logits.txt](results/2026-11-20_overnight/part2/logs/golden_vs_hf_logits.txt) |
+| GEMV kernels | I2_S (maddubs) and two-table LUT produce bit-identical outputs; speed not yet measured on a clean machine | [i2s_bitwise_identity.txt](results/2026-11-20_overnight/logs/i2s_bitwise_identity.txt) |
+
+No speed claim is made here: tonight's machines were never idle (see the deferred queue `scripts/pending_benchmarks.sh`).
+
+## Measured (2026-11-18) — SUPERSEDED
+
+> **Superseded, do not cite.** These numbers were produced by an engine with two semantic bugs: RoPE base hard-coded to 10000 instead of the
+> model's 500000 (fixed in `c0db56f`) and activations quantized to +-31 levels instead of HF's 127 (fixed in `5012150`). All quality numbers
+> below (PPL, parity) are invalid; the speed comparison used the old 6-bit kernel and a broken bitnet.cpp build. Current numbers:
+> [Measured (2026-11-19/20)](#measured-2026-11-1920).
+
 
 Everything below was produced on one laptop (Intel Core i3-1215U, governor `powersave`, no sudo to change it) by the scripts and logs under
 [`results/2026-11-18_overnight/`](results/2026-11-18_overnight/). It is a snapshot of branch `overnight/2026-11-18`, not a release claim.

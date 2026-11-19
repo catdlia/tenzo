@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2026-11-19/20
+
+### Fixed — semantic fixes: **outputs change; previous quality numbers invalid**
+- **RoPE base.** The runtime engine (`FusedKVCache`, `PagedKVCache`) hard-coded 10000. It now uses the model's
+  `rope_theta` (500000 for BitNet-b1.58-2B-4T) via `tenzo_config_t.rope_theta`, which is read from the model's
+  `config.json` by `tenzo-inference`. The Python bindings take `rope_theta`. The MLIR op `tenzo.rope` now requires a
+  `theta` attribute: lowering fails without it.
+- **Activation quantization.** The BitLinear activations now follow HF `ActQuant`: per-token
+  `127 / max(|x|, 1e-5)`, round half to even, clamp [-128, 127]. Before, they used ±31 levels (engine, Python
+  bindings, `bitlinear_tl1_pack` lowering) or 63 levels with truncation (`bitlinear_tl1` lowering).
+- **Effect.** WikiText-2 PPL with fp32 KV went from 23.13 to 19.12 against a golden fp32 of 19.07. All PPL, parity
+  and generation numbers measured before 2026-11-19 are invalid.
+
+### Added
+- I2_S-style maddubs GEMV (`TENZO_GEMV=i2s`, default; `lut` fallback), bit-identical to the LUT kernel.
+- `tenzo-cli hf-semantics` regression tests (compiler and engine) and `scripts/test_pybind_hf_semantics.py`.
+- Opt-in intermediate tensor dumps (`TENZO_DUMP_DIR`, `TENZO_DUMP_POS`, `TENZO_DUMP_LAYERS`).
+- `tools/reference/golden_bitnet.py`: an independent layer-major fp32 reference.
+
+---
+
 ## [v1.1.0-beta] — 2026-08-18
 
 ### Highlights

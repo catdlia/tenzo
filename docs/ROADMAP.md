@@ -5,7 +5,7 @@
 ### 🚀 v1.0.0-beta (Universal Low-Bit Compiler & Engine)
 - [x] **Universal Quantization Matrix:** Native MLIR operations, lowerings, and micro-kernels for TL1 (1.58b), INT4, INT3, GGUF (Q4_0, Q8_0), AutoGPTQ, AutoAWQ, and ExLlamaV2 (EXL2).
 - [x] **Frontend Exporter Suite:** Standalone Python exporters generating MLIR and binary weights for all formats.
-- [x] **Fused Zero-Allocation KV Cache:** `popcount_fused`, `tl1_fused`, `int8_fused` caches with 14.2x memory footprint reduction.
+- [x] **Fused Zero-Allocation KV Cache:** `popcount_fused`, `tl1_fused`, `int8_fused` caches with 14.2x memory footprint reduction. Quality (2026-11-19): int8_fused within 0.4% of the fp32 reference; tl1_fused x2.9 (EN) / x8.9 (UK) PPL, popcount_fused x10.9 / x29 — the ternary caches are not quality-preserving yet.
 - [x] **C/C++ Standalone Engine & SDK:** Pure C ABI (`libtenzo_runtime.a` / `libtenzo_runtime.so` / `include/tenzo.h`).
 - [x] **Tenzo CLI (not a verified production claim):** Model hub, model pulling, stats inspection, memory telemetry, and graceful interrupt handling.
 - [x] **Repository Health Standards:** Complete GitHub community profile, security policy, and contributing guidelines.
@@ -23,6 +23,13 @@
 - [x] **PagedAttention & Virtual Memory Management:** Block-based KV cache allocation (`BLOCK_SIZE = 16`).
 
 ---
+
+### 🔧 Correctness & research track (2026-11)
+- [x] HF-semantics fixes (rope_theta, 8-bit ActQuant) in engine, bindings and MLIR lowerings, with regression tests.
+- [x] Independent fp32 golden reference and valid bitnet.cpp baseline (BitNet@c17d1c5).
+- [x] I2_S maddubs GEMV (bit-identical to the LUT kernel); speed A/B pending a clean machine.
+- [ ] Ternary KV cache that stays within 5% PPL at <= 2.5 bits (T30): not reached by PTQ so far (best +7.1% EN / +16.1% UK).
+- [ ] Batched prefill (T32), lower peak RSS (T31), standalone runtime build (T37).
 
 ### 🌟 v1.2.0 (Target: Speculative Decoding & Continuous Serving)
 - [ ] **Speculative Verification Engine:** Draft-target verification using 1-layer ternary draft models.

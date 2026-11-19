@@ -1,0 +1,8 @@
+prompt cos max_abs top1_equal  (golden fp32 vs HF bf16 first-step logits; results/reference/{golden,hf}/*.logits.f32)
+p1_fact_en 0.99922 0.540 True
+p2_tech_en 0.99987 0.532 True
+p3_code 0.99990 0.705 True
+p4_ukrainian 0.99992 1.634 True
+p5_long_ctx 0.99324 1.109 True
+p6_weird 0.99977 0.684 True
+p7_math_en 0.99988 0.813 True

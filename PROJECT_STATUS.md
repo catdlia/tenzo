@@ -67,7 +67,7 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 | Engine / Configuration | Model Format | KV-Cache | Decode Speed | Latency / Token | Note |
 |---|---|---|---|---|---|
 | **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms | Official Microsoft C++ Reference Engine |
-| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms** | 1.65x vs BitNet.cpp **(UNVERIFIED, historical; see README 'Measured (2026-11-18)')** |
+| **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms** | 1.65x vs BitNet.cpp **(UNVERIFIED, historical; superseded; see README 'Measured (2026-11-19/20)')** |
 
 ---
 
@@ -79,7 +79,9 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 - [x] Hand-tuned AVX2 micro-kernels (Zero-Spill).
 - [x] Fused OpenMP Loops & 16-Bit SIMD Accumulation.
 - [x] Fused in-register quantized INT8 KV-Cache compression.
-- [ ] Beat Microsoft `BitNet.cpp` on edge CPUs: **UNVERIFIED**. An earlier run reported 20.32 tok/sec; not reproduced (see README 'Measured (2026-11-18)').
+- [ ] Beat Microsoft `BitNet.cpp` on edge CPUs: **UNVERIFIED**. An earlier run reported 20.32 tok/sec; not reproduced. A valid bitnet.cpp baseline now exists (PPL within CI of the golden reference); a clean-machine speed comparison is still pending (README 'Measured (2026-11-19/20)').
+- [x] Quality: engine PPL within 0.4% of an fp32 HF-semantics reference (EN and UK) after the 2026-11-19 RoPE/activation fixes; strict logit parity gate (max_abs <= 0.25) not met, also not between the two references.
+- [ ] Ternary KV cache without retraining: best simulated scheme +7.1% EN / +16.1% UK at 2.9 bits (tl1_fused today: x2.9 EN / x8.9 UK).
 
 ### Phase 2 (Phase E): C/C++ SDK, Packaging & Ternary KV-Cache (Completed ✅)
 - [x] **Tenzo C/C++ SDK**: ABI-stable pure C header [`include/tenzo.h`](include/tenzo.h) and modern C++ wrapper [`include/tenzo.hpp`](include/tenzo.hpp).
