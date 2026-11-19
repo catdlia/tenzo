@@ -1,0 +1,7 @@
+2026-11-19T02:29:17+02:00 scheme=fp32 MemAvailable=15669540kB
+fp32 exit=0 02:41:50
+2026-11-19T02:41:50+02:00 scheme=S3+s4r32 MemAvailable=15693180kB
+S3+s4r32 exit=0 02:55:15
+2026-11-19T02:55:15+02:00 scheme=S13+s4r32 MemAvailable=15695972kB
+S13+s4r32 exit=0 03:08:35
+DONE0C
