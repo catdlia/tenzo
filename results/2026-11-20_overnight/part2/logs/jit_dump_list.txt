@@ -1,0 +1,14 @@
+audit_exit=0
+ 
+392 .
+24 ..
+6256 explicit_attention_H1_KV1_T8_D32.o
+8752 explicit_gqa_H20_KV5_T8_D32.o
+3048 fused_pack.o
+3448 fusion_consumer_pack.o
+3168 fusion_nonzero_c_pack.o
+4016 linalg_attention_H1_KV1_T8_D32.o
+9624 linalg_gqa_H20_KV5_T8_D32.o
+5784 standalone_pack.o
+0
+

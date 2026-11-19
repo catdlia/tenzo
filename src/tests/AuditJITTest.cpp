@@ -74,11 +74,18 @@ static void saveIR(mlir::ModuleOp m, const std::string &name) {
     }
 }
 
+// Dump the object code of a JIT-compiled module (TENZO_DUMP_JIT_ASM=1). mlir::ExecutionEngine compiles lazily: the
+// object cache is only filled when the first symbol is looked up, so this MUST be called after the first lookup
+// (calling it right after ExecutionEngine::create dumped nothing for most kernels).
 static void dumpObjectFile(mlir::ExecutionEngine &engine, const std::string &name) {
     const char *dumpEnv = std::getenv("TENZO_DUMP_JIT_ASM");
     if (!dumpEnv || std::string(dumpEnv) == "0") return;
     llvm::sys::fs::create_directories("asm");
-    engine.dumpToObjectFile("asm/" + name + ".o");
+    const std::string path = "asm/" + name + ".o";
+    engine.dumpToObjectFile(path);
+    uint64_t size = 0;
+    if (llvm::sys::fs::file_size(path, size) || size == 0)
+        llvm::errs() << "⚠️ [AUDIT JIT] TENZO_DUMP_JIT_ASM: " << path << " is missing or empty\n";
 }
 
 static std::unique_ptr<mlir::ExecutionEngine> compileModule(
@@ -138,7 +145,6 @@ static std::unique_ptr<mlir::ExecutionEngine> compileModule(
         return nullptr;
     }
     auto engine = std::move(*maybeEngine);
-    dumpObjectFile(*engine, name);
     return engine;
 }
 
@@ -206,6 +212,7 @@ bool auditTernaryPack(mlir::MLIRContext &ctx, bool fused) {
     }
 
     auto ptr = engine->lookup("_mlir_ciface_audit_pack");
+    dumpObjectFile(*engine, name);  // after the first lookup: the module is compiled now
     if (!ptr) {
         llvm::errs() << "❌ Failed to lookup symbol _mlir_ciface_audit_pack: "
                      << llvm::toString(ptr.takeError()) << "\n";
@@ -353,6 +360,7 @@ bool auditFusionMultiConsumer(mlir::MLIRContext &ctx) {
     }
 
     auto ptr = engine->lookup("_mlir_ciface_audit_pack");
+    dumpObjectFile(*engine, name);  // after the first lookup: the module is compiled now
     if (!ptr) {
         llvm::errs() << "❌ Failed to lookup symbol _mlir_ciface_audit_pack: "
                      << llvm::toString(ptr.takeError()) << "\n";
@@ -509,6 +517,7 @@ bool auditFusionMultiConsumer(mlir::MLIRContext &ctx) {
     auto engine2 = compileModule(m2, name2, false);
     if (engine2) {
         auto ptr2 = engine2->lookup("_mlir_ciface_audit_pack_nonzero");
+        dumpObjectFile(*engine2, name2);
         if (ptr2) {
             auto d_c_mem = tenzo::runtime::MemRefDescriptor<float, 2>::create(c_mem, {4, 16});
             std::uniform_real_distribution<float> dist_c(-1.5f, 1.5f);
@@ -636,6 +645,7 @@ bool auditAttention(mlir::MLIRContext &ctx,
     }
 
     auto ptr = engine->lookup("_mlir_ciface_audit_attention");
+    dumpObjectFile(*engine, name);
     if (!ptr) {
         llvm::errs() << "❌ Failed to lookup symbol _mlir_ciface_audit_attention: "
                      << llvm::toString(ptr.takeError()) << "\n";
