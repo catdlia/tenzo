@@ -81,7 +81,9 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 - [x] Fused in-register quantized INT8 KV-Cache compression.
 - [ ] Beat Microsoft `BitNet.cpp` on edge CPUs: **UNVERIFIED**. An earlier run reported 20.32 tok/sec; not reproduced. A valid bitnet.cpp baseline now exists (PPL within CI of the golden reference); a clean-machine speed comparison is still pending (README 'Measured (2026-11-19/20)').
 - [x] Quality: engine PPL within 0.4% of an fp32 HF-semantics reference (EN and UK) after the 2026-11-19 RoPE/activation fixes; strict logit parity gate (max_abs <= 0.25) not met, also not between the two references.
-- [ ] Ternary KV cache without retraining: best simulated scheme +7.1% EN / +16.1% UK at 2.9 bits (tl1_fused today: x2.9 EN / x8.9 UK).
+- [ ] Ternary KV cache without retraining: best engine mode `ternary_rot` (Hadamard + ternary g32 + INT8 sinks/recent) +7.5% EN / +16.7% UK PPL at 14.4 KB/token (tl1_fused: x2.9 EN / x8.9 UK); learned clip multipliers bring the simulated scheme to +4.0% EN / +11.7% UK (not yet in the engine default). On Qwen2.5-1.5B ternary KV is far worse (x1.96 EN / x2.77 UK even with INT8 windows).
+- [x] Engine memory: int8_fused, ctx 2048: 0.94 GB peak = steady RSS (was 2.76 GB peak).
+- [x] Batched prefill: bit-identical to token-by-token; speed not yet measured on a clean machine.
 
 ### Phase 2 (Phase E): C/C++ SDK, Packaging & Ternary KV-Cache (Completed ✅)
 - [x] **Tenzo C/C++ SDK**: ABI-stable pure C header [`include/tenzo.h`](include/tenzo.h) and modern C++ wrapper [`include/tenzo.hpp`](include/tenzo.hpp).

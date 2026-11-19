@@ -20,7 +20,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Effect.** WikiText-2 PPL with fp32 KV went from 23.13 to 19.12 against a golden fp32 of 19.07. All PPL, parity
   and generation numbers measured before 2026-11-19 are invalid.
 
-### Added
+### Added (2026-11-20)
+- `ternary_rot` KV mode (`--kv-quant ternary_rot`): Hadamard-rotated ternary g32 K/V with INT8 sinks (4) and recent window (32); 14,400 B/token
+  vs 39,600 for `int8_fused`; quality equals the simulator's S3+s4r32 (WikiText-2 PPL ratio to the fp32 reference 1.075, Kobza-UK 1.167).
+  Optional calibrated clip multipliers via `TENZO_KV_ALPHA`.
+- Batched prefill (`--prefill batched`, `tenzo_prefill_tokens`): CPU + I2_S, bit-identical to token-by-token prefill.
+- `tenzo_create_engine` rejects unknown `kv_mode` values (`tenzo-cli engine-api` test); the standalone runtime build
+  (`-DTENZO_STANDALONE_RUNTIME=ON`) builds again; `TENZO_DUMP_JIT_ASM` dumps all audit kernels (it dumped only one).
+- `TENZO_SMAPS_DIR` (smaps dumps), `scripts/analyze_smaps.py`.
+
+### Changed (2026-11-20)
+- Peak RSS at load: weights.bin is mmapped and released progressively, the I2_S layout is built per layer, the unused paged KV pool is no longer
+  allocated: `int8_fused`, ctx 2048: VmHWM 2761 -> 935 MB. Outputs unchanged (G6 and per-window PPL identical).
+- `rms_norm_raw` is `noinline` so that the token-by-token and batched paths execute the same code (results of the existing paths unchanged).
+
+### Added (2026-11-19)
 - I2_S-style maddubs GEMV (`TENZO_GEMV=i2s`, default; `lut` fallback), bit-identical to the LUT kernel.
 - `tenzo-cli hf-semantics` regression tests (compiler and engine) and `scripts/test_pybind_hf_semantics.py`.
 - Opt-in intermediate tensor dumps (`TENZO_DUMP_DIR`, `TENZO_DUMP_POS`, `TENZO_DUMP_LAYERS`).

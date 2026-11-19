@@ -29,7 +29,9 @@
 - [x] Independent fp32 golden reference and valid bitnet.cpp baseline (BitNet@c17d1c5).
 - [x] I2_S maddubs GEMV (bit-identical to the LUT kernel); speed A/B pending a clean machine.
 - [ ] Ternary KV cache that stays within 5% PPL at <= 2.5 bits (T30): not reached by PTQ so far (best +7.1% EN / +16.1% UK).
-- [ ] Batched prefill (T32), lower peak RSS (T31), standalone runtime build (T37).
+- [x] Batched prefill (T32, correctness; speed pending), lower peak RSS (T31), standalone runtime build (T37), `ternary_rot` KV mode.
+- [ ] Clean-machine speed runs: I2_S vs LUT GEMV, batched prefill TTFT, KV-mode decode (`scripts/pending_benchmarks.sh`).
+- [ ] Ternary KV that holds quality on models other than BitNet (Qwen2.5-1.5B: x1.96 EN / x2.77 UK with INT8 windows).
 
 ### 🌟 v1.2.0 (Target: Speculative Decoding & Continuous Serving)
 - [ ] **Speculative Verification Engine:** Draft-target verification using 1-layer ternary draft models.
