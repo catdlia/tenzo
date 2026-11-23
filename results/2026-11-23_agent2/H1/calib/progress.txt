@@ -1,0 +1,7 @@
+2026-11-23T14:10:22+02:00 calibrate mix MemAvailable=10159696kB
+calib mix exit=0 14:34:03
+2026-11-23T14:34:03+02:00 eval mix eval_en16 MemAvailable=10237368kB
+eval mix eval_en16 exit=0 14:40:48
+2026-11-23T14:40:48+02:00 eval mix eval_uk32 MemAvailable=10385392kB
+eval mix eval_uk32 exit=0 14:54:46
+PIPELINEDONE
