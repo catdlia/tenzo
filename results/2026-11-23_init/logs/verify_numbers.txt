@@ -1,0 +1,21 @@
+Item                               | Kind  |   Claimed | Recomputed | RelDiff% | Status | Details
+-------------------------------------------------------------------------------------------------------------------
+golden EN fp32                     | ppl   |   19.0660 |  19.066456 | +0.0024% | OK     | windows=16, tokens=8176
+golden UK8 fp32                    | ppl   |  141.9110 | 141.910613 | -0.0003% | OK     | windows=8, tokens=4088
+kv_v2 fp32 (EN16)                  | ppl   |   19.1240 |  19.124496 | +0.0026% | OK     | windows=16, tokens=8176
+kv_v2 int8_fused (EN16)            | ppl   |   19.1410 |  19.140996 | -0.0000% | OK     | windows=16, tokens=8176
+kv_v2 tl1_fused (EN16)             | ppl   |   54.9400 |  54.934731 | -0.0096% | OK     | windows=16, tokens=8176
+kv_v2 popcount_fused (EN16)        | ppl   |  207.7000 | 207.711832 | +0.0057% | OK     | windows=16, tokens=8176
+bitnet_ref EN16                    | ppl   |   19.0590 |  19.058811 | -0.0010% | OK     | windows=16, tokens=8176
+ternary_rot EN16                   | ppl   |   20.5020 |  20.502103 | +0.0005% | OK     | windows=16, tokens=8176
+PTQ S13+s4r32 EN16 vs golden       | ratio |    1.0104 |   1.010396 | -0.0004% | OK     | windows=16, cand=19.2647, ref=19.0665
+PTQ S3+s4r32 UK32 vs uk32/fp32     | ratio |    1.1512 |   1.151222 | +0.0019% | OK     | windows=32, cand=136.0942, ref=118.2172
+PTQ S13+s4r32 UK32 vs uk32/fp32    | ratio |    1.0960 |   1.096017 | +0.0015% | OK     | windows=32, cand=129.5680, ref=118.2172
+calib_en eval EN16 vs golden       | ratio |    1.0399 |   1.039928 | +0.0027% | OK     | windows=16, cand=19.8277, ref=19.0665
+calib_uk eval EN16 vs golden       | ratio |    1.0488 |   1.048781 | -0.0018% | OK     | windows=16, cand=19.9965, ref=19.0665
+calib_en eval UK32 vs uk32/fp32    | ratio |    1.1261 |   1.126099 | -0.0001% | OK     | windows=32, cand=133.1243, ref=118.2172
+calib_uk eval UK32 vs uk32/fp32    | ratio |    1.1166 |   1.116563 | -0.0033% | OK     | windows=32, cand=131.9969, ref=118.2172
+Qwen2.5 tenzo_int8 EN vs fp_en     | ratio |    1.0160 |   1.015565 | -0.0428% | OK     | windows=16, cand=11.3560, ref=11.1820
+Qwen2.5 S3+s4r32 EN vs fp_en       | ratio |    1.9560 |   1.955917 | -0.0042% | OK     | windows=16, cand=21.8710, ref=11.1820
+Qwen2.5 tenzo_int8 UK vs fp_uk     | ratio |    1.0410 |   1.040788 | -0.0204% | OK     | windows=16, cand=7.7091, ref=7.4070
+Qwen2.5 S3+s4r32 UK vs fp_uk       | ratio |    2.7740 |   2.773724 | -0.0100% | OK     | windows=16, cand=20.5450, ref=7.4070
