@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2026-11-23
+
+### Added
+- **Native Llama-3 byte-level BPE tokenizer (`src/runtime/Tokenizer.{h,cpp}`, `src/runtime/UnicodeTables.h`).**
+  Dependency-free C++17 HuggingFace `tokenizer.json` loader supporting `added_tokens`, 7-branch regex-free Llama-3 pre-tokenizer over generated Unicode property tables (`tools/tokenizer/gen_unicode_tables.py`), 280,147 BPE merges (`ignore_merges=True`), and inverse GPT-2 byte-to-UTF-8 decoding; auto-upgrades vocabs `>= 128k`. Integrated into `tenzo-inference` (`--tokenizer`, `--tokenize-batch`) and `tenzo-cli test` (`runTokenizerTests`). Verified `3200/3200` exact ID & round-trip parity vs HF (`scripts/test_tokenizer_parity.py`) and `7/7 identical=True` via `verify_model_parity.py --only-tokenization`.
+- **Parity gate v2 (`scripts/verify_model_parity.py --gate v2`).**
+  Added prompt-normalized logit/NLL parity checks (`max_abs <= 1.5 * max_abs_ref`, `1 - cos <= 1.5 * (1 - cos_ref)`, `top-1 >= 6/7`, EN16 PPL CI containment) while leaving the `v1` gate unchanged (`results/2026-11-23_agent2/L2/parity_v3.md`).
+- **EN+UK mixed KV calibration (`results/2026-11-23_agent2/H1/`).**
+  Calibrated per-layer `ternary_rot` clip multipliers (`alpha_mix.txt`) on `calib_en8 + calib_uk8`; wired into `TenzoEngine` via `TENZO_KV_ALPHA`. Improved `ternary_rot` PPL ratio vs `int8_fused` from `×1.0711` to `×1.0365` (`19.839`) on EN16 and from `×1.1648` (`UK8`) to `×1.1263` (`×1.1162` / `132.327` on UK32), while `eng/sim` 95% CIs contain `1.0`.
+- **Cross-family `2×2` disparity & long-context (`ctx = 2048`) evaluation suites (`results/2026-11-23_agent2/{L3,H2,H3}/`).**
+  - `L3`: Confirmed byte/character normalization (`c_UK > 0` in `BPC` and `BPB`) across BitNet ternary KV and `Qwen2.5-1.5B` `BPB` (`scripts/analyze_disparity_bpc.py`).
+  - `H2`: Evaluated `2×2` (`EN/UK × Wiki/Web`, 16×512 windows each) across `BitNet-b1.58-2B-4T`, `Qwen2.5-1.5B`, and `utter-project/EuroLLM-1.7B`; in `EuroLLM-1.7B` (`uk_wiki` base BPC `0.802 ≈ en_web 0.803`), `S3+s4r32` and `S13+s4r32` retain a significant UK penalty after adjusting for `Web` and `base_BPC`.
+  - `H3`: Evaluated `ctx = 2048` (4 EN + 4 UK windows) in golden and `TenzoEngine`; engine peak RSS stayed `< 1 GB` (`950.7 MB` `int8_fused`, `902.8 MB` `ternary_rot`). Engine `ternary_rot` degradation stays bounded across context blocks on EN (`×1.067..×1.066`, `×1.0381` full w/ `alpha_mix`) but increases monotonically with context position on UK (`×1.144 → ×1.165 → ×1.243 → ×1.305`; `×1.117 → ×1.251` w/ `alpha_mix`).
+
+### Fixed
+- **Attention `q_dim` vs `hidden_size` mismatch (`src/runtime/TenzoEngine.cpp`, `src/bindings/PybindModule.cpp`).**
+  Fixed `attn_sub_norm` input size and `out_proj` weight/GEMV dimension from `hidden_size` to `q_dim` across CPU, GPU, CUDA, ROCm, RVV paths, `PybindModule`, and helpers (`gemv_i2s_rows`, `gemm_i2s_rows`); added `runQDimNeHiddenTests()` (`rel_l2 = 9.91e-8` vs `0.493` pre-fix on `q_dim=256, hidden=128`) and eliminated compiler warnings (`JOBS=1` Docker build, `0` warnings).
+
+---
+
 ## [Unreleased] — 2026-11-19/20
 
 ### Fixed — semantic fixes: **outputs change; previous quality numbers invalid**

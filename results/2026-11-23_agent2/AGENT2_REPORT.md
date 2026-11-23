@@ -2,7 +2,8 @@
 
 - **Branch:** `agent2/2026-11-23`
 - **Start weights checksum (`models/bitnet-1.58b/weights.bin`):** `68c8f32b7f5d905ed7b3aaaf688e8913ed12227c7d9afc1bf3f429e3479400d1`
-- **Initial machine state (`2026-11-23T13:48:30+02:00`):** **User at laptop ("Людина за ноутом")** — `loadavg` `1.69 2.35 2.48`, `MemAvailable` `11,869 MiB`, `/` `5.6G` free (`99%` used), governor `powersave`, active `Telegram`, `zen-bin`, `claude-desktop`, `qemu-system-x86`, `jetbrains-toolbox`. Heavy commands run `nice -n 19 ionice -c3`, builds `-j1`, Python `MemoryMax <= 4G`, benchmarks (`B1`) deferred until clean machine.
+- **End-of-day weights checksum (`models/bitnet-1.58b/weights.bin`):** `68c8f32b7f5d905ed7b3aaaf688e8913ed12227c7d9afc1bf3f429e3479400d1` (unchanged)
+- **End-of-day machine state (`2026-11-24T01:31+02:00`):** Desktop active (`loadavg 2.51 4.08 5.39`, `MemAvailable` `9.9 GiB`, `/` `8.6G` free / `99%` used, governor `powersave`, active `antigravity`, `Telegram`, `Hyprland`, `zen-bin`, `qemu-system-x86`, `steam`, `claude-desktop`, `jetbrains-toolbox`).
 
 ## 1. Tasks
 
@@ -16,7 +17,7 @@
 | **L4** (T29: Llama-3 byte-level BPE tokenizer) | L + build | **done** | ~25 min | Dependency-free C++17 HF `tokenizer.json` BPE (`UnicodeTables.h`, 7-branch pre-tokenizer, `280,147` merges, GPT-2 byte decode) wired into `tenzo-inference` & `tenzo-cli test`; `0` build warnings; `3200/3200` exact ID & UTF-8 round-trip parity vs HF; `verify_model_parity --only-tokenization` `7/7 identical=True`; all regression gates pass (`G6` 5/5 MATCH, `PPL4=16.700700` byte-identical) | `src/runtime/{Tokenizer.{h,cpp},UnicodeTables.h}`, `src/main_inference.cpp`, `src/tests/TestEngineAPI.cpp`, `scripts/test_tokenizer_parity.py`, `results/2026-11-23_agent2/L4/` |
 | **H3** (T30: ctx 2048 PTQ & engine eval) | H | **done** | ~2 h | `4×2048` EN+UK windows evaluated across golden (`fp32/tenzo_int8/S3+s4r32/S13+s4r32`) & engine (`int8_fused/ternary_rot/ternary_rot+alpha_mix`); engine-sim parity holds at `ctx=2048` (`adj ratio` EN `1.0006 [0.997,1.003]`, UK `1.0030 [0.999,1.008]`, `contains 1 = True`). EN `ternary_rot` stays bounded across `1..512..2047` (`×1.067..×1.066`, full `×1.0687`, `×1.0381` w/ `alpha_mix`), while UK degrades monotonically (`×1.144→×1.165→×1.243→×1.305`, full `×1.2127`; `×1.117→×1.251`, full `×1.1643` w/ `alpha_mix`); engine peak RSS `950.7 MB` `int8_fused`, `902.8 MB` `ternary_rot` | `scripts/{make_windows_2048,run_h3_ctx2048,analyze_h3_ctx2048}.py`, `results/reference/windows_{en,uk}_2048.{ids,json}`, `results/2026-11-23_agent2/H3/` |
 | **B1** (T38: Clean-machine speed queue) | B | **deferred** (blocked on clean machine) | — | Not run: machine in active desktop use (`loadavg 3.33 5.15 5.91`, governor `powersave`, active `antigravity`, `Telegram`, `Hyprland`, `zen-bin`, `qemu-system-x86`, `steam`, `claude-desktop`, `jetbrains-toolbox`) | — |
-| **L5** (End-of-day summary & docs) | L | in progress | — | — | — |
+| **L5** (End-of-day summary & docs) | L | **done** | ~8 min | Regenerated `results/paper/tables.{md,tex}` (`Speed -> 0 rows` rule preserved); updated `CHANGELOG.md`; verified `sha256sum models/bitnet-1.58b/weights.bin == 68c8f32b7f5d905ed7b3aaaf688e8913ed12227c7d9afc1bf3f429e3479400d1`; finalized `AGENT2_REPORT.md` | `CHANGELOG.md`, `results/paper/tables.{md,tex}`, `results/2026-11-23_agent2/AGENT2_REPORT.md` |
 
 ## 2. Decision Log
 
@@ -24,11 +25,13 @@
 - **D2 (`2026-11-23T13:48` — Machine state at start):** User at laptop (`Telegram`, `zen-bin`, `claude-desktop`, `qemu-system-x86`, `load1=1.69`, `MemAvailable=11.6 GiB`, `/=5.6G` free). Policy: `nice -n 19 ionice -c3`, `-j1` builds, Python `MemoryMax <= 4G`, defer `B1`. Note: `/` currently has `5.6G < 8G` free, so full-model downloads in `H2` are blocked unless disk space is freed by owner; small tokenizers (`<= 20 MB`) and text slices (`<= 50 MB`) for `L3`/`H2` corpus prep remain allowed under D5.
 - **D3 (`2026-11-23T14:02` — Machine state before L2):** Still "User at laptop" (`loadavg=4.30 4.66 3.83`, `MemAvailable=10,239 MiB`). Ran L2 parity evaluations sequentially with `nice -n 19 ionice -c3`. Preserved exact `v2` gate threshold `1 - cos(Tenzo, golden) <= 1.5 * (1 - cos(HF, golden))` without tuning despite `fp32` (`p4`) and `int8_fused` (`p2`) missing on 1 prompt each; documented for owner review.
 - **D4 (`2026-11-23T15:32` — Third model selection for H2, D5):** Selected **`utter-project/EuroLLM-1.7B`** over `Qwen/Qwen3-1.7B`. Rationale: `EuroLLM-1.7B` is non-gated (`gated=False`), Apache-2.0 licensed, `3.31 GB` weights (`pytorch_model.bin` <= `4 GB` limit), explicitly trained on Ukrainian (`uk` & `en` tags), uses `LlamaForCausalLM` architecture (`head_dim=128`, `16` Q / `8` KV heads — compatible with Hadamard-128 / `g=32` `kv_ptq` schemes without head-dim mismatch), and provides cross-family / lower-UK-fertility diversity (`476..616` tokens on H2 `uk_wiki` vs `740..923` on `Qwen2.5-1.5B`) instead of comparing two Qwen models. Disk check prior to download: `/` had `14G` free (`>= 12 GB` required by D3).
+- **D5 (`2026-11-23T23:24` — H3 chunked `log_softmax` for 4 GB `MemoryMax`):** Evaluating `N=4, seq=2048` in `tools/reference/golden_bitnet.py nll` materializes `log_softmax(lg.double(), -1)` on `[2047, 128256]` (`~6.4 GB` RSS -> OOM under `MemoryMax=4G`). Added `scripts/run_h3_ctx2048.py` calling `GB.Golden` with 256-row chunked `log_softmax`, keeping peak RSS at `3.01–3.55 GB` under `MemoryMax=4G` while computing exact fp64 `log_softmax` NLL.
+- **D6 (`2026-11-24T01:28` — Deferring `B1` cleanly & tracking remaining H1 analysis artifacts):** Machine stayed in active desktop use throughout the session (`loadavg 3.33 5.15 5.91` at `01:28`, `2.51 4.08 5.39` at `01:31`; active `antigravity`, `Telegram`, `Hyprland`, `zen-bin`, `qemu-system-x86`, `steam`, `claude-desktop`, `jetbrains-toolbox`). Under the clean-machine rule (`load1 < 1.0`, no browsers/VM/IDE), skipped `scripts/pending_benchmarks.sh` (`B1`) and marked it `deferred`. Also tracked `results/2026-11-23_agent2/H1/{calib_analysis.*,run_kv_calib.log}` in git so zero untracked artifacts remain without deleting any files.
 
 ## 3. Blockers & Disk Watch
 
-- **Disk space on `/`:** Updated check (`2026-11-23T15:26`): **`14G` free** (above the `12 GB` threshold under D3 — H2 model download unblocked; checking `df -h /` again before each download).
-- **Clean-machine state for `B1`:** Laptop currently in active desktop use (`load1=1.69+`, desktop apps active).
+- **Disk space on `/`:** Current end-of-day free space is **`8.6G`** (`464G` used / `476G`, `99%`) after downloading `utter-project/EuroLLM-1.7B` and `Qwen/Qwen2.5-1.5B` into `~/tenzo-refs/hf/`.
+- **Clean-machine state for `B1`:** Laptop remained in active desktop use (`load1=2.51..3.33` at end of session, active desktop/VM/IDE processes). `scripts/pending_benchmarks.sh` (`B1`) is ready to run on an idle machine.
 
 ## 4. What Must NOT Be Claimed
 
@@ -39,3 +42,5 @@
 ## 5. Questions to Owner
 
 1. **L2 Parity Gate `v2` cosine floor:** `fp32` (`p4_ukrainian`: `1−cos = 1.77e-4` vs `1.5×ref = 1.13e-4`) and `int8_fused` (`p2_tech_en`: `3.09e-4` vs `1.96e-4`) pass `v2` `max_abs` (7/7), `top-1`, and `EN16 PPL` CI (`[1.0003, 1.0057]`, `[1.0009, 1.0070]`), failing only because `1−cos_ref` on those specific prompts is tiny (`~1e-4`). Should `v2` keep the strict `1.5×(1−cos_ref)` rule or add a small noise floor (e.g., `max(1.5*(1−cos_ref), 5e-4)`)?
+2. **`TENZO_KV_ALPHA` default & UK `ctx=2048` drift follow-up:** `alpha_mix.txt` (`H1`) improves `ternary_rot` on both EN (`×1.0711 -> ×1.0365` at 512; `×1.0687 -> ×1.0381` at 2048) and UK (`×1.1648 -> ×1.1263` UK8, `×1.1162` UK32; `×1.2127 -> ×1.1643` at 2048). Should `alpha_mix.txt` be wired as the default clip table for `--kv-quant ternary_rot` (currently opt-in via `TENZO_KV_ALPHA`), and do you want the next session to investigate why UK `ternary_rot` error compounds across context position (`×1.144 -> ×1.305` at 2048 while EN stays flat)?
+3. **Clean-machine `B1` execution:** Ready whenever the laptop is idle (`load1 < 1.0`, desktop apps/VM closed).
