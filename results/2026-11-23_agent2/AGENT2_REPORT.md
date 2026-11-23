@@ -10,7 +10,7 @@
 |---|---|---|---|---|---|
 | **L1** (T42: `q_dim` fix, warnings, pybind) | L + build | **done** | ~10 min | `attn_sub_norm` & `out_proj` length fixed to `q_dim` across CPU/GPU/CUDA/ROCm/RVV & pybind (`rel_l2=9.91e-8` vs `0.493` bug on `q_dim=256, hidden=128`); zero build warnings; all gates pass (`G6` 5/5 MATCH, `PPL4=16.700700` byte-identical) | `src/runtime/TenzoEngine.cpp`, `src/bindings/PybindModule.cpp`, `src/tests/TestEngineAPI.cpp`, `Makefile`, `results/2026-11-23_agent2/L1/` |
 | **L2** (T02: Parity gate v2) | L | **done** | ~8 min | `--gate v2` added (`v1` unchanged); `fp32` & `int8_fused` pass `v2` `max_abs` (7/7), `top-1` (6/7, 7/7), and EN16 PPL CI (`[1.0003,1.0057]`, `[1.0009,1.0070]`), each failing 1 prompt `1−cos` (`p4` for `fp32`, `p2` for `int8_fused`); `ternary_rot` fails `v2` as expected (`p5` `cos=0.9596`, PPL `1.0753`) | `scripts/verify_model_parity.py`, `results/2026-11-23_agent2/L2/parity_v3.md` |
-| **L3** (T40 p1: BPC/byte disparity) | L | in progress | — | — | `scripts/analyze_disparity_bpc.py`, `results/2026-11-23_agent2/L3/` |
+| **L3** (T40 p1: BPC/byte disparity) | L | **done** | ~4 min | `c_UK > 0` holds after byte/char norm on BitNet ternary schemes (`c_UK(BPC) +0.052..+0.068`, `c_UK(BPB) +0.015..+0.025`, all 95% CIs > 0) and Qwen2.5 under `BPB` (`int8 +0.0109 [+0.0054,+0.0163]` at equal `base BPB` `0.8155` vs `0.8113`; `S3+s4r32 +0.1852`), while Qwen `int8` `c_UK(BPC)` CI crosses 0 (`[-0.015,+0.078]`) from disjoint `base BPC` ranges; fertility alone does not explain UK loss | `scripts/analyze_disparity_bpc.py`, `results/2026-11-23_agent2/L3/` |
 | **H1** (T39: EN+UK mix calib & engine `TENZO_KV_ALPHA`) | H | in progress | — | — | `results/2026-11-23_agent2/H1/` |
 | **H2** (T40 p2: language × domain + 3rd model) | H | pending | — | — | — |
 | **L4** (T29: Llama-3 byte-level BPE tokenizer) | L + build | pending | — | — | — |
@@ -34,7 +34,7 @@
 - No post-fix speed claims (clean-machine `B1` queue not yet executed).
 - No full `7/7` `v2` parity gate pass for `fp32` or `int8_fused` (each fails `1 - cos <= 1.5 * (1 - cos_ref)` on 1/7 prompts, while passing `max_abs` 7/7, `top-1`, and `EN16 PPL` CI).
 - No EN+UK mix calibration result or `TENZO_KV_ALPHA` engine result yet (`H1` running).
-- No byte-/character-normalized disparity conclusion yet (`L3` running).
+- No language × domain (`2×2`) separation or 3rd model disparity result yet (`H2` pending).
 - No `ctx 2048` KV quality result yet (`H3` pending).
 
 ## 5. Questions to Owner
