@@ -1,0 +1,5 @@
+{
+ "model": "/home/illia/tenzo-refs/hf/qwen2.5-1.5b",
+ "max_abs_lp_diff": 0.0,
+ "check_windows": 2
+}

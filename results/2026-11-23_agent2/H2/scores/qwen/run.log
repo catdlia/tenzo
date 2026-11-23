@@ -1,0 +1,265 @@
+Running as unit: run-p72994-i79064.scope; invocation ID: 003ac03dc63144b3b7481c13b333a2b4
+Loading /home/illia/tenzo-refs/hf/qwen2.5-1.5b (qwen2, bfloat16, eager, threads=6)... rss=0.54GB
+Installed float32 linear cast on 196 layers; rss=0.56GB
+eager      en_wiki  w= 0 n=520 ppl= 10.118 t=34s rss=3.68GB
+eager      en_wiki  w= 1 n=526 ppl= 14.802 t=58s rss=3.69GB
+eager      uk_wiki  w= 0 n=850 ppl=  4.810 t=104s rss=3.81GB
+eager      uk_wiki  w= 1 n=843 ppl=  4.348 t=150s rss=3.81GB
+fp         en_wiki  w= 0 n=520 ppl= 10.118 t=174s rss=3.81GB
+fp         en_wiki  w= 1 n=526 ppl= 14.802 t=198s rss=3.81GB
+fp         en_wiki  w= 2 n=523 ppl= 16.876 t=222s rss=3.81GB
+fp         en_wiki  w= 3 n=520 ppl= 12.939 t=245s rss=3.81GB
+fp         en_wiki  w= 4 n=521 ppl= 10.070 t=269s rss=3.81GB
+fp         en_wiki  w= 5 n=514 ppl= 18.312 t=292s rss=3.81GB
+fp         en_wiki  w= 6 n=515 ppl= 15.959 t=315s rss=3.81GB
+fp         en_wiki  w= 7 n=513 ppl= 13.551 t=337s rss=3.81GB
+fp         en_wiki  w= 8 n=512 ppl= 16.631 t=360s rss=3.81GB
+fp         en_wiki  w= 9 n=522 ppl= 17.449 t=383s rss=3.81GB
+fp         en_wiki  w=10 n=513 ppl= 22.195 t=407s rss=3.81GB
+fp         en_wiki  w=11 n=511 ppl= 20.683 t=430s rss=3.81GB
+fp         en_wiki  w=12 n=517 ppl= 19.550 t=454s rss=3.81GB
+fp         en_wiki  w=13 n=516 ppl= 17.685 t=478s rss=3.81GB
+fp         en_wiki  w=14 n=514 ppl= 20.383 t=501s rss=3.81GB
+fp         en_wiki  w=15 n=511 ppl= 17.420 t=523s rss=3.81GB
+fp         uk_wiki  w= 0 n=850 ppl=  4.810 t=570s rss=3.81GB
+fp         uk_wiki  w= 1 n=843 ppl=  4.348 t=616s rss=3.81GB
+fp         uk_wiki  w= 2 n=780 ppl=  6.071 t=658s rss=3.81GB
+fp         uk_wiki  w= 3 n=753 ppl=  4.040 t=697s rss=3.81GB
+fp         uk_wiki  w= 4 n=880 ppl=  2.257 t=747s rss=3.82GB
+fp         uk_wiki  w= 5 n=923 ppl=  4.434 t=801s rss=3.82GB
+fp         uk_wiki  w= 6 n=840 ppl=  3.391 t=847s rss=3.82GB
+fp         uk_wiki  w= 7 n=867 ppl=  4.562 t=894s rss=3.82GB
+fp         uk_wiki  w= 8 n=851 ppl=  6.680 t=944s rss=3.82GB
+fp         uk_wiki  w= 9 n=806 ppl=  7.510 t=989s rss=3.81GB
+fp         uk_wiki  w=10 n=816 ppl=  7.235 t=1033s rss=3.82GB
+fp         uk_wiki  w=11 n=800 ppl=  7.744 t=1077s rss=3.81GB
+fp         uk_wiki  w=12 n=876 ppl=  6.569 t=1126s rss=3.82GB
+fp         uk_wiki  w=13 n=750 ppl=  5.290 t=1165s rss=3.82GB
+fp         uk_wiki  w=14 n=762 ppl=  6.371 t=1204s rss=3.82GB
+fp         uk_wiki  w=15 n=740 ppl=  6.123 t=1242s rss=3.82GB
+fp         en_web   w= 0 n=513 ppl= 21.166 t=1265s rss=3.82GB
+fp         en_web   w= 1 n=520 ppl= 17.550 t=1289s rss=3.82GB
+fp         en_web   w= 2 n=511 ppl= 17.702 t=1312s rss=3.82GB
+fp         en_web   w= 3 n=513 ppl= 14.387 t=1335s rss=3.82GB
+fp         en_web   w= 4 n=514 ppl=  8.111 t=1359s rss=3.82GB
+fp         en_web   w= 5 n=513 ppl=  8.678 t=1382s rss=3.82GB
+fp         en_web   w= 6 n=511 ppl= 13.304 t=1404s rss=3.82GB
+fp         en_web   w= 7 n=523 ppl=  8.274 t=1428s rss=3.82GB
+fp         en_web   w= 8 n=521 ppl=  9.662 t=1452s rss=3.82GB
+fp         en_web   w= 9 n=526 ppl=  9.763 t=1476s rss=3.82GB
+fp         en_web   w=10 n=515 ppl= 11.850 t=1499s rss=3.82GB
+fp         en_web   w=11 n=511 ppl= 11.521 t=1522s rss=3.82GB
+fp         en_web   w=12 n=514 ppl= 16.148 t=1545s rss=3.82GB
+fp         en_web   w=13 n=557 ppl= 16.054 t=1571s rss=3.82GB
+fp         en_web   w=14 n=546 ppl= 11.857 t=1596s rss=3.82GB
+fp         en_web   w=15 n=522 ppl=  8.368 t=1620s rss=3.82GB
+fp         uk_web   w= 0 n=766 ppl=  8.519 t=1659s rss=3.82GB
+fp         uk_web   w= 1 n=758 ppl= 11.049 t=1699s rss=3.82GB
+fp         uk_web   w= 2 n=803 ppl=  9.107 t=1741s rss=3.81GB
+fp         uk_web   w= 3 n=765 ppl=  8.889 t=1781s rss=3.82GB
+fp         uk_web   w= 4 n=845 ppl=  5.713 t=1827s rss=3.82GB
+fp         uk_web   w= 5 n=724 ppl= 11.688 t=1864s rss=3.82GB
+fp         uk_web   w= 6 n=781 ppl=  9.317 t=1905s rss=3.82GB
+fp         uk_web   w= 7 n=792 ppl=  8.696 t=1947s rss=3.85GB
+fp         uk_web   w= 8 n=818 ppl=  8.385 t=1991s rss=3.82GB
+fp         uk_web   w= 9 n=808 ppl=  8.406 t=2034s rss=3.81GB
+fp         uk_web   w=10 n=682 ppl= 11.227 t=2068s rss=3.82GB
+fp         uk_web   w=11 n=759 ppl=  9.300 t=2107s rss=3.82GB
+fp         uk_web   w=12 n=758 ppl=  8.763 t=2146s rss=3.82GB
+fp         uk_web   w=13 n=769 ppl= 10.373 t=2186s rss=3.82GB
+fp         uk_web   w=14 n=792 ppl=  9.349 t=2228s rss=3.85GB
+fp         uk_web   w=15 n=735 ppl= 12.216 t=2265s rss=3.85GB
+PATCH_IDENTITY eager vs fp max_abs_lp_diff=0.000e+00
+tenzo_int8 en_wiki  w= 0 n=520 ppl= 10.760 t=2288s rss=3.85GB
+tenzo_int8 en_wiki  w= 1 n=526 ppl= 15.893 t=2311s rss=3.85GB
+tenzo_int8 en_wiki  w= 2 n=523 ppl= 17.133 t=2335s rss=3.85GB
+tenzo_int8 en_wiki  w= 3 n=520 ppl= 13.026 t=2358s rss=3.85GB
+tenzo_int8 en_wiki  w= 4 n=521 ppl= 10.913 t=2381s rss=3.85GB
+tenzo_int8 en_wiki  w= 5 n=514 ppl= 18.942 t=2404s rss=3.85GB
+tenzo_int8 en_wiki  w= 6 n=515 ppl= 15.972 t=2427s rss=3.85GB
+tenzo_int8 en_wiki  w= 7 n=513 ppl= 14.142 t=2450s rss=3.85GB
+tenzo_int8 en_wiki  w= 8 n=512 ppl= 17.012 t=2472s rss=3.85GB
+tenzo_int8 en_wiki  w= 9 n=522 ppl= 17.964 t=2495s rss=3.85GB
+tenzo_int8 en_wiki  w=10 n=513 ppl= 23.608 t=2518s rss=3.85GB
+tenzo_int8 en_wiki  w=11 n=511 ppl= 21.719 t=2540s rss=3.85GB
+tenzo_int8 en_wiki  w=12 n=517 ppl= 20.290 t=2563s rss=3.85GB
+tenzo_int8 en_wiki  w=13 n=516 ppl= 17.986 t=2587s rss=3.85GB
+tenzo_int8 en_wiki  w=14 n=514 ppl= 21.563 t=2609s rss=3.85GB
+tenzo_int8 en_wiki  w=15 n=511 ppl= 18.449 t=2632s rss=3.85GB
+tenzo_int8 uk_wiki  w= 0 n=850 ppl=  5.380 t=2679s rss=3.82GB
+tenzo_int8 uk_wiki  w= 1 n=843 ppl=  4.773 t=2725s rss=3.82GB
+tenzo_int8 uk_wiki  w= 2 n=780 ppl=  6.435 t=2766s rss=3.82GB
+tenzo_int8 uk_wiki  w= 3 n=753 ppl=  4.505 t=2804s rss=3.82GB
+tenzo_int8 uk_wiki  w= 4 n=880 ppl=  2.324 t=2853s rss=3.82GB
+tenzo_int8 uk_wiki  w= 5 n=923 ppl=  4.757 t=2906s rss=3.82GB
+tenzo_int8 uk_wiki  w= 6 n=840 ppl=  3.597 t=2953s rss=3.82GB
+tenzo_int8 uk_wiki  w= 7 n=867 ppl=  4.983 t=3001s rss=3.82GB
+tenzo_int8 uk_wiki  w= 8 n=851 ppl=  7.277 t=3049s rss=3.82GB
+tenzo_int8 uk_wiki  w= 9 n=806 ppl=  8.118 t=3093s rss=3.81GB
+tenzo_int8 uk_wiki  w=10 n=816 ppl=  8.098 t=3137s rss=3.82GB
+tenzo_int8 uk_wiki  w=11 n=800 ppl=  8.734 t=3179s rss=3.81GB
+tenzo_int8 uk_wiki  w=12 n=876 ppl=  7.700 t=3228s rss=3.82GB
+tenzo_int8 uk_wiki  w=13 n=750 ppl=  5.582 t=3266s rss=3.82GB
+tenzo_int8 uk_wiki  w=14 n=762 ppl=  7.031 t=3306s rss=3.82GB
+tenzo_int8 uk_wiki  w=15 n=740 ppl=  6.705 t=3344s rss=3.82GB
+tenzo_int8 en_web   w= 0 n=513 ppl= 23.915 t=3367s rss=3.82GB
+tenzo_int8 en_web   w= 1 n=520 ppl= 18.900 t=3391s rss=3.82GB
+tenzo_int8 en_web   w= 2 n=511 ppl= 18.977 t=3413s rss=3.82GB
+tenzo_int8 en_web   w= 3 n=513 ppl= 15.035 t=3437s rss=3.82GB
+tenzo_int8 en_web   w= 4 n=514 ppl=  8.554 t=3460s rss=3.82GB
+tenzo_int8 en_web   w= 5 n=513 ppl=  9.151 t=3483s rss=3.82GB
+tenzo_int8 en_web   w= 6 n=511 ppl= 13.726 t=3506s rss=3.82GB
+tenzo_int8 en_web   w= 7 n=523 ppl=  8.234 t=3530s rss=3.82GB
+tenzo_int8 en_web   w= 8 n=521 ppl= 10.151 t=3553s rss=3.82GB
+tenzo_int8 en_web   w= 9 n=526 ppl= 10.131 t=3577s rss=3.82GB
+tenzo_int8 en_web   w=10 n=515 ppl= 12.469 t=3600s rss=3.82GB
+tenzo_int8 en_web   w=11 n=511 ppl= 11.756 t=3623s rss=3.82GB
+tenzo_int8 en_web   w=12 n=514 ppl= 16.912 t=3646s rss=3.82GB
+tenzo_int8 en_web   w=13 n=557 ppl= 17.573 t=3672s rss=3.82GB
+tenzo_int8 en_web   w=14 n=546 ppl= 13.154 t=3697s rss=3.82GB
+tenzo_int8 en_web   w=15 n=522 ppl=  9.052 t=3720s rss=3.82GB
+tenzo_int8 uk_web   w= 0 n=766 ppl=  9.363 t=3760s rss=3.82GB
+tenzo_int8 uk_web   w= 1 n=758 ppl= 12.745 t=3799s rss=3.82GB
+tenzo_int8 uk_web   w= 2 n=803 ppl= 10.352 t=3842s rss=3.81GB
+tenzo_int8 uk_web   w= 3 n=765 ppl=  9.776 t=3882s rss=3.82GB
+tenzo_int8 uk_web   w= 4 n=845 ppl=  6.515 t=3929s rss=3.82GB
+tenzo_int8 uk_web   w= 5 n=724 ppl= 13.670 t=3966s rss=3.82GB
+tenzo_int8 uk_web   w= 6 n=781 ppl= 10.331 t=4007s rss=3.82GB
+tenzo_int8 uk_web   w= 7 n=792 ppl=  9.950 t=4049s rss=3.85GB
+tenzo_int8 uk_web   w= 8 n=818 ppl=  9.170 t=4093s rss=3.82GB
+tenzo_int8 uk_web   w= 9 n=808 ppl=  9.613 t=4137s rss=3.82GB
+tenzo_int8 uk_web   w=10 n=682 ppl= 12.182 t=4171s rss=3.82GB
+tenzo_int8 uk_web   w=11 n=759 ppl= 10.850 t=4210s rss=3.82GB
+tenzo_int8 uk_web   w=12 n=758 ppl=  9.383 t=4249s rss=3.82GB
+tenzo_int8 uk_web   w=13 n=769 ppl= 11.397 t=4290s rss=3.82GB
+tenzo_int8 uk_web   w=14 n=792 ppl= 10.213 t=4332s rss=3.85GB
+tenzo_int8 uk_web   w=15 n=735 ppl= 13.886 t=4369s rss=3.85GB
+S3+s4r32   en_wiki  w= 0 n=520 ppl= 17.448 t=4402s rss=3.85GB
+S3+s4r32   en_wiki  w= 1 n=526 ppl= 37.019 t=4436s rss=3.85GB
+S3+s4r32   en_wiki  w= 2 n=523 ppl= 30.898 t=4469s rss=3.85GB
+S3+s4r32   en_wiki  w= 3 n=520 ppl= 51.138 t=4502s rss=3.85GB
+S3+s4r32   en_wiki  w= 4 n=521 ppl= 17.553 t=4535s rss=3.85GB
+S3+s4r32   en_wiki  w= 5 n=514 ppl= 35.024 t=4567s rss=3.85GB
+S3+s4r32   en_wiki  w= 6 n=515 ppl= 26.501 t=4599s rss=3.85GB
+S3+s4r32   en_wiki  w= 7 n=513 ppl= 22.521 t=4631s rss=3.85GB
+S3+s4r32   en_wiki  w= 8 n=512 ppl= 27.370 t=4663s rss=3.85GB
+S3+s4r32   en_wiki  w= 9 n=522 ppl= 40.628 t=4696s rss=3.85GB
+S3+s4r32   en_wiki  w=10 n=513 ppl= 33.448 t=4728s rss=3.85GB
+S3+s4r32   en_wiki  w=11 n=511 ppl= 47.571 t=4760s rss=3.85GB
+S3+s4r32   en_wiki  w=12 n=517 ppl= 43.576 t=4792s rss=3.85GB
+S3+s4r32   en_wiki  w=13 n=516 ppl= 36.108 t=4825s rss=3.85GB
+S3+s4r32   en_wiki  w=14 n=514 ppl= 72.304 t=4857s rss=3.85GB
+S3+s4r32   en_wiki  w=15 n=511 ppl= 90.412 t=4889s rss=3.85GB
+S3+s4r32   uk_wiki  w= 0 n=850 ppl= 19.371 t=4961s rss=3.83GB
+S3+s4r32   uk_wiki  w= 1 n=843 ppl= 25.129 t=5032s rss=3.83GB
+S3+s4r32   uk_wiki  w= 2 n=780 ppl= 24.732 t=5094s rss=3.82GB
+S3+s4r32   uk_wiki  w= 3 n=753 ppl= 10.820 t=5153s rss=3.85GB
+S3+s4r32   uk_wiki  w= 4 n=880 ppl=  7.181 t=5231s rss=3.85GB
+S3+s4r32   uk_wiki  w= 5 n=923 ppl= 20.296 t=5313s rss=3.81GB
+S3+s4r32   uk_wiki  w= 6 n=840 ppl= 13.185 t=5384s rss=3.83GB
+S3+s4r32   uk_wiki  w= 7 n=867 ppl= 18.864 t=5459s rss=3.83GB
+S3+s4r32   uk_wiki  w= 8 n=851 ppl= 38.047 t=5531s rss=3.83GB
+S3+s4r32   uk_wiki  w= 9 n=806 ppl= 37.367 t=5597s rss=3.82GB
+S3+s4r32   uk_wiki  w=10 n=816 ppl= 20.477 t=5665s rss=3.82GB
+S3+s4r32   uk_wiki  w=11 n=800 ppl= 26.478 t=5730s rss=3.84GB
+S3+s4r32   uk_wiki  w=12 n=876 ppl= 28.243 t=5806s rss=3.84GB
+S3+s4r32   uk_wiki  w=13 n=750 ppl= 13.297 t=5865s rss=3.85GB
+S3+s4r32   uk_wiki  w=14 n=762 ppl= 24.422 t=5925s rss=3.82GB
+S3+s4r32   uk_wiki  w=15 n=740 ppl= 22.437 t=5982s rss=3.84GB
+S3+s4r32   en_web   w= 0 n=513 ppl= 47.104 t=6015s rss=3.84GB
+S3+s4r32   en_web   w= 1 n=520 ppl= 41.906 t=6048s rss=3.84GB
+S3+s4r32   en_web   w= 2 n=511 ppl= 49.841 t=6080s rss=3.84GB
+S3+s4r32   en_web   w= 3 n=513 ppl= 30.102 t=6113s rss=3.84GB
+S3+s4r32   en_web   w= 4 n=514 ppl= 12.910 t=6146s rss=3.84GB
+S3+s4r32   en_web   w= 5 n=513 ppl= 13.897 t=6179s rss=3.84GB
+S3+s4r32   en_web   w= 6 n=511 ppl= 24.989 t=6211s rss=3.84GB
+S3+s4r32   en_web   w= 7 n=523 ppl= 11.599 t=6245s rss=3.84GB
+S3+s4r32   en_web   w= 8 n=521 ppl= 14.986 t=6282s rss=3.84GB
+S3+s4r32   en_web   w= 9 n=526 ppl= 18.739 t=6313s rss=3.84GB
+S3+s4r32   en_web   w=10 n=515 ppl= 24.768 t=6343s rss=3.84GB
+S3+s4r32   en_web   w=11 n=511 ppl= 20.531 t=6374s rss=3.84GB
+S3+s4r32   en_web   w=12 n=514 ppl= 24.727 t=6404s rss=3.84GB
+S3+s4r32   en_web   w=13 n=557 ppl= 44.609 t=6438s rss=3.84GB
+S3+s4r32   en_web   w=14 n=546 ppl= 28.614 t=6470s rss=3.84GB
+S3+s4r32   en_web   w=15 n=522 ppl= 18.444 t=6501s rss=3.84GB
+S3+s4r32   uk_web   w= 0 n=766 ppl= 38.316 t=6562s rss=3.82GB
+S3+s4r32   uk_web   w= 1 n=758 ppl= 47.993 t=6616s rss=3.82GB
+S3+s4r32   uk_web   w= 2 n=803 ppl= 57.763 t=6680s rss=3.82GB
+S3+s4r32   uk_web   w= 3 n=765 ppl= 39.855 t=6738s rss=3.82GB
+S3+s4r32   uk_web   w= 4 n=845 ppl= 20.336 t=6807s rss=3.83GB
+S3+s4r32   uk_web   w= 5 n=724 ppl= 41.768 t=6863s rss=3.84GB
+S3+s4r32   uk_web   w= 6 n=781 ppl= 30.584 t=6925s rss=3.82GB
+S3+s4r32   uk_web   w= 7 n=792 ppl= 49.301 t=6985s rss=3.79GB
+S3+s4r32   uk_web   w= 8 n=818 ppl= 30.833 t=7053s rss=3.82GB
+S3+s4r32   uk_web   w= 9 n=808 ppl= 29.389 t=7123s rss=3.82GB
+S3+s4r32   uk_web   w=10 n=682 ppl= 29.560 t=7173s rss=3.84GB
+S3+s4r32   uk_web   w=11 n=759 ppl= 33.055 t=7234s rss=3.82GB
+S3+s4r32   uk_web   w=12 n=758 ppl= 30.609 t=7297s rss=3.82GB
+S3+s4r32   uk_web   w=13 n=769 ppl= 41.587 t=7365s rss=3.82GB
+S3+s4r32   uk_web   w=14 n=792 ppl= 43.768 t=7431s rss=3.79GB
+S3+s4r32   uk_web   w=15 n=735 ppl= 53.485 t=7492s rss=3.84GB
+S13+s4r32  en_wiki  w= 0 n=520 ppl=1108.894 t=7526s rss=3.84GB
+S13+s4r32  en_wiki  w= 1 n=526 ppl=832.167 t=7560s rss=3.84GB
+S13+s4r32  en_wiki  w= 2 n=523 ppl=2443.680 t=7593s rss=3.84GB
+S13+s4r32  en_wiki  w= 3 n=520 ppl=1069.626 t=7626s rss=3.84GB
+S13+s4r32  en_wiki  w= 4 n=521 ppl=661.194 t=7659s rss=3.84GB
+S13+s4r32  en_wiki  w= 5 n=514 ppl=1722.741 t=7692s rss=3.84GB
+S13+s4r32  en_wiki  w= 6 n=515 ppl=968.302 t=7725s rss=3.84GB
+S13+s4r32  en_wiki  w= 7 n=513 ppl=1655.853 t=7757s rss=3.84GB
+S13+s4r32  en_wiki  w= 8 n=512 ppl=1096.237 t=7790s rss=3.84GB
+S13+s4r32  en_wiki  w= 9 n=522 ppl=1263.997 t=7823s rss=3.84GB
+S13+s4r32  en_wiki  w=10 n=513 ppl=1298.852 t=7856s rss=3.84GB
+S13+s4r32  en_wiki  w=11 n=511 ppl=1421.752 t=7889s rss=3.84GB
+S13+s4r32  en_wiki  w=12 n=517 ppl=2345.512 t=7924s rss=3.84GB
+S13+s4r32  en_wiki  w=13 n=516 ppl=1828.938 t=7957s rss=3.84GB
+S13+s4r32  en_wiki  w=14 n=514 ppl=1357.293 t=7990s rss=3.84GB
+S13+s4r32  en_wiki  w=15 n=511 ppl=1038.262 t=8022s rss=3.84GB
+S13+s4r32  uk_wiki  w= 0 n=850 ppl=287.269 t=8096s rss=3.84GB
+S13+s4r32  uk_wiki  w= 1 n=843 ppl=166.701 t=8171s rss=3.84GB
+S13+s4r32  uk_wiki  w= 2 n=780 ppl=354.659 t=8236s rss=3.82GB
+S13+s4r32  uk_wiki  w= 3 n=753 ppl=597.702 t=8293s rss=3.85GB
+S13+s4r32  uk_wiki  w= 4 n=880 ppl= 96.348 t=8368s rss=3.85GB
+S13+s4r32  uk_wiki  w= 5 n=923 ppl=319.614 t=8444s rss=3.83GB
+S13+s4r32  uk_wiki  w= 6 n=840 ppl=208.032 t=8512s rss=3.83GB
+S13+s4r32  uk_wiki  w= 7 n=867 ppl=215.568 t=8604s rss=3.83GB
+S13+s4r32  uk_wiki  w= 8 n=851 ppl=312.199 t=8670s rss=3.83GB
+S13+s4r32  uk_wiki  w= 9 n=806 ppl=381.541 t=8731s rss=3.82GB
+S13+s4r32  uk_wiki  w=10 n=816 ppl=417.122 t=8795s rss=3.82GB
+S13+s4r32  uk_wiki  w=11 n=800 ppl=354.460 t=8862s rss=3.82GB
+S13+s4r32  uk_wiki  w=12 n=876 ppl=311.134 t=8934s rss=3.83GB
+S13+s4r32  uk_wiki  w=13 n=750 ppl=353.382 t=8991s rss=3.85GB
+S13+s4r32  uk_wiki  w=14 n=762 ppl=326.761 t=9049s rss=3.82GB
+S13+s4r32  uk_wiki  w=15 n=740 ppl=381.925 t=9101s rss=3.84GB
+S13+s4r32  en_web   w= 0 n=513 ppl=1857.436 t=9131s rss=3.84GB
+S13+s4r32  en_web   w= 1 n=520 ppl=3318.620 t=9161s rss=3.84GB
+S13+s4r32  en_web   w= 2 n=511 ppl=2515.727 t=9191s rss=3.84GB
+S13+s4r32  en_web   w= 3 n=513 ppl=773.824 t=9225s rss=3.84GB
+S13+s4r32  en_web   w= 4 n=514 ppl=276.261 t=9255s rss=3.84GB
+S13+s4r32  en_web   w= 5 n=513 ppl=539.568 t=9285s rss=3.84GB
+S13+s4r32  en_web   w= 6 n=511 ppl=821.241 t=9315s rss=3.84GB
+S13+s4r32  en_web   w= 7 n=523 ppl=1596.527 t=9348s rss=3.84GB
+S13+s4r32  en_web   w= 8 n=521 ppl=1211.199 t=9378s rss=3.84GB
+S13+s4r32  en_web   w= 9 n=526 ppl=904.423 t=9410s rss=3.84GB
+S13+s4r32  en_web   w=10 n=515 ppl=1719.152 t=9440s rss=3.84GB
+S13+s4r32  en_web   w=11 n=511 ppl=1298.183 t=9469s rss=3.84GB
+S13+s4r32  en_web   w=12 n=514 ppl=975.206 t=9502s rss=3.84GB
+S13+s4r32  en_web   w=13 n=557 ppl=1311.180 t=9539s rss=3.84GB
+S13+s4r32  en_web   w=14 n=546 ppl=1320.267 t=9575s rss=3.84GB
+S13+s4r32  en_web   w=15 n=522 ppl=3148.173 t=9609s rss=3.84GB
+S13+s4r32  uk_web   w= 0 n=766 ppl=413.167 t=9677s rss=3.82GB
+S13+s4r32  uk_web   w= 1 n=758 ppl=459.771 t=9759s rss=3.68GB
+S13+s4r32  uk_web   w= 2 n=803 ppl=281.818 t=9848s rss=3.79GB
+S13+s4r32  uk_web   w= 3 n=765 ppl=406.229 t=9912s rss=3.79GB
+S13+s4r32  uk_web   w= 4 n=845 ppl=171.230 t=9984s rss=3.79GB
+S13+s4r32  uk_web   w= 5 n=724 ppl=324.641 t=10040s rss=3.81GB
+S13+s4r32  uk_web   w= 6 n=781 ppl=315.208 t=10109s rss=3.79GB
+S13+s4r32  uk_web   w= 7 n=792 ppl=497.088 t=10175s rss=3.76GB
+S13+s4r32  uk_web   w= 8 n=818 ppl=276.584 t=10244s rss=3.79GB
+S13+s4r32  uk_web   w= 9 n=808 ppl=259.221 t=10311s rss=3.79GB
+S13+s4r32  uk_web   w=10 n=682 ppl=515.353 t=10361s rss=3.80GB
+S13+s4r32  uk_web   w=11 n=759 ppl=348.910 t=10423s rss=3.79GB
+S13+s4r32  uk_web   w=12 n=758 ppl=336.109 t=10482s rss=3.79GB
+S13+s4r32  uk_web   w=13 n=769 ppl=277.976 t=10544s rss=3.79GB
+S13+s4r32  uk_web   w=14 n=792 ppl=347.148 t=10611s rss=3.76GB
+S13+s4r32  uk_web   w=15 n=735 ppl=450.692 t=10669s rss=3.81GB
+DONE 10669.5s peak_rss=4.11GB

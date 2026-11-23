@@ -1,0 +1,11 @@
+start qwen 2026-11-23T18:28:14+02:00 MemAvailable=10887088kB
+qwen exit=0 2026-11-23T21:26:07+02:00 MemAvailable=10064788kB
+[run] fp32: systemd-run --user --scope -p MemoryMax=4G -p MemorySwapMax=0 -- nice -n 19 ionice -c3 python3 tools/reference/golden_bitnet.py nll --windows results/2026-11-23_agent2/H2/bitnet_2x2_all64.ids --batch 8 --threads 4 --out results/2026-11-23_agent2/H2/scores/bitnet/_all64_fp32.txt
+[done] split fp32 -> ['en_wiki', 'uk_wiki', 'en_web', 'uk_web']
+[run] tenzo_int8: systemd-run --user --scope -p MemoryMax=4G -p MemorySwapMax=0 -- nice -n 19 ionice -c3 python3 tools/reference/golden_bitnet.py nll --windows results/2026-11-23_agent2/H2/bitnet_2x2_all64.ids --batch 8 --threads 4 --out results/2026-11-23_agent2/H2/scores/bitnet/_all64_tenzo_int8.txt --kv-scheme tenzo_int8
+[done] split tenzo_int8 -> ['en_wiki', 'uk_wiki', 'en_web', 'uk_web']
+[run] S3_s4r32: systemd-run --user --scope -p MemoryMax=4G -p MemorySwapMax=0 -- nice -n 19 ionice -c3 python3 tools/reference/golden_bitnet.py nll --windows results/2026-11-23_agent2/H2/bitnet_2x2_all64.ids --batch 8 --threads 4 --out results/2026-11-23_agent2/H2/scores/bitnet/_all64_S3_s4r32.txt --kv-scheme S3+s4r32
+[done] split S3_s4r32 -> ['en_wiki', 'uk_wiki', 'en_web', 'uk_web']
+[run] S13_s4r32: systemd-run --user --scope -p MemoryMax=4G -p MemorySwapMax=0 -- nice -n 19 ionice -c3 python3 tools/reference/golden_bitnet.py nll --windows results/2026-11-23_agent2/H2/bitnet_2x2_all64.ids --batch 8 --threads 4 --out results/2026-11-23_agent2/H2/scores/bitnet/_all64_S13_s4r32.txt --kv-scheme S13+s4r32
+[done] split S13_s4r32 -> ['en_wiki', 'uk_wiki', 'en_web', 'uk_web']
+bitnet exit=0 2026-11-23T23:23:50+02:00

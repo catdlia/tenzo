@@ -1,0 +1,5 @@
+{
+ "model": "/home/illia/tenzo-refs/hf/eurollm-1.7b",
+ "max_abs_lp_diff": 0.0,
+ "check_windows": 2
+}
