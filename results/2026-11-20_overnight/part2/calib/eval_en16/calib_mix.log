@@ -1,0 +1,1 @@
+Failed to start transient scope unit: Transaction for run-p882759-i880401.scope/start is destructive (shutdown.target has 'start' job queued, but 'stop' is included in transaction).
