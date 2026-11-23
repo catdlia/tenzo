@@ -189,7 +189,7 @@ inline float quantize_act_i8(const float* __restrict__ act, int64_t K, int8_t* _
 // Rows [row0, row0 + nrows) of an I2_S matrix with K inputs (K % 128 == 0); 4 rows share the activation loads.
 inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t nrows, int64_t K,
                           const int8_t* __restrict__ q, int32_t sum_q, float scale, float* __restrict__ out) {
-    if (nrows <= 0 || K <= 0 || row0 < 0) return;
+    if (nrows <= 0 || nrows > (1LL << 30) || K <= 0 || row0 < 0) return;
     const size_t kb_n = static_cast<size_t>(K / 128);
     const size_t row_bytes = static_cast<size_t>(K / 4);
     const size_t n_rows = static_cast<size_t>(nrows);
@@ -214,7 +214,8 @@ inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
         return _mm256_madd_epi16(p, ones);
     };
     size_t r = 0;
-    for (; r + 4 <= n_rows; r += 4) {
+    const size_t n4 = n_rows & ~size_t(3);
+    for (; r < n4; r += 4) {
         const uint8_t* w0 = w_base + r * row_bytes;
         const uint8_t* w1 = w0 + row_bytes;
         const uint8_t* w2 = w1 + row_bytes;
@@ -236,7 +237,7 @@ inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
         out[r + 2] = static_cast<float>(hsum(a2) - sum_q) * scale;
         out[r + 3] = static_cast<float>(hsum(a3) - sum_q) * scale;
     }
-    for (; r < n_rows; ++r) {
+    for (size_t t = 0; t < 3 && r < n_rows; ++t, ++r) {
         const uint8_t* wr = w_base + r * row_bytes;
         __m256i a = _mm256_setzero_si256();
         for (size_t kb = 0; kb < kb_n; ++kb) {
