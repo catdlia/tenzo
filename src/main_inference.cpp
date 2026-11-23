@@ -12,6 +12,7 @@
 
 #include "tenzo.hpp"
 #include "runtime/MicroarchProfiler.h"
+#include "runtime/Tokenizer.h"
 #include <iostream>
 #include <memory>
 #include <fstream>
@@ -36,113 +37,9 @@
 #define ANSI_CYAN    "\033[36m"
 #define ANSI_WHITE   "\033[37m"
 
-class BpeTokenizer {
-public:
-    std::unordered_map<int, std::string> id_to_token;
-    std::unordered_map<std::string, int> token_to_id;
-    int bos_token = 128000;
-    int eos_token = 128001;
-    int eot_token = 128009;
-
-    bool load_vocab(const std::string& vocab_path) {
-        std::ifstream f(vocab_path);
-        if (!f.is_open()) return false;
-        std::string line;
-        while (std::getline(f, line)) {
-            if (line.empty()) continue;
-            size_t space_pos = line.find(' ');
-            if (space_pos != std::string::npos) {
-                int tok_id = std::stoi(line.substr(0, space_pos));
-                std::string tok_str = line.substr(space_pos + 1);
-                // Handle GPT-2 / LLaMA space replacement (Ġ -> " ")
-                size_t pos = 0;
-                while ((pos = tok_str.find("\xc4\xa0", pos)) != std::string::npos) {
-                    tok_str.replace(pos, 2, " ");
-                    pos += 1;
-                }
-                // Handle newline replacement (Ċ -> "\n")
-                pos = 0;
-                while ((pos = tok_str.find("\xc4\x8a", pos)) != std::string::npos) {
-                    tok_str.replace(pos, 2, "\n");
-                    pos += 1;
-                }
-                id_to_token[tok_id] = tok_str;
-                token_to_id[tok_str] = tok_id;
-            }
-        }
-        if (token_to_id.count("<|begin_of_text|>")) bos_token = token_to_id["<|begin_of_text|>"];
-        if (token_to_id.count("<|endoftext|>")) eos_token = token_to_id["<|endoftext|>"];
-        if (token_to_id.count("<|eot_id|>")) eot_token = token_to_id["<|eot_id|>"];
-        return true;
-    }
-
-    std::vector<int> encode(const std::string& text, bool add_bos = true) const {
-        std::vector<int> tokens;
-        if (add_bos) {
-            tokens.push_back(bos_token);
-        }
-
-        size_t i = 0;
-        while (i < text.size()) {
-            bool matched = false;
-            for (size_t len = std::min((size_t)32, text.size() - i); len >= 1; --len) {
-                std::string sub = text.substr(i, len);
-                auto it = token_to_id.find(sub);
-                if (it != token_to_id.end()) {
-                    tokens.push_back(it->second);
-                    i += len;
-                    matched = true;
-                    break;
-                }
-            }
-            if (!matched) {
-                unsigned char c = text[i];
-                std::string byte_str(1, c);
-                if (token_to_id.count(byte_str)) {
-                    tokens.push_back(token_to_id.at(byte_str));
-                }
-                i += 1;
-            }
-        }
-        return tokens;
-    }
-
-    std::string decode_token(int token_id) const {
-        auto it = id_to_token.find(token_id);
-        if (it != id_to_token.end()) {
-            return it->second;
-        }
-        return "";
-    }
-
-    std::string decode(const std::vector<int>& token_ids) const {
-        std::string res;
-        for (int tid : token_ids) {
-            auto it = id_to_token.find(tid);
-            if (it != id_to_token.end()) {
-                res += it->second;
-            }
-        }
-        return res;
-    }
-
-    bool is_stop_token(int tid) const {
-        if (tid >= 128000 && tid <= 128256) return true;
-        if (tid == eos_token || tid == eot_token) return true;
-        auto it = id_to_token.find(tid);
-        if (it != id_to_token.end()) {
-            const std::string& s = it->second;
-            if (s == "<|end_of_text|>" || s == "<|endoftext|>" || s == "<|eot_id|>" || s == "</s>" || s == "<eos>") return true;
-            if (s.find("endoftext") != std::string::npos || s.find("eot_id") != std::string::npos || 
-                s.find("end_of_eot") != std::string::npos || s.find("end_of_text") != std::string::npos ||
-                s.find("end_header_id") != std::string::npos) return true;
-        }
-        return false;
-    }
-};
-
 // ---------------------------------------------------------------------------
-// Evaluation helpers (token-id driven, tokenizer-independent)
+// Base64 helpers for --tokenize-batch parity testing (preserves binary/newlines)
+// ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 static std::vector<std::vector<int>> read_id_lines(const std::string& path) {
     std::vector<std::vector<int>> out;
@@ -186,8 +83,61 @@ static bool valid_kv_mode(const std::string& m) {
     return m == "fp32" || m == "int8_fused" || m == "tl1_fused" || m == "popcount_fused" || m == "paged_int8" || m == "ternary_rot";
 }
 
+static std::string base64_decode(const std::string& in) {
+    static const int T[256] = {
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
+        52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,
+        -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
+        15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
+        -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+        41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+    };
+    std::string out;
+    int val = 0, valb = -8;
+    for (unsigned char c : in) {
+        if (c == '\r' || c == '\n' || c == ' ') continue;
+        int d = T[c];
+        if (d == -1) break;
+        val = (val << 6) + d;
+        valb += 6;
+        if (valb >= 0) {
+            out.push_back(static_cast<char>((val >> valb) & 0xFF));
+            valb -= 8;
+        }
+    }
+    return out;
+}
+
+static std::string base64_encode(const std::string& in) {
+    static const char* B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string out;
+    int val = 0, valb = -6;
+    for (unsigned char c : in) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            out.push_back(B64[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    if (valb > -6) out.push_back(B64[((val << 8) >> (valb + 8)) & 0x3F]);
+    while (out.size() % 4) out.push_back('=');
+    return out;
+}
+
 struct CliOptions {
     std::string model_dir = "/app/tenzo-frontend/export_output";
+    std::string tokenizer_path = "";
     std::string prompt = "";
     std::string system_prompt = "You are Tenzo, a fast and helpful AI assistant powered by 1.58-bit native MLIR execution.";
     std::string kv_mode = "int8_fused";
@@ -204,6 +154,7 @@ struct CliOptions {
     bool profile = false;
     // --- evaluation / measurement modes (token-id driven) ---
     bool tokenize_only = false;
+    bool tokenize_batch = false;
     std::string ids_file;        // whitespace-separated token ids, one sequence per line
     std::string dump_prefix;     // writes <prefix>.logits.f32 and <prefix>.greedy.txt
     int greedy_steps = 32;
@@ -318,6 +269,11 @@ int main(int argc, char** argv) {
             opt.profile = true;
         } else if (arg == "--tokenize-only") {
             opt.tokenize_only = true;
+        } else if (arg == "--tokenize-batch") {
+            opt.tokenize_batch = true;
+            opt.show_banner = false;
+        } else if (arg == "--tokenizer" && i + 1 < argc) {
+            opt.tokenizer_path = argv[++i];
         } else if (arg == "--ids-file" && i + 1 < argc) {
             opt.ids_file = argv[++i];
         } else if (arg == "--dump-prefix" && i + 1 < argc) {
@@ -360,7 +316,8 @@ int main(int argc, char** argv) {
     std::string weights_path = opt.model_dir + "/weights.bin";
 
     // Auto-fallback search if model path is not directly accessible
-    if (!std::ifstream(vocab_path).is_open()) {
+    if (opt.tokenizer_path.empty() && !std::ifstream(vocab_path).is_open() &&
+        !std::ifstream(opt.model_dir + "/tokenizer.json").is_open()) {
         std::vector<std::string> candidates = {
             "tenzo-frontend/export_output",
             "./tenzo-frontend/export_output",
@@ -368,7 +325,8 @@ int main(int argc, char** argv) {
         };
         for (const auto& c : candidates) {
             std::string test_v = c + "/tokenizer.vocab";
-            if (std::ifstream(test_v).is_open()) {
+            std::string test_j = c + "/tokenizer.json";
+            if (std::ifstream(test_v).is_open() || std::ifstream(test_j).is_open()) {
                 opt.model_dir = c;
                 vocab_path = c + "/tokenizer.vocab";
                 mlir_path = c + "/model.mlir";
@@ -378,20 +336,46 @@ int main(int argc, char** argv) {
         }
     }
 
-    BpeTokenizer tokenizer;
-    std::cout << ANSI_CYAN << "📖 Loading vocabulary..." << ANSI_RESET;
-    if (!tokenizer.load_vocab(vocab_path)) {
-        std::cout << ANSI_RED << " [FAILED]" << ANSI_RESET << std::endl;
-        std::cerr << "❌ Could not open vocab file: " << vocab_path << std::endl;
+    const std::string tok_load_path = opt.tokenizer_path.empty() ? vocab_path : opt.tokenizer_path;
+    tenzo::runtime::Tokenizer tokenizer;
+    if (!opt.tokenize_batch) {
+        std::cout << ANSI_CYAN << "📖 Loading vocabulary..." << ANSI_RESET;
+    }
+    if (!tokenizer.load(tok_load_path)) {
+        if (!opt.tokenize_batch) {
+            std::cout << ANSI_RED << " [FAILED]" << ANSI_RESET << std::endl;
+        }
+        std::cerr << "❌ Could not load tokenizer from: " << tok_load_path << std::endl;
         return 1;
     }
-    std::cout << ANSI_GREEN << " [OK] " << ANSI_RESET << "(" << tokenizer.id_to_token.size() << " tokens)\n";
+    if (!opt.tokenize_batch) {
+        std::cout << ANSI_GREEN << " [OK] " << ANSI_RESET << "(" << tokenizer.vocab_size() << " tokens"
+                  << (tokenizer.uses_bpe() ? ", BPE" : ", legacy") << ")\n";
+    }
+
+    if (opt.tokenize_batch) {
+        std::string b64_line;
+        while (std::getline(std::cin, b64_line)) {
+            if (!b64_line.empty() && b64_line.back() == '\r') b64_line.pop_back();
+            if (b64_line == ".") break;
+            std::string raw = base64_decode(b64_line);
+            auto ids_bos = tokenizer.encode(raw, true);
+            auto ids_raw = tokenizer.encode(raw, false);
+            std::string rt = tokenizer.decode(ids_raw);
+            std::cout << "IDS_BOS:";
+            for (int32_t t : ids_bos) std::cout << " " << t;
+            std::cout << "\tIDS_RAW:";
+            for (int32_t t : ids_raw) std::cout << " " << t;
+            std::cout << "\tRT:" << base64_encode(rt) << "\n";
+        }
+        return 0;
+    }
 
     if (opt.tokenize_only) {
         // Machine-readable: "TOKENS: id id id ..." (BOS included, as in single-shot generation)
-        std::vector<int> ids = tokenizer.encode(opt.prompt, true);
+        auto ids = tokenizer.encode(opt.prompt, true);
         std::cout << "TOKENS:";
-        for (int t : ids) std::cout << " " << t;
+        for (int32_t t : ids) std::cout << " " << t;
         std::cout << "\n";
         return 0;
     }
@@ -586,10 +570,10 @@ int main(int argc, char** argv) {
         // Apply System Prompt
         if (!opt.system_prompt.empty()) {
             std::string sys_formatted = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + opt.system_prompt + "<|eot_id|>";
-            std::vector<int> sys_tokens = tokenizer.encode(sys_formatted, false);
-            for (int t : sys_tokens) {
-                engine.prefill_token(t);
-                conversation_tokens.push_back(t);
+            auto sys_tokens = tokenizer.encode(sys_formatted, false);
+            for (int32_t t : sys_tokens) {
+                engine.prefill_token(static_cast<int>(t));
+                conversation_tokens.push_back(static_cast<int>(t));
             }
         }
 
@@ -625,10 +609,10 @@ int main(int argc, char** argv) {
                     std::cout << ANSI_YELLOW << "🧹 Conversation context & KV-cache reset.\n" << ANSI_RESET;
                     if (!opt.system_prompt.empty()) {
                         std::string sys_formatted = "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n" + opt.system_prompt + "<|eot_id|>";
-                        std::vector<int> sys_tokens = tokenizer.encode(sys_formatted, false);
-                        for (int t : sys_tokens) {
-                            engine.prefill_token(t);
-                            conversation_tokens.push_back(t);
+                        auto sys_tokens = tokenizer.encode(sys_formatted, false);
+                        for (int32_t t : sys_tokens) {
+                            engine.prefill_token(static_cast<int>(t));
+                            conversation_tokens.push_back(static_cast<int>(t));
                         }
                     }
                     continue;
@@ -672,19 +656,19 @@ int main(int argc, char** argv) {
             }
 
             std::string turn_formatted = "<|start_header_id|>user<|end_header_id|>\n\n" + user_input + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n";
-            std::vector<int> turn_tokens = tokenizer.encode(turn_formatted, false);
+            auto turn_tokens = tokenizer.encode(turn_formatted, false);
 
             auto t_prefill_0 = std::chrono::high_resolution_clock::now();
-            for (size_t i = 0; i < turn_tokens.size() - 1; ++i) {
-                engine.prefill_token(turn_tokens[i]);
-                conversation_tokens.push_back(turn_tokens[i]);
+            for (size_t i = 0; i + 1 < turn_tokens.size(); ++i) {
+                engine.prefill_token(static_cast<int>(turn_tokens[i]));
+                conversation_tokens.push_back(static_cast<int>(turn_tokens[i]));
             }
             auto t_prefill_1 = std::chrono::high_resolution_clock::now();
             double ttft_ms = std::chrono::duration<double, std::milli>(t_prefill_1 - t_prefill_0).count();
 
             std::cout << ANSI_BOLD << ANSI_CYAN << "Tenzo > " << ANSI_RESET << std::flush;
 
-            int cur_token = turn_tokens.back();
+            int cur_token = static_cast<int>(turn_tokens.back());
             conversation_tokens.push_back(cur_token);
 
             auto t_dec_0 = std::chrono::high_resolution_clock::now();
@@ -716,7 +700,8 @@ int main(int argc, char** argv) {
     // --- Single-Shot Generation Mode ---
     std::string prompt_text = opt.prompt.empty() ? "In computer science, a compiler translates source code written in a high-level programming language into" : opt.prompt;
 
-    std::vector<int> prompt_tokens = tokenizer.encode(prompt_text, true);
+    auto ptoks32 = tokenizer.encode(prompt_text, true);
+    std::vector<int> prompt_tokens(ptoks32.begin(), ptoks32.end());
 
     std::cout << ANSI_BOLD << "💬 Prompt: " << ANSI_RESET << prompt_text << "\n";
     std::cout << ANSI_BOLD << ANSI_CYAN << "⚡ Output: " << ANSI_RESET << std::flush;
