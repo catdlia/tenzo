@@ -189,8 +189,11 @@ inline float quantize_act_i8(const float* __restrict__ act, int64_t K, int8_t* _
 // Rows [row0, row0 + nrows) of an I2_S matrix with K inputs (K % 128 == 0); 4 rows share the activation loads.
 inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t nrows, int64_t K,
                           const int8_t* __restrict__ q, int32_t sum_q, float scale, float* __restrict__ out) {
-    const int64_t kb_n = K / 128;
-    const int64_t row_bytes = K / 4;
+    if (nrows <= 0 || K <= 0 || row0 < 0) return;
+    const size_t kb_n = static_cast<size_t>(K / 128);
+    const size_t row_bytes = static_cast<size_t>(K / 4);
+    const size_t n_rows = static_cast<size_t>(nrows);
+    const uint8_t* w_base = w + static_cast<size_t>(row0) * row_bytes;
     const __m256i m3 = _mm256_set1_epi8(0x03);
     const __m256i ones = _mm256_set1_epi16(1);
     auto hsum = [](__m256i v) {
@@ -199,7 +202,7 @@ inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
         x = _mm_add_epi32(x, _mm_shuffle_epi32(x, 0xB1));
         return _mm_cvtsi128_si32(x);
     };
-    auto block = [&](const uint8_t* wr, int64_t kb, __m256i q0, __m256i q1, __m256i q2, __m256i q3) {
+    auto block = [&](const uint8_t* wr, size_t kb, __m256i q0, __m256i q1, __m256i q2, __m256i q3) {
         __m256i b = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(wr + kb * 32));
         __m256i u0 = _mm256_and_si256(b, m3);
         __m256i u1 = _mm256_and_si256(_mm256_srli_epi16(b, 2), m3);
@@ -210,14 +213,14 @@ inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
                                      _mm256_add_epi16(_mm256_maddubs_epi16(u2, q2), _mm256_maddubs_epi16(u3, q3)));
         return _mm256_madd_epi16(p, ones);
     };
-    int64_t r = 0;
-    for (; r + 4 <= nrows; r += 4) {
-        const uint8_t* w0 = w + (row0 + r) * row_bytes;
+    size_t r = 0;
+    for (; r + 4 <= n_rows; r += 4) {
+        const uint8_t* w0 = w_base + r * row_bytes;
         const uint8_t* w1 = w0 + row_bytes;
         const uint8_t* w2 = w1 + row_bytes;
         const uint8_t* w3 = w2 + row_bytes;
         __m256i a0 = _mm256_setzero_si256(), a1 = a0, a2 = a0, a3 = a0;
-        for (int64_t kb = 0; kb < kb_n; ++kb) {
+        for (size_t kb = 0; kb < kb_n; ++kb) {
             const int8_t* qb = q + kb * 128;
             __m256i q0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb));
             __m256i q1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 32));
@@ -233,10 +236,10 @@ inline void gemv_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
         out[r + 2] = static_cast<float>(hsum(a2) - sum_q) * scale;
         out[r + 3] = static_cast<float>(hsum(a3) - sum_q) * scale;
     }
-    for (; r < nrows; ++r) {
-        const uint8_t* wr = w + (row0 + r) * row_bytes;
+    for (; r < n_rows; ++r) {
+        const uint8_t* wr = w_base + r * row_bytes;
         __m256i a = _mm256_setzero_si256();
-        for (int64_t kb = 0; kb < kb_n; ++kb) {
+        for (size_t kb = 0; kb < kb_n; ++kb) {
             const int8_t* qb = q + kb * 128;
             a = _mm256_add_epi32(a, block(wr, kb, _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb)),
                                           _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 32)),
@@ -273,7 +276,10 @@ inline std::vector<uint8_t> tl1_to_i2s(const int8_t* tl1, int64_t N, int64_t K) 
 inline void gemm_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t nrows, int64_t K, const int8_t* __restrict__ q,
                           int64_t ldq, const int32_t* __restrict__ sum_q, const float* __restrict__ scale, int M,
                           float* __restrict__ out, int64_t ld_out) {
-    const int64_t kb_n = K / 128, row_bytes = K / 4;
+    if (nrows <= 0 || K <= 0 || row0 < 0 || M <= 0) return;
+    const size_t kb_n = static_cast<size_t>(K / 128), row_bytes = static_cast<size_t>(K / 4), n_rows = static_cast<size_t>(nrows);
+    const size_t u_ldq = static_cast<size_t>(ldq), u_ld_out = static_cast<size_t>(ld_out);
+    const uint8_t* w_base = w + static_cast<size_t>(row0) * row_bytes;
     const __m256i m3 = _mm256_set1_epi8(0x03), ones = _mm256_set1_epi16(1);
     auto hsum = [](__m256i v) {
         __m128i x = _mm_add_epi32(_mm256_castsi256_si128(v), _mm256_extracti128_si256(v, 1));
@@ -281,14 +287,14 @@ inline void gemm_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
         x = _mm_add_epi32(x, _mm_shuffle_epi32(x, 0xB1));
         return _mm_cvtsi128_si32(x);
     };
-    for (int64_t r = 0; r < nrows; r += 2) {
-        const uint8_t* w0 = w + (row0 + r) * row_bytes;
+    for (size_t r = 0; r + 1 < n_rows; r += 2) {
+        const uint8_t* w0 = w_base + r * row_bytes;
         const uint8_t* w1 = w0 + row_bytes;
         for (int m0 = 0; m0 < M; m0 += 4) {
             const int mt = std::min(4, M - m0);
             __m256i acc0[4], acc1[4];
             for (int i = 0; i < 4; ++i) { acc0[i] = _mm256_setzero_si256(); acc1[i] = _mm256_setzero_si256(); }
-            for (int64_t kb = 0; kb < kb_n; ++kb) {
+            for (size_t kb = 0; kb < kb_n; ++kb) {
                 const __m256i b0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w0 + kb * 32));
                 const __m256i b1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(w1 + kb * 32));
                 const __m256i a0 = _mm256_and_si256(b0, m3), a1 = _mm256_and_si256(_mm256_srli_epi16(b0, 2), m3),
@@ -296,7 +302,7 @@ inline void gemm_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
                 const __m256i c0 = _mm256_and_si256(b1, m3), c1 = _mm256_and_si256(_mm256_srli_epi16(b1, 2), m3),
                               c2 = _mm256_and_si256(_mm256_srli_epi16(b1, 4), m3), c3 = _mm256_and_si256(_mm256_srli_epi16(b1, 6), m3);
                 for (int i = 0; i < mt; ++i) {
-                    const int8_t* qb = q + static_cast<int64_t>(m0 + i) * ldq + kb * 128;
+                    const int8_t* qb = q + static_cast<size_t>(m0 + i) * u_ldq + kb * 128;
                     const __m256i q0 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb));
                     const __m256i q1 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 32));
                     const __m256i q2 = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(qb + 64));
@@ -310,8 +316,8 @@ inline void gemm_i2s_rows(const uint8_t* __restrict__ w, int64_t row0, int64_t n
                 }
             }
             for (int i = 0; i < mt; ++i) {
-                out[static_cast<int64_t>(m0 + i) * ld_out + r] = static_cast<float>(hsum(acc0[i]) - sum_q[m0 + i]) * scale[m0 + i];
-                out[static_cast<int64_t>(m0 + i) * ld_out + r + 1] = static_cast<float>(hsum(acc1[i]) - sum_q[m0 + i]) * scale[m0 + i];
+                out[static_cast<size_t>(m0 + i) * u_ld_out + r] = static_cast<float>(hsum(acc0[i]) - sum_q[m0 + i]) * scale[m0 + i];
+                out[static_cast<size_t>(m0 + i) * u_ld_out + r + 1] = static_cast<float>(hsum(acc1[i]) - sum_q[m0 + i]) * scale[m0 + i];
             }
         }
     }
@@ -2158,7 +2164,7 @@ bool TenzoEngineImpl::prefill_tokens_batched(const int* tokens, int n, int chunk
     const int LDQ = std::max(h, std::max(QD, F));
     std::vector<float> X(size_t(C) * h), Xn(size_t(C) * h), Qb(size_t(C) * QD), Kb(size_t(C) * KD), Vb(size_t(C) * KD),
         Ab(size_t(C) * QD), An(size_t(C) * QD), Ob(size_t(C) * h), H1(size_t(C) * h), Pn(size_t(C) * h), G(size_t(C) * F),
-        U(size_t(C) * F), Act(size_t(C) * F), Fn(size_t(C) * F), Dn(size_t(C) * h), Sc(C);
+        U(size_t(C) * F), Act(size_t(C) * F), Fn(size_t(C) * F), Dn(size_t(C) * h);
     std::vector<int8_t> Q8(size_t(C) * LDQ);
     std::vector<int32_t> sq(C);
     std::vector<float> inv(C), sc(C);
