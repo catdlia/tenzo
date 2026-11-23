@@ -1,0 +1,18 @@
+⚠️ УВАГА: Запуск локальної компіляції (може бути довго)...
+docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug -j1 tenzo-cli tenzo-diag paper_benchmark tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
+ Container untitled-dev-run-bbe74068ac6f Creating 
+ Container untitled-dev-run-bbe74068ac6f Created 
+ninja: Entering directory `/app/cmake-build-debug'
+[1/13] Building CXX object CMakeFiles/tenzo-cli.dir/src/runtime/Tokenizer.cpp.o
+[2/13] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/EndToEndMathTest.cpp.o
+[3/13] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/TestEngineAPI.cpp.o
+[4/13] Building CXX object CMakeFiles/tenzo-cli.dir/src/tests/GenerationTest.cpp.o
+[5/13] Linking CXX executable tenzo-cli
+[6/13] Building CXX object CMakeFiles/tenzo_runtime_static.dir/src/runtime/Tokenizer.cpp.o
+[7/13] Linking CXX static library libtenzo_runtime.a
+[8/13] Building CXX object CMakeFiles/tenzo_runtime_shared.dir/src/runtime/Tokenizer.cpp.o
+[9/13] Linking CXX shared library libtenzo_runtime.so
+[10/13] Linking CXX executable tenzo_basic_inference
+[11/13] Building CXX object CMakeFiles/tenzo-inference.dir/src/main_inference.cpp.o
+[12/13] Linking CXX executable tenzo-inference
+[13/13] Linking CXX executable tenzo-diag

@@ -11,6 +11,7 @@ namespace tenzo {
 bool runKVRotTests();
 bool runBatchedPrefillTests();
 bool runQDimNeHiddenTests();
+bool runTokenizerTests();
 
 bool runEngineAPITests() {
     llvm::outs() << "--- Engine API validation ---\n";
@@ -58,7 +59,8 @@ bool runEngineAPITests() {
     const bool kv_ok = runKVRotTests();
     const bool bp_ok = runBatchedPrefillTests();
     const bool qd_ok = runQDimNeHiddenTests();
-    return ok && kv_ok && bp_ok && qd_ok;
+    const bool tok_ok = runTokenizerTests();
+    return ok && kv_ok && bp_ok && qd_ok && tok_ok;
 }
 
 } // namespace tenzo
@@ -406,6 +408,74 @@ bool runQDimNeHiddenTests() {
                  << ", lut=" << eq_lut << ")\n";
     bool ok = (e_i2s < 1e-4) && (e_bat < 1e-4) && (e_lut < 1e-4) && (bug_diff > 1e-2) && eq_bat && eq_lut;
     llvm::outs() << (ok ? "✅ [PASS] q_dim != hidden_size\n" : "❌ [FAIL] q_dim != hidden_size\n");
+    return ok;
+}
+
+} // namespace tenzo
+
+// ------------------------------------------------------------------------------------------------------------------
+// Tokenizer parity (L4): HF Llama-3 BPE pre-tokenizer + byte-level merges + UTF-8 round-trip decode.
+#include "runtime/Tokenizer.h"
+#include <fstream>
+
+namespace tenzo {
+
+bool runTokenizerTests() {
+    llvm::outs() << "--- Llama-3 BPE Tokenizer parity & UTF-8 round-trip ---\n";
+    runtime::Tokenizer tok;
+    std::string loaded_from;
+    for (const char* cand : {
+             "models/bitnet-1.58b-v2/tokenizer.vocab",
+             "/app/models/bitnet-1.58b-v2/tokenizer.vocab",
+             "tools/tokenizer/bitnet_b158_tokenizer.json",
+             "/app/tools/tokenizer/bitnet_b158_tokenizer.json",
+         }) {
+        if (std::ifstream(cand).good() && tok.load(cand)) {
+            loaded_from = cand;
+            break;
+        }
+    }
+    if (loaded_from.empty()) {
+        llvm::errs() << "  ❌ Could not locate tokenizer assets\n";
+        return false;
+    }
+    bool ok = tok.uses_bpe() && tok.vocab_size() == 128256;
+    llvm::outs() << "  loaded " << loaded_from << " (vocab=" << tok.vocab_size()
+                 << ", bpe=" << tok.uses_bpe() << ")\n";
+
+    struct Case {
+        const char* name;
+        std::string text;
+        std::vector<int32_t> expected_with_bos;
+    };
+    const std::vector<Case> cases = {
+        {"empty", "", {128000}},
+        {"en_france", "The capital of France is", {128000, 791, 6864, 315, 9822, 374}},
+        {"utf8_ile", "\xc3\x8ele-de-France", {128000, 72907, 273, 6953, 7424, 35206}},
+        {"utf8_the_ile", "The \xc3\x8ele-de-France region", {128000, 791, 60208, 273, 6953, 7424, 35206, 5654}},
+        {"uk_sentence",
+         "\xd0\x9a\xd0\xb8\xd1\x97\xd0\xb2 \xe2\x80\x94 \xd1\x81\xd1\x82\xd0\xbe\xd0\xbb\xd0\xb8\xd1\x86\xd1\x8f \xd0\xa3\xd0\xba\xd1\x80\xd0\xb0\xd1\x97\xd0\xbd\xd0\xb8. 2026 \xd1\x80\xd1\x96\xd0\xba!",
+         {128000, 27435, 1840, 105598, 2001, 18868, 101745, 101820, 101737, 13, 220, 2366, 21, 110531, 0}},
+        {"contractions_ws_added", "It's I'LL you'RE  \r\n   1234567<|eot_id|>",
+         {128000, 2181, 596, 358, 6, 4178, 499, 95253, 10636, 256, 220, 4513, 10961, 22, 128009}},
+    };
+
+    for (const auto& tc : cases) {
+        const auto got_bos = tok.encode(tc.text, true);
+        const auto got_nobos = tok.encode(tc.text, false);
+        const std::string decoded = tok.decode(got_nobos);
+        const bool ids_ok = (got_bos == tc.expected_with_bos);
+        const bool rt_ok = (decoded == tc.text);
+        if (!ids_ok || !rt_ok) {
+            llvm::errs() << "  ❌ case " << tc.name << ": ids_ok=" << ids_ok << " rt_ok=" << rt_ok << "\n";
+        }
+        ok &= ids_ok && rt_ok;
+    }
+
+    const std::string ile_decoded = tok.decode({60208, 273, 6953, 7424, 35206});
+    ok &= (ile_decoded == " \xc3\x8ele-de-France");
+    ok &= tok.is_stop_token(128001) && tok.is_stop_token(128009) && !tok.is_stop_token(791);
+    llvm::outs() << (ok ? "✅ [PASS] Llama-3 BPE Tokenizer\n" : "❌ [FAIL] Llama-3 BPE Tokenizer\n");
     return ok;
 }
 
