@@ -1,0 +1,17 @@
+
+=======================================================
+▶ Running Parity Evaluator Self-Test (R5 Unit Validation)
+=======================================================
+  ✅ Self-test: NaN detection and rejection verified.
+  ✅ Self-test: Inf detection and rejection verified.
+  ✅ Self-test: Identical vector metrics verified (cosine=1.0, max_diff=0.0, top1=True).
+  ✅ Self-test: Bounded noise parity verified (cosine=0.999950, max_diff=0.0456).
+  ✅ Self-test: Divergence correctly detected (cosine=0.0020 < 0.999).
+  ✅ Self-test: Degenerate near-zero vector rejection verified.
+  ✅ Self-test: KL divergence verified.
+  ✅ Self-test: greedy prefix matcher verified.
+  ✅ Self-test: missing reference raises (no stub fallback).
+  ✅ Self-test: gate v2 reference-calibrated limits and PPL bootstrap CI verified.
+=======================================================
+🎉 ALL PARITY EVALUATOR SELF-TESTS PASSED!
+=======================================================

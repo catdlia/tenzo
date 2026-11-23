@@ -1,0 +1,15 @@
+[FAIL] p1_fact_en     vs golden cos=0.999587 max_abs=0.6233 top1=True top5=1.0 KL=0.0003 greedy=23/32
+[FAIL] p1_fact_en     vs hf    cos=0.999208 max_abs=0.6141 top1=True top5=1.0 KL=0.0009 greedy=23/32
+[FAIL] p2_tech_en     vs golden cos=0.999691 max_abs=0.7279 top1=True top5=1.0 KL=0.0025 greedy=32/32
+[FAIL] p2_tech_en     vs hf    cos=0.999653 max_abs=0.7592 top1=True top5=1.0 KL=0.0058 greedy=32/32
+[FAIL] p3_code        vs golden cos=0.999864 max_abs=0.7871 top1=True top5=0.8 KL=0.0002 greedy=32/32
+[FAIL] p3_code        vs hf    cos=0.999866 max_abs=0.7532 top1=True top5=1.0 KL=0.0000 greedy=32/32
+[FAIL] p4_ukrainian   vs golden cos=0.999897 max_abs=1.9497 top1=True top5=1.0 KL=0.0277 greedy=14/32
+[FAIL] p4_ukrainian   vs hf    cos=0.999959 max_abs=0.9868 top1=True top5=1.0 KL=0.0129 greedy=14/32
+[FAIL] p5_long_ctx    vs golden cos=0.996686 max_abs=0.8819 top1=True top5=1.0 KL=0.0030 greedy=32/32
+[FAIL] p5_long_ctx    vs hf    cos=0.998846 max_abs=0.6523 top1=True top5=1.0 KL=0.0071 greedy=32/32
+[FAIL] p6_weird       vs golden cos=0.999740 max_abs=0.6917 top1=True top5=0.8 KL=0.0054 greedy=26/32
+[FAIL] p6_weird       vs hf    cos=0.999824 max_abs=0.4947 top1=True top5=0.8 KL=0.0038 greedy=17/32
+[FAIL] p7_math_en     vs golden cos=0.999927 max_abs=0.5746 top1=True top5=0.8 KL=0.0000 greedy=7/32
+[FAIL] p7_math_en     vs hf    cos=0.999901 max_abs=0.7201 top1=True top5=0.8 KL=0.0000 greedy=7/32
+PARITY RESULT: GATE FAILURES (see numbers above)

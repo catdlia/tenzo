@@ -1,0 +1,10 @@
+[PASS] p1_fact_en     vs golden (v2): max_abs=0.5378<=1.5*0.5400(0.8100) 1-cos=3.895e-04<=1.5*7.780e-04(1.167e-03) top1=True KL=0.0004 greedy=32/32
+[PASS] p2_tech_en     vs golden (v2): max_abs=0.5548<=1.5*0.5323(0.7984) 1-cos=1.490e-04<=1.5*1.309e-04(1.963e-04) top1=True KL=0.0010 greedy=32/32
+[PASS] p3_code        vs golden (v2): max_abs=0.7598<=1.5*0.7049(1.0574) 1-cos=1.496e-04<=1.5*1.022e-04(1.532e-04) top1=True KL=0.0001 greedy=32/32
+[FAIL] p4_ukrainian   vs golden (v2): max_abs=2.2709<=1.5*1.6342(2.4512) 1-cos=1.773e-04<=1.5*7.555e-05(1.133e-04) top1=False KL=0.0764 greedy=0/32
+[PASS] p5_long_ctx    vs golden (v2): max_abs=0.6614<=1.5*1.1090(1.6634) 1-cos=2.353e-03<=1.5*6.755e-03(1.013e-02) top1=True KL=0.0042 greedy=32/32
+[PASS] p6_weird       vs golden (v2): max_abs=0.5950<=1.5*0.6839(1.0259) 1-cos=2.034e-04<=1.5*2.322e-04(3.483e-04) top1=True KL=0.0047 greedy=18/32
+[PASS] p7_math_en     vs golden (v2): max_abs=0.5921<=1.5*0.8134(1.2202) 1-cos=8.076e-05<=1.5*1.237e-04(1.855e-04) top1=True KL=0.0000 greedy=32/32
+[PASS] v2 top-1 aggregate: 6/7 (required >= 6)
+[PASS] v2 EN16 PPL ratio: 19.124/19.066 = 1.0030 95% CI [1.0003, 1.0057] in [0.995, 1.010]
+PARITY RESULT: GATE FAILURES (see numbers above)
