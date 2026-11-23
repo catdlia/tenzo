@@ -14,8 +14,19 @@ What changed vs. the previous revision (honesty fixes):
 
 Metrics per prompt and source: cosine, max_abs, mae, rmse, top-1, top-5 overlap, KL(ref||tenzo) over softmax, and the
 length of the greedy-token prefix that matches before the first divergence.
-Gates (NOT relaxed): cosine > 0.999 and max_abs <= 0.25 on first-step logits, top-1 equal; greedy agreement is reported
-(and gated only with --gate-greedy). Exit code is non-zero if any gated check fails.
+
+Gate modes:
+  * v1 (default, unchanged): cosine > 0.999 and max_abs <= 0.25 on first-step logits, top-1 equal on all prompts;
+    greedy agreement is reported (and gated only with --gate-greedy).
+  * v2 (reference-calibrated): calibrated to the empirical fp32-vs-bf16 noise floor between the two ground-truth
+    references (tools/reference/golden_bitnet.py fp32 vs HF transformers bf16 across the 7 prompts:
+    max_abs = 0.532..1.634 [0/7 pass <= 0.25], cosine = 0.9932..0.99992 [1 - cos = 7.56e-5..6.76e-3]):
+      1. Per prompt p: max_abs(Tenzo, golden) <= 1.5 * max_abs(HF bf16, golden)
+         and (1 - cos(Tenzo, golden)) <= 1.5 * (1 - cos(HF bf16, golden)).
+      2. top-1(Tenzo) == top-1(golden) on >= 6 of 7 prompts.
+      3. Paired PPL ratio Tenzo / golden on 16 WikiText-2 EN windows: 95% bootstrap CI inside [0.995, 1.010].
+
+Exit code is non-zero if any gated check fails.
 """
 import sys
 import os
@@ -197,6 +208,89 @@ def compare_one(tenzo: Dict[str, Any], ref: Dict[str, Any], cos_min: float, maxd
     return m
 
 
+def evaluate_v2_prompt(tenzo_vs_golden: Dict[str, Any], hf_vs_golden: Dict[str, Any]) -> Dict[str, Any]:
+    """Reference-calibrated v2 prompt checks against golden fp32, scaled from HF bf16 vs golden fp32."""
+    dcos_tenzo = 1.0 - float(tenzo_vs_golden["cosine_similarity"])
+    dcos_ref = 1.0 - float(hf_vs_golden["cosine_similarity"])
+    mabs_tenzo = float(tenzo_vs_golden["max_abs_diff"])
+    mabs_ref = float(hf_vs_golden["max_abs_diff"])
+    gate_max_abs_v2 = bool(mabs_tenzo <= 1.5 * mabs_ref)
+    gate_cosine_v2 = bool(dcos_tenzo <= 1.5 * dcos_ref)
+    return {
+        "one_minus_cos_tenzo": dcos_tenzo,
+        "one_minus_cos_ref": dcos_ref,
+        "one_minus_cos_limit": 1.5 * dcos_ref,
+        "ref_max_abs": mabs_ref,
+        "max_abs_limit": 1.5 * mabs_ref,
+        "gate_max_abs_v2": gate_max_abs_v2,
+        "gate_cosine_v2": gate_cosine_v2,
+        "gate_prompt_v2": bool(gate_max_abs_v2 and gate_cosine_v2),
+    }
+
+
+def load_score_windows(path: Path) -> Dict[int, Tuple[int, float]]:
+    """Parse `w <id> <n_tokens> <sum_nll>` lines from a score file."""
+    if not path.is_file():
+        raise FileNotFoundError(f"score file missing: {path}")
+    out: Dict[int, Tuple[int, float]] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if parts and parts[0] == "w":
+            out[int(parts[1])] = (int(parts[2]), float(parts[3]))
+    if not out:
+        raise ValueError(f"no 'w' lines in score file: {path}")
+    return out
+
+
+def paired_ppl_bootstrap_ci(
+    cand_scores: Dict[int, Tuple[int, float]],
+    ref_scores: Dict[int, Tuple[int, float]],
+    n_draws: int = 10000,
+    seed: int = 0,
+    lo_bound: float = 0.995,
+    hi_bound: float = 1.010,
+) -> Dict[str, Any]:
+    """Paired bootstrap 95% CI of PPL(cand) / PPL(ref) across identical windows."""
+    ids = sorted(set(cand_scores.keys()) & set(ref_scores.keys()))
+    if len(ids) != len(ref_scores) or len(ids) == 0:
+        raise ValueError(f"window mismatch: cand={len(cand_scores)} ref={len(ref_scores)} common={len(ids)}")
+    cn = np.array([cand_scores[i][0] for i in ids], dtype=np.float64)
+    cl = np.array([cand_scores[i][1] for i in ids], dtype=np.float64)
+    rn = np.array([ref_scores[i][0] for i in ids], dtype=np.float64)
+    rl = np.array([ref_scores[i][1] for i in ids], dtype=np.float64)
+    if not np.array_equal(cn, rn):
+        raise ValueError("token count mismatch across windows")
+    cand_ppl = float(math.exp(cl.sum() / cn.sum()))
+    ref_ppl = float(math.exp(rl.sum() / rn.sum()))
+    ratio = cand_ppl / ref_ppl
+    rs = np.random.RandomState(seed)
+    idx = rs.randint(0, len(ids), size=(n_draws, len(ids)))
+    ratios = np.exp(cl[idx].sum(axis=1) / cn[idx].sum(axis=1)) / np.exp(rl[idx].sum(axis=1) / rn[idx].sum(axis=1))
+    ci_lo, ci_hi = float(np.percentile(ratios, 2.5)), float(np.percentile(ratios, 97.5))
+    return {
+        "n_windows": len(ids),
+        "cand_ppl": cand_ppl,
+        "ref_ppl": ref_ppl,
+        "ratio": ratio,
+        "ci_lo": ci_lo,
+        "ci_hi": ci_hi,
+        "gate_ppl_ci_v2": bool(ci_lo >= lo_bound and ci_hi <= hi_bound),
+    }
+
+
+def run_tenzo_score(model_dir: str, kv_quant: str, windows_file: Path, out_score: Path) -> None:
+    """Run tenzo-inference --score on 16 EN windows inside the dev container."""
+    m = model_dir if (in_docker() or model_dir.startswith("/app")) else "/app/" + model_dir
+    out_score.parent.mkdir(parents=True, exist_ok=True)
+    rc, out = run_tenzo([
+        "-m", m, "--kv-quant", kv_quant, "-c", "512",
+        "--score", _container_path(windows_file),
+        "--score-out", _container_path(out_score),
+    ], timeout_sec=3600)
+    if rc != 0:
+        raise RuntimeError(f"tenzo-inference --score failed (rc={rc}):\n{out[-600:]}")
+
+
 def check_tokenization(model_dir: str, prompts: List[Dict[str, str]], ref_dir: Path, sources: List[str]) -> List[Dict[str, Any]]:
     """Compare Tenzo's tokenizer (tenzo-inference --tokenize-only) with every reference tokenizer."""
     m = model_dir if (in_docker() or model_dir.startswith("/app")) else "/app/" + model_dir
@@ -318,6 +412,19 @@ def run_self_test() -> bool:
     except FileNotFoundError:
         print("  ✅ Self-test: missing reference raises (no stub fallback).")
 
+    # 9. Gate v2 helpers: reference-calibrated prompt limits and paired PPL bootstrap CI
+    ref_v2 = compute_logits_metrics(clean_vec, clean_vec + (rng.randn(vocab_size) * 0.05).astype(np.float32))
+    t_pass = compute_logits_metrics(clean_vec, clean_vec + (rng.randn(vocab_size) * 0.04).astype(np.float32))
+    t_fail = compute_logits_metrics(clean_vec, clean_vec + (rng.randn(vocab_size) * 0.50).astype(np.float32))
+    assert evaluate_v2_prompt(t_pass, ref_v2)["gate_prompt_v2"] is True
+    assert evaluate_v2_prompt(t_fail, ref_v2)["gate_prompt_v2"] is False
+    w_ref = {i: (511, 1500.0 + 10.0 * i) for i in range(16)}
+    w_ok = {i: (511, 1501.0 + 10.0 * i) for i in range(16)}
+    w_bad = {i: (511, 1530.0 + 10.0 * i) for i in range(16)}
+    assert paired_ppl_bootstrap_ci(w_ok, w_ref, n_draws=200)["gate_ppl_ci_v2"] is True
+    assert paired_ppl_bootstrap_ci(w_bad, w_ref, n_draws=200)["gate_ppl_ci_v2"] is False
+    print("  ✅ Self-test: gate v2 reference-calibrated limits and PPL bootstrap CI verified.")
+
     print("=======================================================")
     print("🎉 ALL PARITY EVALUATOR SELF-TESTS PASSED!")
     print("=======================================================")
@@ -339,6 +446,11 @@ def main():
     ap.add_argument("--check-tokenization", action="store_true")
     ap.add_argument("--only-tokenization", action="store_true", help="compare tokenisation only (implies --check-tokenization)")
     ap.add_argument("--negative-control", action="store_true", help="run the truncated-weights negative control")
+    ap.add_argument("--gate", choices=["v1", "v2"], default="v1",
+                    help="v1: legacy strict cos>0.999 & max_abs<=0.25; v2: reference-calibrated vs golden/HF")
+    ap.add_argument("--score-file", default=None, help="16-window EN score file for --gate v2 (runs --score if omitted)")
+    ap.add_argument("--golden-score-file", default=str(PROJECT_ROOT / "results" / "reference" / "golden" / "nll_golden_float32.txt"))
+    ap.add_argument("--windows-file", default=str(PROJECT_ROOT / "results" / "reference" / "windows.ids"))
     ap.add_argument("--out", default=None, help="write JSON results here")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
@@ -348,9 +460,13 @@ def main():
 
     ref_dir = Path(args.ref_dir)
     sources = [s for s in args.sources.split(",") if s]
+    if args.gate == "v2":
+        for req in ("golden", "hf"):
+            if req not in sources:
+                sources.append(req)
     prompts = load_prompts(Path(args.prompts))
-    results: Dict[str, Any] = {"kv_quant": args.kv_quant, "prompts": {}, "tolerance_cos": args.tolerance,
-                               "tolerance_max_abs": args.max_diff}
+    results: Dict[str, Any] = {"kv_quant": args.kv_quant, "gate_mode": args.gate, "prompts": {},
+                               "tolerance_cos": args.tolerance, "tolerance_max_abs": args.max_diff}
     ok = True
 
     if args.check_tokenization or args.only_tokenization:
@@ -390,16 +506,52 @@ def main():
             for s, r in refs.items():
                 m = compare_one(t, r, args.tolerance, args.max_diff)
                 entry[s] = m
-                tag = "PASS" if m["gate_pass"] else "FAIL"
-                print(f"[{tag}] {pid:<14} vs {s:<5} cos={m['cosine_similarity']:.6f} max_abs={m['max_abs_diff']:.4f} "
-                      f"top1={m['top1_match']} top5={m['top5_agreement']:.1f} KL={m['kl_ref_to_tenzo']:.4f} "
-                      f"greedy={m['greedy_prefix_match']}/{m['greedy_len']}")
-                if s == args.gate_source:
-                    if not m["gate_pass"]:
-                        ok = False
-                    if args.gate_greedy and m["greedy_prefix_match"] != m["greedy_len"]:
-                        ok = False
+                if args.gate == "v1":
+                    tag = "PASS" if m["gate_pass"] else "FAIL"
+                    print(f"[{tag}] {pid:<14} vs {s:<5} cos={m['cosine_similarity']:.6f} max_abs={m['max_abs_diff']:.4f} "
+                          f"top1={m['top1_match']} top5={m['top5_agreement']:.1f} KL={m['kl_ref_to_tenzo']:.4f} "
+                          f"greedy={m['greedy_prefix_match']}/{m['greedy_len']}")
+                    if s == args.gate_source:
+                        if not m["gate_pass"]:
+                            ok = False
+                        if args.gate_greedy and m["greedy_prefix_match"] != m["greedy_len"]:
+                            ok = False
+            if args.gate == "v2":
+                ref_cmp = compute_logits_metrics(refs["hf"]["logits"], refs["golden"]["logits"])
+                v2 = evaluate_v2_prompt(entry["golden"], ref_cmp)
+                entry["v2_golden_vs_hf_ref"] = ref_cmp
+                entry["v2"] = v2
+                g_m = entry["golden"]
+                tag = "PASS" if v2["gate_prompt_v2"] else "FAIL"
+                print(f"[{tag}] {pid:<14} vs golden (v2): max_abs={g_m['max_abs_diff']:.4f}<=1.5*{v2['ref_max_abs']:.4f}({v2['max_abs_limit']:.4f}) "
+                      f"1-cos={v2['one_minus_cos_tenzo']:.3e}<=1.5*{v2['one_minus_cos_ref']:.3e}({v2['one_minus_cos_limit']:.3e}) "
+                      f"top1={g_m['top1_match']} KL={g_m['kl_ref_to_tenzo']:.4f} greedy={g_m['greedy_prefix_match']}/{g_m['greedy_len']}")
+                if not v2["gate_prompt_v2"]:
+                    ok = False
+                if args.gate_greedy and g_m["greedy_prefix_match"] != g_m["greedy_len"]:
+                    ok = False
             results["prompts"][pid] = entry
+        if args.gate == "v2":
+            top1_hits = sum(1 for e in results["prompts"].values() if e.get("golden", {}).get("top1_match"))
+            n_prompts = len(results["prompts"])
+            min_top1 = 6 if n_prompts == 7 else max(1, int(math.ceil(6.0 * n_prompts / 7.0)))
+            gate_top1_v2 = (top1_hits >= min_top1) and (n_prompts == len(prompts))
+            results["v2_top1"] = {"hits": top1_hits, "total": n_prompts, "required": min_top1, "pass": gate_top1_v2}
+            print(f"[{'PASS' if gate_top1_v2 else 'FAIL'}] v2 top-1 aggregate: {top1_hits}/{n_prompts} (required >= {min_top1})")
+            ok = ok and gate_top1_v2
+
+            if args.score_file:
+                score_path = Path(args.score_file)
+            else:
+                score_path = work / f"score_{args.kv_quant}.txt"
+                run_tenzo_score(args.model_dir, args.kv_quant, Path(args.windows_file), score_path)
+            ppl_res = paired_ppl_bootstrap_ci(load_score_windows(score_path), load_score_windows(Path(args.golden_score_file)))
+            ppl_res["score_file"] = str(score_path)
+            results["v2_ppl_ci"] = ppl_res
+            print(f"[{'PASS' if ppl_res['gate_ppl_ci_v2'] else 'FAIL'}] v2 EN16 PPL ratio: "
+                  f"{ppl_res['cand_ppl']:.3f}/{ppl_res['ref_ppl']:.3f} = {ppl_res['ratio']:.4f} "
+                  f"95% CI [{ppl_res['ci_lo']:.4f}, {ppl_res['ci_hi']:.4f}] in [0.995, 1.010]")
+            ok = ok and ppl_res["gate_ppl_ci_v2"]
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
