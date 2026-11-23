@@ -1163,11 +1163,11 @@ public:
         kv_cache.forward_attention_raw(layer_idx, buf_q.data(), buf_k.data(), buf_v.data(), buf_attn_out.data());
 
         // 5. Attn Sub-Norm
-        rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), hidden_size);
+        rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), q_dim);
 
         // 6. Out Projection
-        float inv_s_out = build_lut(buf_attn_sub.data(), hidden_size, lut_ptr());
-        compute_from_lut(lut_ptr(), lw.out_w_ptr, hidden_size / 64, k_half, buf_out.data(), inv_s_out * lw.out_scale);
+        float inv_s_out = build_lut(buf_attn_sub.data(), q_dim, lut_ptr());
+        compute_from_lut(lut_ptr(), lw.out_w_ptr, hidden_size / 64, q_dim / 2, buf_out.data(), inv_s_out * lw.out_scale);
 
         // 7. Residual 1
         #pragma omp simd

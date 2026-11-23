@@ -1743,10 +1743,10 @@ void TenzoEngineImpl::forward_layer_gpu(int layer_idx) {
     }
 
     // 4. GPU Attn Sub-Norm
-    runtime::VulkanRuntime::executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+    runtime::VulkanRuntime::executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), q_dim);
 
     // 5. GPU Out Projection
-    runtime::VulkanRuntime::executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), h_dim, h_dim, lw.out_scale);
+    runtime::VulkanRuntime::executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), q_dim, h_dim, lw.out_scale);
 
     // 6. Residual 1
     #pragma omp simd
@@ -1794,10 +1794,10 @@ void TenzoEngineImpl::forward_layer_cuda(int layer_idx) {
     }
 
     // 4. CUDA Attn Sub-Norm
-    CUDARuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+    CUDARuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), q_dim);
 
     // 5. CUDA Out Projection
-    CUDARuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+    CUDARuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, q_dim, h_dim, lw.out_scale);
 
     // 6. Residual 1
     #pragma omp simd
@@ -1845,10 +1845,10 @@ void TenzoEngineImpl::forward_layer_rocm(int layer_idx) {
     }
 
     // 4. ROCm Attn Sub-Norm
-    ROCmRuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+    ROCmRuntime::getInstance().executeRMSNorm(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), q_dim);
 
     // 5. ROCm Out Projection
-    ROCmRuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+    ROCmRuntime::getInstance().executeBitLinearTL1(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, q_dim, h_dim, lw.out_scale);
 
     // 6. Residual 1
     #pragma omp simd
@@ -1896,10 +1896,10 @@ void TenzoEngineImpl::forward_layer_riscv(int layer_idx) {
     }
 
     // 4. RISC-V RVV Attn Sub-Norm
-    rvv::rms_norm_rvv(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
+    rvv::rms_norm_rvv(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), q_dim);
 
     // 5. RISC-V RVV Out Projection
-    rvv::gemv_bitlinear_tl1_rvv(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, h_dim, h_dim, lw.out_scale);
+    rvv::gemv_bitlinear_tl1_rvv(buf_attn_sub.data(), reinterpret_cast<const uint8_t*>(lw.out_w_ptr), buf_out.data(), 1, q_dim, h_dim, lw.out_scale);
 
     // 6. Residual 1
     #pragma omp simd
@@ -2000,15 +2000,15 @@ void TenzoEngineImpl::forward_layer_raw(int layer_idx) {
     }
     TENZO_DUMP("q_rope", buf_q, q_dim); // RoPE is applied in place by forward_attention_raw
     TENZO_DUMP("k_rope", buf_k, kv_dim);
-    TENZO_DUMP("attn_out", buf_attn_out, h_dim);
+    TENZO_DUMP("attn_out", buf_attn_out, q_dim);
 
     // 5. Attn Sub-Norm
-    rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
-    TENZO_DUMP("attn_sub_norm", buf_attn_sub, h_dim);
+    rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), q_dim);
+    TENZO_DUMP("attn_sub_norm", buf_attn_sub, q_dim);
 
     // 6. Out Projection
-    float inv_s_out = build_lut(buf_attn_sub.data(), h_dim, lut_ptr());
-    compute_from_lut(lut_ptr(), lw.out_w_ptr, h_dim / 64, k_half, buf_out.data(), inv_s_out * lw.out_scale);
+    float inv_s_out = build_lut(buf_attn_sub.data(), q_dim, lut_ptr());
+    compute_from_lut(lut_ptr(), lw.out_w_ptr, h_dim / 64, q_dim / 2, buf_out.data(), inv_s_out * lw.out_scale);
     TENZO_DUMP("o_proj", buf_out, h_dim);
 
     // 7. Residual 1
@@ -2097,10 +2097,10 @@ void TenzoEngineImpl::forward_layer_i2s(int layer_idx, int dpos, bool dmp) {
     }
     TENZO_DUMP("q_rope", buf_q, q_dim);
     TENZO_DUMP("k_rope", buf_k, kv_dim);
-    TENZO_DUMP("attn_out", buf_attn_out, h_dim);
+    TENZO_DUMP("attn_out", buf_attn_out, q_dim);
 
-    rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), h_dim);
-    TENZO_DUMP("attn_sub_norm", buf_attn_sub, h_dim);
+    rms_norm_raw(buf_attn_out.data(), lw.attn_sub_norm_ptr, buf_attn_sub.data(), q_dim);
+    TENZO_DUMP("attn_sub_norm", buf_attn_sub, q_dim);
 
     const float inv_o = quantize_act_i8(buf_attn_sub.data(), q_dim, qa, sq);
     #pragma omp parallel for schedule(dynamic, 4)
@@ -2195,7 +2195,7 @@ bool TenzoEngineImpl::prefill_tokens_batched(const int* tokens, int n, int chunk
                                                Ab.data() + size_t(m) * QD);
             }
             #pragma omp parallel for schedule(static)
-            for (int m = 0; m < M; ++m) rms_norm_raw(Ab.data() + size_t(m) * QD, lw.attn_sub_norm_ptr, An.data() + size_t(m) * QD, h);
+            for (int m = 0; m < M; ++m) rms_norm_raw(Ab.data() + size_t(m) * QD, lw.attn_sub_norm_ptr, An.data() + size_t(m) * QD, QD);
             quantize_rows(An, QD, QD, M);
             set_scales(M, lw.out_scale); gemm(lw.out_i2, h, QD, M, Ob, h);
             for (size_t i = 0; i < size_t(M) * h; ++i) H1[i] = X[i] + Ob[i];

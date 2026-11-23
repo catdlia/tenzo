@@ -10,6 +10,7 @@ namespace tenzo {
 
 bool runKVRotTests();
 bool runBatchedPrefillTests();
+bool runQDimNeHiddenTests();
 
 bool runEngineAPITests() {
     llvm::outs() << "--- Engine API validation ---\n";
@@ -56,7 +57,8 @@ bool runEngineAPITests() {
     llvm::outs() << (ok ? "✅ [PASS] Engine API validation\n" : "❌ [FAIL] Engine API validation\n");
     const bool kv_ok = runKVRotTests();
     const bool bp_ok = runBatchedPrefillTests();
-    return ok && kv_ok && bp_ok;
+    const bool qd_ok = runQDimNeHiddenTests();
+    return ok && kv_ok && bp_ok && qd_ok;
 }
 
 } // namespace tenzo
@@ -247,6 +249,163 @@ bool runKVRotTests() {
         ok &= (worst < 1e-4);
     }
     llvm::outs() << (ok ? "✅ [PASS] ternary_rot KV\n" : "❌ [FAIL] ternary_rot KV\n");
+    return ok;
+}
+
+// ------------------------------------------------------------------------------------------------------------------
+// q_dim != hidden_size regression (T42): attn_sub_norm and out_proj input length must be q_dim, not hidden_size.
+// Tested on a tiny 1-layer model (hidden=128, q_dim=2*128=256) across decode (i2s, lut) and batched prefill (i2s).
+bool runQDimNeHiddenTests() {
+    llvm::outs() << "--- q_dim != hidden_size (attn_sub_norm + out_proj length) ---\n";
+    const int Hd = 128, NQ = 2, NKV = 1, HD = 128, QD = NQ * HD, F = 128, V = 32, T = 6;
+    const double theta = 500000.0;
+    unsigned st = 4242;
+    auto rnd = [&]() { st = st * 1664525u + 1013904223u; return (st >> 8) & 0xFFFF; };
+    auto mat = [&](int n, int k) { std::vector<int8_t> m(size_t(n) * k); for (auto& w : m) w = int8_t(int(rnd() % 3) - 1); return m; };
+    auto vec = [&](int n, float lo, float hi) { std::vector<float> v(n); for (auto& x : v) x = lo + (hi - lo) * (rnd() / 65536.0f); return v; };
+
+    auto Wq = mat(QD, Hd), Wk = mat(NKV * HD, Hd), Wv = mat(NKV * HD, Hd), Wo = mat(Hd, QD);
+    auto Wg = mat(F, Hd), Wu = mat(F, Hd), Wd = mat(Hd, F);
+    const float sq = 0.05f, sk = 0.05f, sv = 0.08f, so = 0.06f, sg = 0.07f, su = 0.07f, sd = 0.05f;
+    auto n_in = vec(Hd, 0.5f, 1.5f), n_attn = vec(QD, 0.5f, 1.5f), n_post = vec(Hd, 0.5f, 1.5f), n_ffn = vec(F, 0.5f, 1.5f),
+         n_final = vec(Hd, 0.5f, 1.5f), E = vec(V * Hd, -1.0f, 1.0f);
+    std::vector<int> toks;
+    for (int t = 0; t < T; ++t) toks.push_back(int(rnd() % V));
+
+    auto rms = [](const std::vector<float>& x, const std::vector<float>& w, int dim) {
+        double ss = 0;
+        for (int i = 0; i < dim; ++i) ss += double(x[i]) * x[i];
+        const float inv = 1.0f / std::sqrt(float(ss / dim) + 1e-5f);
+        std::vector<float> y(x.size(), 0.0f);
+        for (int i = 0; i < dim; ++i) y[i] = x[i] * inv * w[i];
+        return y;
+    };
+    auto bitlin = [](const std::vector<float>& x, const std::vector<int8_t>& W, int N, int K, float ws) {
+        float m = 0.0f;
+        for (float v : x) m = std::max(m, std::abs(v));
+        m = std::max(m, 1e-5f);
+        const float sc = 127.0f / m, inv = 1.0f / sc;
+        std::vector<int> q(K);
+        for (int k = 0; k < K; ++k) q[k] = static_cast<int>(std::clamp(std::nearbyint(x[k] * sc), -128.0f, 127.0f));
+        std::vector<float> y(N);
+        for (int n = 0; n < N; ++n) {
+            int64_t acc = 0;
+            for (int k = 0; k < K; ++k) acc += int64_t(W[size_t(n) * K + k]) * q[k];
+            y[n] = static_cast<float>(acc) * (inv * ws);
+        }
+        return y;
+    };
+    auto rope = [&](float* h, int pos) {
+        for (int i = 0; i < HD / 2; ++i) {
+            double inv = 1.0 / std::pow(theta, (2.0 * i) / HD);
+            double c = std::cos(pos * inv), s = std::sin(pos * inv);
+            double x1 = h[i], x2 = h[i + HD / 2];
+            h[i] = static_cast<float>(x1 * c - x2 * s);
+            h[i + HD / 2] = static_cast<float>(x1 * s + x2 * c);
+        }
+    };
+    auto run_ref = [&](int attn_norm_dim) {
+        std::vector<std::vector<float>> K, Vv;
+        std::vector<float> last_logits(V);
+        for (int t = 0; t < T; ++t) {
+            std::vector<float> x(E.begin() + size_t(toks[t]) * Hd, E.begin() + size_t(toks[t] + 1) * Hd);
+            auto h = rms(x, n_in, Hd);
+            auto q = bitlin(h, Wq, QD, Hd, sq);
+            auto k = bitlin(h, Wk, NKV * HD, Hd, sk);
+            auto v = bitlin(h, Wv, NKV * HD, Hd, sv);
+            for (int hh = 0; hh < NQ; ++hh) rope(q.data() + hh * HD, t);
+            for (int hh = 0; hh < NKV; ++hh) rope(k.data() + hh * HD, t);
+            K.push_back(k); Vv.push_back(v);
+            std::vector<float> a(QD, 0.0f);
+            for (int hh = 0; hh < NQ; ++hh) {
+                std::vector<double> sc(t + 1);
+                double mx = -1e300;
+                for (int s = 0; s <= t; ++s) {
+                    double d = 0;
+                    for (int i = 0; i < HD; ++i) d += double(q[hh * HD + i]) * K[s][i];
+                    sc[s] = d / std::sqrt(double(HD)); mx = std::max(mx, sc[s]);
+                }
+                double z = 0;
+                for (auto& s : sc) { s = std::exp(s - mx); z += s; }
+                for (int s = 0; s <= t; ++s)
+                    for (int i = 0; i < HD; ++i) a[hh * HD + i] += float(sc[s] / z * Vv[s][i]);
+            }
+            auto o = bitlin(rms(a, n_attn, attn_norm_dim), Wo, Hd, QD, so);
+            for (int i = 0; i < Hd; ++i) x[i] += o[i];
+            auto p = rms(x, n_post, Hd);
+            auto gt = bitlin(p, Wg, F, Hd, sg), up = bitlin(p, Wu, F, Hd, su);
+            std::vector<float> act(F);
+            for (int i = 0; i < F; ++i) { float r = std::max(0.0f, gt[i]); act[i] = r * r * up[i]; }
+            auto d = bitlin(rms(act, n_ffn, F), Wd, Hd, F, sd);
+            for (int i = 0; i < Hd; ++i) x[i] += d[i];
+            auto fn = rms(x, n_final, Hd);
+            for (int vv = 0; vv < V; ++vv) {
+                double acc = 0;
+                for (int i = 0; i < Hd; ++i) acc += double(fn[i]) * E[size_t(vv) * Hd + i];
+                last_logits[vv] = float(acc);
+            }
+        }
+        return last_logits;
+    };
+    auto rel_l2 = [](const std::vector<float>& a, const std::vector<float>& b) {
+        double num = 0, den = 0;
+        for (size_t i = 0; i < a.size(); ++i) { double d = double(a[i]) - b[i]; num += d * d; den += double(b[i]) * b[i]; }
+        return std::sqrt(num / std::max(den, 1e-300));
+    };
+
+    const auto ref_ok = run_ref(QD);
+    const auto ref_bug = run_ref(Hd);
+    const double bug_diff = rel_l2(ref_bug, ref_ok);
+
+    auto pq = bp_pack_tl1(Wq, QD, Hd), pk = bp_pack_tl1(Wk, NKV * HD, Hd), pv = bp_pack_tl1(Wv, NKV * HD, Hd),
+         po = bp_pack_tl1(Wo, Hd, QD), pg = bp_pack_tl1(Wg, F, Hd), pu = bp_pack_tl1(Wu, F, Hd), pd = bp_pack_tl1(Wd, Hd, F);
+
+    const char* old_gemv = std::getenv("TENZO_GEMV");
+    std::string saved_gemv = old_gemv ? old_gemv : "";
+
+    auto run_engine = [&](const char* gemv, bool batched) {
+        setenv("TENZO_GEMV", gemv, 1);
+        tenzo_config_t c = tenzo_default_config();
+        c.hidden_size = Hd; c.num_q_heads = NQ; c.num_kv_heads = NKV; c.head_dim = HD; c.num_layers = 1;
+        c.ffn_dim = F; c.vocab_size = V; c.max_seq_len = 16; c.kv_mode = "fp32"; c.rope_theta = float(theta);
+        tenzo_engine_t e = tenzo_create_engine(&c);
+        std::vector<float> logits(V);
+        if (!e) return logits;
+        tenzo_layer_weights_t lw{};
+        lw.q_w = pq.data(); lw.q_scale = sq; lw.k_w = pk.data(); lw.k_scale = sk; lw.v_w = pv.data(); lw.v_scale = sv;
+        lw.out_w = po.data(); lw.out_scale = so; lw.gate_w = pg.data(); lw.gate_scale = sg;
+        lw.up_w = pu.data(); lw.up_scale = su; lw.down_w = pd.data(); lw.down_scale = sd;
+        lw.in_norm = n_in.data(); lw.attn_sub_norm = n_attn.data(); lw.post_norm = n_post.data(); lw.ffn_sub_norm = n_ffn.data();
+        tenzo_set_layer_weights(e, 0, &lw);
+        tenzo_set_final_norm(e, n_final.data());
+        tenzo_set_lm_head_f32(e, E.data(), V, Hd);
+        tenzo_reset(e);
+        if (batched) {
+            tenzo_prefill_tokens(e, toks.data(), T - 1, 3);
+        } else {
+            for (int t = 0; t < T - 1; ++t) tenzo_prefill_token(e, toks[t]);
+        }
+        tenzo_forward_logits(e, toks[T - 1], logits.data(), V);
+        tenzo_destroy_engine(e);
+        return logits;
+    };
+
+    const auto out_i2s_seq = run_engine("i2s", false);
+    const auto out_i2s_bat = run_engine("i2s", true);
+    const auto out_lut_seq = run_engine("lut", false);
+
+    if (old_gemv) setenv("TENZO_GEMV", saved_gemv.c_str(), 1); else unsetenv("TENZO_GEMV");
+
+    const double e_i2s = rel_l2(out_i2s_seq, ref_ok);
+    const double e_bat = rel_l2(out_i2s_bat, ref_ok);
+    const double e_lut = rel_l2(out_lut_seq, ref_ok);
+    const bool eq_bat = std::memcmp(out_i2s_seq.data(), out_i2s_bat.data(), V * sizeof(float)) == 0;
+    const bool eq_lut = std::memcmp(out_i2s_seq.data(), out_lut_seq.data(), V * sizeof(float)) == 0;
+    llvm::outs() << "  hidden=" << Hd << " q_dim=" << QD << ": rel_l2 i2s_seq=" << e_i2s << " i2s_batched=" << e_bat
+                 << " lut_seq=" << e_lut << " (old hidden_size bug would be " << bug_diff << "), bit_eq(bat=" << eq_bat
+                 << ", lut=" << eq_lut << ")\n";
+    bool ok = (e_i2s < 1e-4) && (e_bat < 1e-4) && (e_lut < 1e-4) && (bug_diff > 1e-2) && eq_bat && eq_lut;
+    llvm::outs() << (ok ? "✅ [PASS] q_dim != hidden_size\n" : "❌ [FAIL] q_dim != hidden_size\n");
     return ok;
 }
 
