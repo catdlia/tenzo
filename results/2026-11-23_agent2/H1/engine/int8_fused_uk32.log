@@ -1,0 +1,48 @@
+ Container untitled-dev-run-5184db07be19 Creating 
+ Container untitled-dev-run-5184db07be19 Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 512)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(4276.3 ms)
+
+score window 0 tokens=511 ppl=140.1 running_ppl=140.1
+score window 1 tokens=511 ppl=141.0 running_ppl=140.6
+score window 2 tokens=511 ppl=174.9 running_ppl=151.2
+score window 3 tokens=511 ppl=172.8 running_ppl=156.3
+score window 4 tokens=511 ppl=236.7 running_ppl=169.8
+score window 5 tokens=511 ppl=70.4 running_ppl=146.6
+score window 6 tokens=511 ppl=114.2 running_ppl=141.5
+score window 7 tokens=511 ppl=147.3 running_ppl=142.2
+score window 8 tokens=511 ppl=223.8 running_ppl=149.5
+score window 9 tokens=511 ppl=95.8 running_ppl=143.0
+score window 10 tokens=511 ppl=96.7 running_ppl=138.0
+score window 11 tokens=511 ppl=185.3 running_ppl=141.5
+score window 12 tokens=511 ppl=43.3 running_ppl=129.2
+score window 13 tokens=511 ppl=224.6 running_ppl=134.4
+score window 14 tokens=511 ppl=66.1 running_ppl=128.2
+score window 15 tokens=511 ppl=57.3 running_ppl=121.9
+score window 16 tokens=511 ppl=119.2 running_ppl=121.7
+score window 17 tokens=511 ppl=81.1 running_ppl=119.0
+score window 18 tokens=511 ppl=94.9 running_ppl=117.6
+score window 19 tokens=511 ppl=104.8 running_ppl=116.9
+score window 20 tokens=511 ppl=86.5 running_ppl=115.2
+score window 21 tokens=511 ppl=68.8 running_ppl=112.6
+score window 22 tokens=511 ppl=119.1 running_ppl=112.8
+score window 23 tokens=511 ppl=114.8 running_ppl=112.9
+score window 24 tokens=511 ppl=103.3 running_ppl=112.5
+score window 25 tokens=511 ppl=106.7 running_ppl=112.3
+score window 26 tokens=511 ppl=141.0 running_ppl=113.2
+score window 27 tokens=511 ppl=229.3 running_ppl=116.1
+score window 28 tokens=511 ppl=117.1 running_ppl=116.2
+score window 29 tokens=511 ppl=102.4 running_ppl=115.7
+score window 30 tokens=511 ppl=175.0 running_ppl=117.2
+score window 31 tokens=511 ppl=167.9 running_ppl=118.6
+PROC_RSS_KB=897552 PROC_HWM_KB=897552
