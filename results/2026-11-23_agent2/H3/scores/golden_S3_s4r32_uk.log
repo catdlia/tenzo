@@ -1,0 +1,37 @@
+Running as unit: run-p111400-i114582.scope; invocation ID: 5991ac9155614a189885d402db1b695f
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+  layer  0 18.1s rss=0.83GB
+  layer  1 17.7s rss=0.85GB
+  layer  2 18.2s rss=0.87GB
+  layer  3 16.8s rss=0.88GB
+  layer  4 16.1s rss=0.90GB
+  layer  5 16.2s rss=0.92GB
+  layer  6 17.1s rss=0.93GB
+  layer  7 18.1s rss=0.95GB
+  layer  8 17.4s rss=0.97GB
+  layer  9 17.3s rss=0.98GB
+  layer 10 17.0s rss=1.10GB
+  layer 11 16.0s rss=1.08GB
+  layer 12 17.0s rss=1.10GB
+  layer 13 17.1s rss=1.11GB
+  layer 14 17.1s rss=1.13GB
+  layer 15 17.9s rss=1.15GB
+  layer 16 18.0s rss=1.17GB
+  layer 17 16.9s rss=1.18GB
+  layer 18 16.9s rss=1.20GB
+  layer 19 16.2s rss=1.22GB
+  layer 20 17.6s rss=1.23GB
+  layer 21 15.7s rss=1.25GB
+  layer 22 15.6s rss=1.27GB
+  layer 23 16.5s rss=1.28GB
+  layer 24 17.7s rss=1.30GB
+  layer 25 18.0s rss=1.32GB
+  layer 26 16.2s rss=1.34GB
+  layer 27 17.1s rss=1.35GB
+  layer 28 16.8s rss=1.37GB
+  layer 29 17.2s rss=1.39GB
+[golden S3_s4r32 uk] w=0 n=2047 ppl=155.701 t=526s rss=1.91GB
+[golden S3_s4r32 uk] w=1 n=2047 ppl=128.233 t=540s rss=1.91GB
+[golden S3_s4r32 uk] w=2 n=2047 ppl=123.245 t=554s rss=1.91GB
+[golden S3_s4r32 uk] w=3 n=2047 ppl=66.018 t=569s rss=1.91GB
+[done] golden S3_s4r32 uk in 568.7s peak_rss=3.46GB

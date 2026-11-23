@@ -1,0 +1,37 @@
+Running as unit: run-p113007-i127276.scope; invocation ID: 4315102ecc4243f784d3b9b98688bf60
+[kv_ptq] installed S13+s4r32: K INT4 asym g=32, V S10 + sinks 4 + recent 32 INT8
+  layer  0 18.3s rss=1.15GB
+  layer  1 16.7s rss=1.20GB
+  layer  2 18.2s rss=1.22GB
+  layer  3 18.7s rss=1.24GB
+  layer  4 16.2s rss=1.26GB
+  layer  5 16.7s rss=1.27GB
+  layer  6 14.2s rss=1.29GB
+  layer  7 15.8s rss=1.31GB
+  layer  8 16.4s rss=1.32GB
+  layer  9 16.8s rss=1.34GB
+  layer 10 15.4s rss=1.36GB
+  layer 11 15.6s rss=1.37GB
+  layer 12 14.5s rss=1.39GB
+  layer 13 15.0s rss=1.41GB
+  layer 14 16.6s rss=1.43GB
+  layer 15 15.8s rss=1.44GB
+  layer 16 13.8s rss=1.46GB
+  layer 17 15.6s rss=1.48GB
+  layer 18 15.5s rss=1.49GB
+  layer 19 16.6s rss=1.51GB
+  layer 20 16.9s rss=1.53GB
+  layer 21 16.1s rss=1.54GB
+  layer 22 16.5s rss=1.56GB
+  layer 23 15.1s rss=1.58GB
+  layer 24 16.9s rss=1.60GB
+  layer 25 16.3s rss=1.61GB
+  layer 26 13.6s rss=1.63GB
+  layer 27 16.4s rss=1.65GB
+  layer 28 16.0s rss=1.66GB
+  layer 29 16.4s rss=1.68GB
+[golden S13_s4r32 uk] w=0 n=2047 ppl=134.735 t=496s rss=2.12GB
+[golden S13_s4r32 uk] w=1 n=2047 ppl=119.029 t=509s rss=2.12GB
+[golden S13_s4r32 uk] w=2 n=2047 ppl=119.773 t=523s rss=2.12GB
+[golden S13_s4r32 uk] w=3 n=2047 ppl=59.964 t=536s rss=2.12GB
+[done] golden S13_s4r32 uk in 536.0s peak_rss=3.55GB

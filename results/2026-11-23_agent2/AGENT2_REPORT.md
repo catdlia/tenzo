@@ -14,9 +14,9 @@
 | **H1** (T39: EN+UK mix calib & engine `TENZO_KV_ALPHA`) | H | **done** | ~55 min | `calib_mix` matches `calib_en` on EN16 (`19.837` / `×1.0404`) and slightly beats `calib_uk` on UK32 (`131.891` / `×1.1157`). In `TenzoEngine` (`TENZO_KV_ALPHA`), `ternary_rot` improves to `19.839` (`×1.0365` vs `int8_fused`, down from `×1.0711`) on EN16 and `132.327` (`×1.1162`, UK8 `×1.1648→×1.1263`) on UK32; baseline-adjusted `eng/sim` 95% CIs contain `1.0` (`0.9962` EN16, `1.0004` UK32) | `results/2026-11-23_agent2/H1/{alpha_*.txt,kv_calib_mix.md,ternary_rot_alpha.md}` |
 | **H2** (T40 p2: language × domain + 3rd model) | H | **done** | ~5.5 h | `2×2` (`EN/UK × Wiki/Web`, 16×512 each) across **BitNet-2B**, **Qwen2.5-1.5B**, **EuroLLM-1.7B** (`patch_identity=0.0` both HF models). In `EuroLLM-1.7B` (where `uk_wiki base BPC 0.802 ≈ en_web 0.803`), `S3+s4r32` & `S13+s4r32` show significant `UK` effect even after adjusting for `Web` & `base_BPC` (`UK=+0.0148 [+0.010,+0.020]` & `+0.0054 [+0.003,+0.008]` `ΔBPC`; `ΔBPB` `+0.0053`, `+0.0024`). On BitNet `S13+s4r32`: `UK=+0.0243 [+0.015,+0.038]` vs `Web=+0.0000`. Unrotated `K INT4` (`S13`) blows up on `Qwen2.5` (`+1.21..2.95 ΔBPC`) but works on BitNet & EuroLLM | `scripts/{prepare_h2_windows,eval_h2_models,analyze_h2_2x2,run_h2_bitnet}.py`, `results/2026-11-23_agent2/H2/` |
 | **L4** (T29: Llama-3 byte-level BPE tokenizer) | L + build | **done** | ~25 min | Dependency-free C++17 HF `tokenizer.json` BPE (`UnicodeTables.h`, 7-branch pre-tokenizer, `280,147` merges, GPT-2 byte decode) wired into `tenzo-inference` & `tenzo-cli test`; `0` build warnings; `3200/3200` exact ID & UTF-8 round-trip parity vs HF; `verify_model_parity --only-tokenization` `7/7 identical=True`; all regression gates pass (`G6` 5/5 MATCH, `PPL4=16.700700` byte-identical) | `src/runtime/{Tokenizer.{h,cpp},UnicodeTables.h}`, `src/main_inference.cpp`, `src/tests/TestEngineAPI.cpp`, `scripts/test_tokenizer_parity.py`, `results/2026-11-23_agent2/L4/` |
-| **H3** (T30: ctx 2048 PTQ & engine eval) | H | pending | — | — | — |
-| **B1** (T38: Clean-machine speed queue) | B | pending (blocked on clean machine) | — | — | — |
-| **L5** (End-of-day summary & docs) | L | pending | — | — | — |
+| **H3** (T30: ctx 2048 PTQ & engine eval) | H | **done** | ~2 h | `4×2048` EN+UK windows evaluated across golden (`fp32/tenzo_int8/S3+s4r32/S13+s4r32`) & engine (`int8_fused/ternary_rot/ternary_rot+alpha_mix`); engine-sim parity holds at `ctx=2048` (`adj ratio` EN `1.0006 [0.997,1.003]`, UK `1.0030 [0.999,1.008]`, `contains 1 = True`). EN `ternary_rot` stays bounded across `1..512..2047` (`×1.067..×1.066`, full `×1.0687`, `×1.0381` w/ `alpha_mix`), while UK degrades monotonically (`×1.144→×1.165→×1.243→×1.305`, full `×1.2127`; `×1.117→×1.251`, full `×1.1643` w/ `alpha_mix`); engine peak RSS `950.7 MB` `int8_fused`, `902.8 MB` `ternary_rot` | `scripts/{make_windows_2048,run_h3_ctx2048,analyze_h3_ctx2048}.py`, `results/reference/windows_{en,uk}_2048.{ids,json}`, `results/2026-11-23_agent2/H3/` |
+| **B1** (T38: Clean-machine speed queue) | B | **deferred** (blocked on clean machine) | — | Not run: machine in active desktop use (`loadavg 3.33 5.15 5.91`, governor `powersave`, active `antigravity`, `Telegram`, `Hyprland`, `zen-bin`, `qemu-system-x86`, `steam`, `claude-desktop`, `jetbrains-toolbox`) | — |
+| **L5** (End-of-day summary & docs) | L | in progress | — | — | — |
 
 ## 2. Decision Log
 
@@ -32,9 +32,9 @@
 
 ## 4. What Must NOT Be Claimed
 
-- No post-fix speed claims (clean-machine `B1` queue not yet executed).
+- No post-fix speed claims (`B1` deferred — machine in active desktop use, `loadavg 3.33 5.15 5.91`).
 - No full `7/7` `v2` parity gate pass for `fp32` or `int8_fused` (each fails `1 - cos <= 1.5 * (1 - cos_ref)` on 1/7 prompts, while passing `max_abs` 7/7, `top-1`, and `EN16 PPL` CI).
-- No `ctx 2048` KV quality result yet (`H3` running).
+- `H3` (`ctx 2048`) uses `N = 4` windows per language (`8,188` scored tokens each), so window-level bootstrap CIs at `ctx = 2048` are coarser than at `ctx = 512` (`N = 16` / `32`).
 
 ## 5. Questions to Owner
 

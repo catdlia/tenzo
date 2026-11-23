@@ -1,0 +1,37 @@
+Running as unit: run-p108334-i113914.scope; invocation ID: 280c719a71ab438b99fb25d551665cc6
+[kv_ptq] installed tenzo_int8: replica of engine int8_fused
+  layer  0 15.1s rss=0.76GB
+  layer  1 10.6s rss=0.78GB
+  layer  2 13.1s rss=0.80GB
+  layer  3 11.5s rss=0.81GB
+  layer  4 12.2s rss=0.83GB
+  layer  5 10.7s rss=0.85GB
+  layer  6 13.2s rss=0.86GB
+  layer  7 12.5s rss=0.88GB
+  layer  8 13.4s rss=0.90GB
+  layer  9 14.8s rss=0.92GB
+  layer 10 14.9s rss=0.93GB
+  layer 11 17.1s rss=0.95GB
+  layer 12 16.4s rss=0.97GB
+  layer 13 14.6s rss=0.98GB
+  layer 14 13.9s rss=1.00GB
+  layer 15 13.9s rss=1.02GB
+  layer 16 16.7s rss=1.03GB
+  layer 17 16.1s rss=1.05GB
+  layer 18 15.4s rss=1.07GB
+  layer 19 15.0s rss=1.09GB
+  layer 20 13.7s rss=1.10GB
+  layer 21 14.9s rss=1.12GB
+  layer 22 14.9s rss=1.22GB
+  layer 23 15.0s rss=1.23GB
+  layer 24 11.8s rss=1.25GB
+  layer 25 16.4s rss=1.27GB
+  layer 26 15.9s rss=1.29GB
+  layer 27 16.6s rss=1.30GB
+  layer 28 14.7s rss=1.32GB
+  layer 29 15.0s rss=1.34GB
+[golden tenzo_int8 en] w=0 n=2047 ppl=10.501 t=447s rss=1.87GB
+[golden tenzo_int8 en] w=1 n=2047 ppl=18.039 t=465s rss=1.87GB
+[golden tenzo_int8 en] w=2 n=2047 ppl=18.921 t=480s rss=1.87GB
+[golden tenzo_int8 en] w=3 n=2047 ppl=14.515 t=500s rss=1.87GB
+[done] golden tenzo_int8 en in 499.9s peak_rss=3.04GB

@@ -1,0 +1,15 @@
+{
+ "source": "kobza_first_rows.json",
+ "sha256": "03c155fd6c823ce5288613feba260859d50f0a1f0e09d4f15c0d32bbadb9bd19",
+ "n_windows": 4,
+ "window_len": 2048,
+ "scored_tokens_per_window": 2047,
+ "bos": 128000,
+ "overlap_32grams_with_calib": {
+  "en_vs_cal_en": 0,
+  "en_vs_cal_uk": 0,
+  "uk_vs_cal_en": 0,
+  "uk_vs_cal_uk": 0
+ },
+ "ids_sha256": "403a0f9a71daa6210b3167c6c0044cc81627fc16c9a25762924d7a0bf28255a0"
+}

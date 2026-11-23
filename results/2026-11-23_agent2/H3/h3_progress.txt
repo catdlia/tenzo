@@ -1,0 +1,17 @@
+start H3 2026-11-23T23:24:21+02:00 MemAvailable=7590512kB
+[run] fp32 en
+[run] fp32 uk
+[run] tenzo_int8 en
+[run] tenzo_int8 uk
+[run] S3_s4r32 en
+[run] S3_s4r32 uk
+[run] S13_s4r32 en
+[run] S13_s4r32 uk
+golden-all exit=0 2026-11-24T00:37:36+02:00 MemAvailable=8266204kB
+[run] engine int8_fused en
+[run] engine ternary_rot en
+[run] engine ternary_rot_alpha en
+[run] engine int8_fused uk
+[run] engine ternary_rot uk
+[run] engine ternary_rot_alpha uk
+engine-all exit=0 2026-11-24T01:27:42+02:00

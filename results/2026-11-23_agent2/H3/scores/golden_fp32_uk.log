@@ -1,0 +1,36 @@
+Running as unit: run-p107197-i105512.scope; invocation ID: ed5bac12672e4f6394bd338a162ea413
+  layer  0 17.5s rss=1.03GB
+  layer  1 19.5s rss=1.02GB
+  layer  2 18.3s rss=1.04GB
+  layer  3 18.6s rss=1.06GB
+  layer  4 16.7s rss=1.07GB
+  layer  5 16.5s rss=1.09GB
+  layer  6 15.9s rss=1.11GB
+  layer  7 17.5s rss=1.13GB
+  layer  8 16.9s rss=1.14GB
+  layer  9 18.1s rss=1.16GB
+  layer 10 18.7s rss=1.17GB
+  layer 11 19.6s rss=1.19GB
+  layer 12 18.8s rss=1.21GB
+  layer 13 16.7s rss=1.22GB
+  layer 14 12.0s rss=1.24GB
+  layer 15 14.2s rss=1.26GB
+  layer 16 17.8s rss=1.27GB
+  layer 17 18.7s rss=1.29GB
+  layer 18 17.1s rss=1.31GB
+  layer 19 18.2s rss=1.32GB
+  layer 20 17.3s rss=1.34GB
+  layer 21 19.3s rss=1.36GB
+  layer 22 18.3s rss=1.38GB
+  layer 23 18.3s rss=1.39GB
+  layer 24 18.1s rss=1.41GB
+  layer 25 18.3s rss=1.43GB
+  layer 26 17.2s rss=1.44GB
+  layer 27 17.4s rss=1.46GB
+  layer 28 13.7s rss=1.48GB
+  layer 29 13.3s rss=1.49GB
+[golden fp32 uk] w=0 n=2047 ppl=121.801 t=531s rss=2.02GB
+[golden fp32 uk] w=1 n=2047 ppl=104.531 t=544s rss=2.02GB
+[golden fp32 uk] w=2 n=2047 ppl=103.929 t=556s rss=2.02GB
+[golden fp32 uk] w=3 n=2047 ppl=57.445 t=571s rss=2.02GB
+[done] golden fp32 uk in 571.4s peak_rss=3.08GB

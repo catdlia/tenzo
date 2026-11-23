@@ -1,0 +1,15 @@
+{
+ "source": "wt2_test.raw",
+ "sha256": "bbf94c53a05abe9ee670d3b6343608095822c85e26de37c70b24fc571964574a",
+ "n_windows": 4,
+ "window_len": 2048,
+ "scored_tokens_per_window": 2047,
+ "bos": 128000,
+ "overlap_32grams_with_calib": {
+  "en_vs_cal_en": 0,
+  "en_vs_cal_uk": 0,
+  "uk_vs_cal_en": 0,
+  "uk_vs_cal_uk": 0
+ },
+ "ids_sha256": "66bc4ca09d6e49d3d0fcb3896a7743894443b11f4582fe2fdbc55083c28226f4"
+}

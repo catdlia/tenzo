@@ -1,0 +1,20 @@
+ Container untitled-dev-run-4393e8af0a50 Creating 
+ Container untitled-dev-run-4393e8af0a50 Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 2048)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(5219.2 ms)
+
+score window 0 tokens=2047 ppl=121.5 running_ppl=121.5
+score window 1 tokens=2047 ppl=104.5 running_ppl=112.7
+score window 2 tokens=2047 ppl=103.8 running_ppl=109.6
+score window 3 tokens=2047 ppl=57.5 running_ppl=93.3
+PROC_RSS_KB=973472 PROC_HWM_KB=973472
