@@ -1,7 +1,7 @@
 # Tenzo Compiler Makefile
 # Convenience wrapper for common operations
 
-.PHONY: paper-tables build build-local build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help audit verify-references
+.PHONY: paper-tables build build-local build-sdk build-pybind build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help audit verify-references
 
 # Default target
 all: build
@@ -15,15 +15,20 @@ build:
 	@echo "🚀 Запуск віддаленої компіляції через Hetzner..."
 	./remote_build.sh $(TARGETS)
 
-# Локальний білд компілятора та SDK
+# Локальний білд компілятора, SDK та Python-модуля tenzo_runtime*.so (JOBS=1 для тихого режиму)
 build-local:
 	@echo "⚠️ УВАГА: Запуск локальної компіляції (може бути довго)..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo-cli tenzo-diag paper_benchmark tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug $(if $(JOBS),-j$(JOBS)) tenzo-cli tenzo-diag paper_benchmark tenzo_runtime tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
+
+# Збірка лише pybind11 Python-модуля tenzo_runtime*.so
+build-pybind:
+	@echo "🐍 Збірка Python pybind11 модуля tenzo_runtime..."
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug $(if $(JOBS),-j$(JOBS)) tenzo_runtime
 
 # Збірка лише автономного C/C++ SDK та прикладів (швидко)
 build-sdk:
 	@echo "📦 Збірка Tenzo C/C++ SDK та standalone runtime..."
-	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
+	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev ninja -C /app/cmake-build-debug $(if $(JOBS),-j$(JOBS)) tenzo_runtime_static tenzo_runtime_shared tenzo_basic_inference tenzo-inference
 
 # ==========================================
 # 🧪 TESTING & RUNNING (via Docker)
@@ -262,7 +267,8 @@ help:
 	@echo "╔════════════════════════════════════════════════════════════════════════╗"
 	@echo "║                   Tenzo Compiler Build System (v1.1.0)                 ║"
 	@echo "╠════════════════════════════════════════════════════════════════════════╣"
-	@echo "║  make build-local - Compile compiler & runtime locally inside Docker   ║"
+	@echo "║  make build-local - Compile compiler, runtime & tenzo_runtime*.so (Docker)║"
+	@echo "║  make build-pybind - Compile Python pybind11 module tenzo_runtime*.so    ║"
 	@echo "║  make build       - Compile remotely via cloud server                  ║"
 	@echo "║  make run-fast    - Run ultra-fast native C++ 1.58-bit BitNet LLM gen  ║"
 	@echo "║  make compare     - Run side-by-side benchmark vs Microsoft BitNet.cpp ║"
