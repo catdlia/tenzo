@@ -1,0 +1,12 @@
+=== runner.log ===
+[2026-11-24T11:08:39+02:00] === B1 runner starting (dry_run=1 load_thresh=99 during_thresh=99.0 consec=2 interval=1s) ===
+[2026-11-24T11:08:40+02:00] idle check 1/2 OK (load1=1.44 < 99, ac=1)
+[2026-11-24T11:08:41+02:00] idle check 2/2 OK (load1=1.44 < 99, ac=1)
+[2026-11-24T11:08:41+02:00] RUN dryrun_item attempt=1 cmd: echo DRY_RUN_OK && sleep 2
+DRY_RUN_OK
+[2026-11-24T11:08:43+02:00] OK dryrun_item attempt=1 load_before=1.44 load_max=1.44 load_after=1.40 temp=55.0C
+=== b1_summary.csv ===
+item,status,attempt,load_before,load_max_during,load_after,governor,ac_online,temp_c,out_csv,rc
+dryrun_item,valid,1,1.44,1.44,1.40,powersave,1,55.0,results/2026-11-24_agent2/B1_dryrun/dryrun.csv,0
+=== STATUS ===
+done 2026-11-24T11:08:43+02:00 dry_run=1

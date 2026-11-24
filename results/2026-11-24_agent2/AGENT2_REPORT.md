@@ -17,8 +17,8 @@
 | **H4** (T46: Mechanism ablations & diagnostics on FLORES-12) | H | **done** | ~46 min | `FLORES-12` paired (`MemoryMax=4G`, baseline `D=+21.989 [+13.290, +30.496]` nats, `R=+1.42%`). **V quantization dominates**: `K8V` (`V` ternary, `K` INT8) retains **`90.3%`** of `D` (`+19.865`, only `9.7%` removed), whereas `KV8` (`K` ternary, `V` INT8) retains `39.0%` (`+8.571`, `61.0%` removed). **Layers bimodal**: `L0..9` (`47.2%`, `+10.387`) + `L20..29` (`35.9%`, `+7.898`) drive `D` while `L10..19` is `4.3%` (`+0.940 [-0.953, +2.937]`). Expanding `r`: `r=0` `D=+98.239`, `r=128` drops `82.6%` (`+3.823 [-0.58, +8.11]`), `r=256` drops `98.3%` (`+0.370`). **Probes falsify (a), (b), (d)**: `K/V` `S3` rel-L2 errors match (`K 0.4259 vs 0.4263`, `V 0.4264 vs 0.4247`), `fp32` far mass matches (`44.38% vs 43.65%`, `128..255`: `46.50% vs 46.43%`), and `S3-K` far mass actually drops (`42.33%`, `39.42%`). Points to **(c) Value-noise sensitivity** (`K8V` retains `90.3%`) in early/late layers (`L0..9`, `L20..29`) | `scripts/run_h4_mechanism.py`, `results/2026-11-24_agent2/H4/mechanism.{md,csv,png}`, `mechanism_probes_layers.csv`, `probes_summary.json` |
 | **L2** (T02: Parity gate `v2` INT8 embeddings/head diag) | L | **done** | ~3 min | Default Tenzo `v2`: `max_abs 7/7`, PPL CI `[0.995, 1.010]`, `1-cos 6/7` (`p4` `1.77e-4 > 1.13e-4` on `fp32`; `p2` `3.09e-4 > 1.96e-4` on `int8_fused`); `v2` thresholds untouched. With `TENZO_EXPERIMENT_FP32_LM=1`, **both `fp32` and `int8_fused` pass `v2 1-cos` `7/7`, `max_abs` `7/7`, and `top-1` `7/7`** (`p4` `1.77e-4 → 5.17e-5`; `p2` `3.09e-4 → 1.35e-4`). `Golden INT8 embed+head` also shifts `1-cos` to `1.06e-4` (`p4`, `top-1=False`) / `1.68e-4` (`p2`), proving the misses come from intentional INT8 embed/LM-head quantization | `scripts/diagnose_parity_v2.py`, `results/2026-11-24_agent2/L2/parity_v2_diag.{md,csv}` |
 | **L3** (Paper claims registry) | L | **done** | ~5 min | Created [results/paper/claims.md](../paper/claims.md) covering `17` claims (`T10`, `T30` r1–r4, `2026-11-23 L3/H1/H2/H3`, `2026-11-24 H1a/H1b/H2/H3/H4/L2`) with exact 95% CIs, reproduction commands, input files, commits, and honest status (`verified-by-coordinator` / `agent-only` / `exploratory`); zero speed claims prior to `B1` | `results/paper/claims.md` |
-| **L4** (End-of-day wrap-up, tables, changelog, report) | L | pending | — | — | — |
-| **B1** (T38: Self-gated idle speed runner `tenzo-b1`) | B (daemon) | pending | — | — | — |
+| **L4** (End-of-day wrap-up, tables, changelog, report) | L | **done** | ~6 min | Regenerated `results/paper/tables.{md,tex}` (`Speed -> 0 rows`), updated `CHANGELOG.md`, verified `weights.bin` sha256 `68c8f32b7f5d905ed7b3aaaf688e8913ed12227c7d9afc1bf3f429e3479400d1`, finalized `AGENT2_REPORT.md` & Questions to Owner | `results/paper/tables.{md,tex}`, `CHANGELOG.md`, `results/2026-11-24_agent2/AGENT2_REPORT.md` |
+| **B1** (T38: Self-gated idle speed runner `tenzo-b1`) | B (daemon) | **dry-run ok; launched (`tenzo-b1`)** | ~2 min setup | Verified `scripts/b1_idle_runner.sh --dry-run --out-dir results/2026-11-24_agent2/B1_dryrun --load-threshold 99 --consec 2 --interval 1 --fake-cmd "echo DRY_RUN_OK && sleep 2"` (`exit=0`, `STATUS=done`, CSV valid row); updated `bench_decode_modes.sh` (`ternary_rot_alpha`); launched `systemd-run --user --unit=tenzo-b1` right after final commit/push (`STATUS` & unit verified live) | `scripts/b1_idle_runner.sh`, `scripts/{bench_decode_modes,pending_benchmarks}.sh`, `results/2026-11-24_agent2/B1_dryrun.log` |
 
 ## 2. Decision Log
 
@@ -36,17 +36,33 @@
 
 ## 3. Blockers & Disk Watch
 
-- **Disk space on `/`:** `8.5G` free (`464G / 476G`, `99%` used) at `L0` — above `6 GB` floor for text corpora (`H3` FLORES-200 ~25 MB and `H1b` Wikipedia/Kobza slices).
-- **RAM (`MemAvailable 9.5 GiB`):** Fits `4G` golden (`<= 6G` needed) and `6G` HF models (`<= 8G` needed) sequentially under `systemd-run` memory scopes; never run two heavy processes concurrently.
+- **Disk space on `/`:** `8.6G` free (`464G / 476G`, `99%` used) throughout the session (`>= 6 GB` floor under `D3` satisfied; `FLORES-200` archive was ~25 MB and H1b corpora were <10 MB).
+- **RAM (`MemAvailable 8.5–10.0 GiB`):** Fits `4G` golden (`<= 6G` threshold) and `6G` HF models (`<= 8G` threshold) sequentially under `systemd-run` memory scopes; `diagnose_parity_v2.py` chunked `int8` embeddings kept peak RSS at `~2.13 GB` under `MemoryMax=4G`.
+- **Clean-machine speed benchmark condition:** Host remained in active desktop use throughout daytime work; handed off cleanly to self-gated `tenzo-b1` (`scripts/b1_idle_runner.sh`, waiting for AC + 10 min `load1 < 1.0` + no browser/VM/IDE/Steam).
 
 ## 4. What Must NOT Be Claimed
 
-- No post-fix speed numbers until `B1` (`tenzo-b1`) completes on an idle machine and the next session verifies `STATUS` and CSVs.
-- No `7/7` pass claim for parity gate `v2`.
-- **Confirmed (`H1b` `N=12`):** `UK-long` `pos/1000` 95% CI spans `0` (`-0.0488 [-0.1187, +0.0610]`, `Δ(B4−B1)=-0.0681`); therefore **never claim** that positional KV growth at `ctx=2048` is a UK language property — attribute positional rise to multi-document concatenation (`EN-concat` `+0.0458 [+0.0073, +0.0997]`), while reporting that overall `ctx=2048` UK degradation (`×1.147`) remains larger than EN (`×1.074`) even on single contiguous articles.
-- On `H3` (`FLORES-200`), `CI(D) > 0` holds across all three models under `S3+s4r32`; do NOT overclaim `S13+s4r32` (`EuroLLM S13` `D` crosses zero) or `tenzo_int8` on BitNet/EuroLLM (`D ~ 0`), and keep the token-length / `s4r32` protected-fraction caveat explicit pending `H4`.
-- No claim that `alpha_mix` is the default for `ternary_rot`.
+- **Zero post-fix speed claims** until `tenzo-b1` finishes on an idle machine and the next session verifies `results/2026-11-24_B1/STATUS` and per-benchmark CSVs.
+- **No `7/7` pass claim for default parity gate `v2`:** default Tenzo (`INT8` embeddings + LM head) passes `v2 max_abs 7/7`, `EN16 PPL CI [0.995, 1.010]`, and `1-cos 6/7` (`p4` `fp32`, `p2` `int8_fused`); only with `TENZO_EXPERIMENT_FP32_LM=1` does `1-cos` reach `7/7` (`L2`).
+- **Confirmed refutation (`H1b` `N=12`):** `UK-long` `pos/1000` 95% CI spans `0` (`-0.0488 [-0.1187, +0.0610]`, `Δ(B4−B1)=-0.0681`); **never claim** that positional KV growth at `ctx=2048` is a UK language property — attribute positional rise to multi-document concatenation (`EN-concat` `+0.0458 [+0.0073, +0.0997]`), while reporting that overall `ctx=2048` UK degradation (`×1.147`) remains larger than EN (`×1.074`) even on single contiguous articles.
+- **Parallel corpus scope (`H3`, `N=32` FLORES-200):** `95% CI(D) > 0` and `95% CI(R) > 0` hold across all 3 models (`BitNet`, `EuroLLM-1.7B`, `Qwen2.5-1.5B`) on `S3+s4r32`; do NOT generalize `CI(D) > 0` to `EuroLLM S13+s4r32` (`+0.838 [-0.761, +2.469]`) or BitNet/EuroLLM `tenzo_int8` (`D ~ 0`). Note also `H4`'s finding that `r=128`/`256` substantially reduces `D` on short FLORES sequences.
+- **No claim that `alpha_mix.txt` is the `ternary_rot` default:** `--kv-quant ternary_rot` preserves its uncalibrated behavior unless `--kv-alpha` / `TENZO_KV_ALPHA` is explicitly supplied (`D2`).
 
 ## 5. Questions to Owner
 
-*(To be finalized with evidence and recommendations at `L4`.)*
+1. **`D2` — Should `alpha_mix.txt` become the default for `--kv-quant ternary_rot`?**
+   - **Evidence (`H2` `results/2026-11-24_agent2/H2/alpha_domain_transfer.md`):** `alpha_mix.txt` (`sha256: d67ed67b...`) strictly improved `ternary_rot` (`95% CI(gain) > 1.0`) across **all 4 cells**, including both out-of-domain sets — `en_web` (`FineWeb-Edu`, `×1.0308 → ×1.0193`, gain **`×1.0113 [1.0052, 1.0179]`**) and `uk_wiki` (**`×1.1020 → ×1.0786`**, gain **`×1.0217 [1.0121, 1.0308]`**), alongside `en_wiki` (`×1.0068 [1.0032, 1.0106]`) and `uk_web` (`×1.0392 [1.0275, 1.0514]`) — and transferred cleanly to `ctx=2048` (`H1b`). Score headers now record `# kv_alpha=<path> sha256=<hex>`.
+   - **Recommendation:** Keep `--kv-quant ternary_rot` uncalibrated by default for exact baseline reproducibility (per `D2`), and expose calibration cleanly via an explicit preset/mode (e.g., `--kv-quant ternary_rot_alpha` or explicit `--kv-alpha models/bitnet-1.58b-v2/alpha_mix.txt`) — unless you want `ternary_rot` itself switched once speed (`B1`) confirms zero regression.
+2. **Paper narrative — Build the core story around `H3` (`FLORES-200`), `H1b` (`ctx=2048`), and `H4` (`T46`)?**
+   - **Evidence:** `H3` eliminates the `BPC`/`BPB` denominator ambiguity (`T45`) and establishes super-proportional UK degradation on identical parallel sentences across all 3 models under `S3+s4r32` (`BitNet D=+20.85`, `EuroLLM D=+3.66`, `Qwen2.5 D=+453.63` nats; `EuroLLM ΔBPB` crosses 0 solely from UTF-8's `1.82×` byte/char ratio). `H1b` prevents an invalid `T44` claim by proving positional growth stems from concatenation (`EN-concat` `+0.0458`, `UK-long` `-0.0488`) while confirming `×1.147` UK vs `×1.074` EN at `ctx=2048`. `H4` pinpoints **`V` quantization (`K8V` `90.3%` of `D`)** in early/late layers (`L0..9` `47.2%` + `L20..29` `35.9%`) mitigated by `r=128` (`-82.6%`), while ruling out intrinsic `K/V` `S3` error gaps and `S3-K` tail leakage.
+   - **Recommendation:** **Yes** — center the paper on `H3` (cross-family parallel disparity) + `H1b` (concatenation control vs true `ctx=2048` baseline gap) + `H4` (Value-sensitivity mechanism) + `L2` (`FP32_LM` attribution) + pending `B1` throughput.
+3. **`H2` Web corpus matching — Should a future session swap `Kobza` + `FineWeb-Edu` for `FineWeb sample-10BT` vs `FineWeb-2 ukr_Cyrl`?**
+   - **Evidence:** In `2026-11-23 H2` (`2×2`) and `H1b` (`uk_concat` vs `en_concat`), `FineWeb-Edu` (`base BPC=0.816`, educational filtered) and `Goader/kobza` (`base BPC=2.539`, mixed-crawl subcorpora with wide doc-length skew `1..6` docs/win) are not tightly genre-matched.
+   - **Recommendation:** **Yes** as a low-cost robustness check (`<= 50 MB` text slices) if reviewers scrutinize the `2×2` Web interaction, though note `H3` (`FLORES-200`) already bypasses domain mismatch cleanly.
+
+## 6. Background Idle Benchmark Runner (`tenzo-b1`) Commands for Owner
+
+- **Check unit status:** `systemctl --user status tenzo-b1 --no-pager`
+- **Check live runner state (`waiting` / `running` / `done` / `gave_up`):** `cat results/2026-11-24_B1/STATUS`
+- **Follow runner log & summary:** `tail -n 30 results/2026-11-24_B1/runner.log` and `cat results/2026-11-24_B1/b1_summary.csv`
+- **Cancel / stop cleanly:** `systemctl --user stop tenzo-b1`

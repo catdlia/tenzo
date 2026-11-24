@@ -15,5 +15,5 @@ python3 scripts/run_e2e_fair.py --out $OUT/e2e_fair_v3.csv --reps 5 --gen 128 --
 # 3. batched vs sequential prefill (TTFT and prefill tok/s), interleaved ABBA x5, int8_fused, chunk 32
 scripts/ab_prefill_speed.sh $OUT/ab_prefill_pp128.csv 5 int8_fused 128 32
 scripts/ab_prefill_speed.sh $OUT/ab_prefill_pp512.csv 5 int8_fused 512 32
-# 4. decode speed of int8_fused / tl1_fused / ternary_rot at prompt 128 and 512, 3 reps
+# 4. decode speed of int8_fused / tl1_fused / ternary_rot / ternary_rot_alpha at prompt 128 and 512, 3 reps
 scripts/bench_decode_modes.sh $OUT/decode_kv_modes.csv 3

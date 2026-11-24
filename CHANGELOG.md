@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2026-11-24
+
+### Added
+- **KV alpha provenance (`--kv-alpha <path>` & `# kv_alpha=<path> sha256=<hex>` in `src/main_inference.cpp`).**
+  Added FIPS 180-4 `sha256_file_hex()` logging into score-file headers whenever `TENZO_KV_ALPHA` or `--kv-alpha` is set (`d67ed67b...` for `alpha_mix.txt`), preserving bit-identical output against `TENZO_KV_ALPHA` and unchanged `ternary_rot` default behavior (`D2`).
+- **Parallel EN/UK evaluation on FLORES-200 (`H3`, `results/2026-11-24_agent2/H3/`).**
+  Built `N=32` sentence-matched aligned pairs (`flores200_dataset.tar.gz`, `sha256: b8b0b767...`, `0` shared 32-grams vs all calib/eval sets) and evaluated BitNet-b1.58-2B, EuroLLM-1.7B, and Qwen2.5-1.5B with exact `0.000e+00` layer-major unpadded parity vs `B=1`. Under `S3+s4r32`, all three models show super-proportional UK degradation at matched semantic content (`95% CI(D) > 0`, `95% CI(R) > 0`), resolving the `ΔBPC`/`ΔBPB` normalization discrepancy (`T45`).
+- **Controlled `ctx = 2048` document-length vs concatenation study (`H1b`, `T44`, `results/2026-11-24_agent2/H1b/`).**
+  Tested `4 × 12` `ctx=2048` windows (`en_long`, `en_concat`, `uk_long`, `uk_concat`): single contiguous UK Wikipedia articles (`UK-long`) show no positional increase (`full pos/1000 = -0.0488 [-0.1187, +0.0610]`, `Δ(B4−B1) = -0.0681`), whereas multi-article `EN-concat` rises significantly (`+0.0458 [+0.0073, +0.0997]`), attributing positional drift to concatenation while confirming the overall `ctx=2048` UK gap (`+14.7%` vs `+7.4%`).
+- **Cross-domain transfer check for `alpha_mix.txt` (`H2`, `results/2026-11-24_agent2/H2/`).**
+  `alpha_mix.txt` improves `ternary_rot` strictly (`95% CI(gain) > 1.0`) across all four `2×2` cells in `TenzoEngine`, including out-of-domain `en_web` (`×1.0113 [1.0052, 1.0179]`) and `uk_wiki` (`×1.0217 [1.0121, 1.0308]`).
+- **Mechanism ablations & probes on `FLORES-12` (`H4`, `T46`, `results/2026-11-24_agent2/H4/`).**
+  Showed ternary Value quantization drives `90.3%` of UK penalty `D` (`K8V:S3+s4r32` `+19.865` vs `KV8` `+8.571`), concentrated in early (`L0..9` `47.2%`) and late (`L20..29` `35.9%`) layers (`L10..19` `4.3%`) and `82.6%` mitigated at `r=128`, while single-pass probes rule out intrinsic `K/V` S3 error differences, higher `fp32` far-attention mass, or `S3-K` tail leakage.
+- **Parity gate `v2` diagnostics & paper claims registry (`L2` `parity_v2_diag.md`, `L3` `results/paper/claims.md`).**
+  Confirmed `TENZO_EXPERIMENT_FP32_LM=1` passes `v2 1-cos`, `max_abs`, and `top-1` `7/7` for both `fp32` and `int8_fused` KV, attributing the two `6/7` cosine misses to intentional INT8 embedding/LM-head quantization.
+- **Self-gated idle benchmark runner (`scripts/b1_idle_runner.sh`, `B1`, `T38`).**
+  Added AC-power + 10-minute idle (`load1 < 1.0`) + process-gating + `systemd-inhibit` runner for `pending_benchmarks.sh` (`bench_decode_modes.sh` updated to include `ternary_rot_alpha`); validated in `--dry-run` (`results/2026-11-24_agent2/B1_dryrun.log`).
+
+### Changed / Hygiene
+- Removed `tools/tokenizer/bitnet_b158_tokenizer.json` (`9 MB`) from git tracking (`git rm --cached`, `.gitignore`), added `tools/tokenizer/README.md`, copied HF cache `tokenizer.json` to `models/bitnet-1.58b-v2/tokenizer.json`, updated tokenizer fallback order, and documented dataset licenses (`kobza` `CC0-1.0` packaging + notice/takedown, Wikipedia `CC BY-SA 3.0`/`GFDL`, FineWeb-Edu `ODC-By`) in `results/2026-11-23_agent2/H2/corpora/LICENSES.md` (`T43`).
+
+---
+
 ## [Unreleased] — 2026-11-23
 
 ### Added
