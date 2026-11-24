@@ -1,0 +1,25 @@
+Running as unit: run-p188312-i191587.scope; invocation ID: 125a9019ea8347988a0f0bb9f46a6ba6
+[run] diagnostic fp32 probe pass EN+UK (n=12)...
+[done] diagnostic probes in 311.4s
+[kv_ptq] installed KV8:S3+s4r32: V INT8, K from S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[done] KV8_S3_s4r32     en t=434.5s
+[done] KV8_S3_s4r32     uk t=635.0s
+[kv_ptq] installed K8V:S3+s4r32: K INT8, V from S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[done] K8V_S3_s4r32     en t=749.6s
+[done] K8V_S3_s4r32     uk t=930.2s
+[kv_ptq] installed S3+s4r0: S2 + randomized Hadamard (D=128) + sinks 4 + recent 0 INT8
+[done] S3_s4r0          en t=1040.1s
+[done] S3_s4r0          uk t=1222.4s
+[kv_ptq] installed S3+s4r128: S2 + randomized Hadamard (D=128) + sinks 4 + recent 128 INT8
+[done] S3_s4r128        en t=1330.7s
+[done] S3_s4r128        uk t=1535.2s
+[kv_ptq] installed S3+s4r256: S2 + randomized Hadamard (D=128) + sinks 4 + recent 256 INT8
+[done] S3_s4r256        en t=1662.1s
+[done] S3_s4r256        uk t=1881.8s
+[done] S3_s4r32_L0_9    en t=2007.2s
+[done] S3_s4r32_L0_9    uk t=2214.5s
+[done] S3_s4r32_L10_19  en t=2331.9s
+[done] S3_s4r32_L10_19  uk t=2491.2s
+[done] S3_s4r32_L20_29  en t=2605.3s
+[done] S3_s4r32_L20_29  uk t=2765.1s
+Wrote /home/illia/CLionProjects/untitled/results/2026-11-24_agent2/H4/mechanism.{csv,md,png}
