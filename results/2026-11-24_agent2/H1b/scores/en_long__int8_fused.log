@@ -1,0 +1,44 @@
+
+=== CMD: nice -n 19 ionice -c3 docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference -m /app/models/bitnet-1.58b-v2 --kv-quant int8_fused -c 2048 --prefill batched --score /app/results/2026-11-24_agent2/H1b/scores/_tmp_en_long_int8_fused.ids --score-out /app/results/2026-11-24_agent2/H1b/scores/_tmp_en_long_int8_fused.txt ===
+ Container untitled-dev-run-e0873775c5ae Creating 
+ Container untitled-dev-run-e0873775c5ae Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 2048)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(5442.3 ms)
+
+score window 0 tokens=2047 ppl=8.7 running_ppl=8.7
+score window 1 tokens=2047 ppl=9.2 running_ppl=8.9
+score window 2 tokens=2047 ppl=12.5 running_ppl=10.0
+score window 3 tokens=2047 ppl=13.0 running_ppl=10.7
+PROC_RSS_KB=973800 PROC_HWM_KB=973800
+
+=== CMD: nice -n 19 ionice -c3 docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference -m /app/models/bitnet-1.58b-v2 --kv-quant int8_fused -c 2048 --prefill batched --score /app/results/2026-11-24_agent2/H1b/scores/_tmp_en_long_int8_fused.ids --score-out /app/results/2026-11-24_agent2/H1b/scores/_tmp_en_long_int8_fused.txt ===
+ Container untitled-dev-run-b4558d54403d Creating 
+ Container untitled-dev-run-b4558d54403d Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 2048)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(4459.6 ms)
+
+score window 0 tokens=2047 ppl=12.7 running_ppl=12.7
+score window 1 tokens=2047 ppl=17.0 running_ppl=14.7
+score window 2 tokens=2047 ppl=14.5 running_ppl=14.6
+score window 3 tokens=2047 ppl=16.2 running_ppl=15.0
+PROC_RSS_KB=972212 PROC_HWM_KB=972212

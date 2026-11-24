@@ -1,0 +1,344 @@
+{
+ "n_windows_per_cell": 12,
+ "window_tokens": 2048,
+ "overlap_32grams": {
+  "en_long": {
+   "calib_en8": 0,
+   "calib_uk8": 0,
+   "en16": 0,
+   "uk32": 0,
+   "en2048": 0,
+   "uk2048": 0,
+   "h2_en_wiki": 0,
+   "h2_uk_wiki": 0,
+   "h2_en_web": 0,
+   "h2_uk_web": 0,
+   "flores_en": 0,
+   "flores_uk": 0
+  },
+  "en_concat": {
+   "calib_en8": 0,
+   "calib_uk8": 0,
+   "en16": 0,
+   "uk32": 0,
+   "en2048": 0,
+   "uk2048": 0,
+   "h2_en_wiki": 0,
+   "h2_uk_wiki": 0,
+   "h2_en_web": 0,
+   "h2_uk_web": 0,
+   "flores_en": 0,
+   "flores_uk": 0
+  },
+  "uk_long": {
+   "calib_en8": 0,
+   "calib_uk8": 0,
+   "en16": 0,
+   "uk32": 0,
+   "en2048": 0,
+   "uk2048": 0,
+   "h2_en_wiki": 0,
+   "h2_uk_wiki": 0,
+   "h2_en_web": 0,
+   "h2_uk_web": 0,
+   "flores_en": 0,
+   "flores_uk": 0
+  },
+  "uk_concat": {
+   "calib_en8": 0,
+   "calib_uk8": 0,
+   "en16": 0,
+   "uk32": 0,
+   "en2048": 0,
+   "uk2048": 0,
+   "h2_en_wiki": 0,
+   "h2_uk_wiki": 0,
+   "h2_en_web": 0,
+   "h2_uk_web": 0,
+   "flores_en": 0,
+   "flores_uk": 0
+  }
+ },
+ "cells": {
+  "en_long": {
+   "source": "wt2_test.raw (w=0..3 reused from windows_en_2048.ids; w=4..11 continuous non-overlapping)",
+   "wt2_sha256": "bbf94c53a05abe9ee670d3b6343608095822c85e26de37c70b24fc571964574a",
+   "reused_windows": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "nl2_boundary_counts": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "n_source_docs": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "ids_sha256": "737d876e79a3976bc556caa2feafc1fec29906b3d61dd60c1b7c313ff27edbf0"
+  },
+  "en_concat": {
+   "source": "wikimedia/wikipedia 20231101.en (<1500 chars, offset >= 200)",
+   "rows_fetched_until": 2300,
+   "docs_used_count": 128,
+   "doc_row_indices_sample": [
+    232,
+    233,
+    243,
+    265,
+    293,
+    297,
+    315,
+    371,
+    395,
+    418,
+    432,
+    446,
+    448,
+    449,
+    450,
+    466,
+    474,
+    478,
+    480,
+    484,
+    518,
+    519,
+    520,
+    525,
+    541
+   ],
+   "n_source_docs_per_window": [
+    8,
+    11,
+    10,
+    12,
+    10,
+    11,
+    9,
+    10,
+    9,
+    10,
+    12,
+    13
+   ],
+   "nl2_boundary_counts": [
+    64,
+    46,
+    51,
+    47,
+    43,
+    48,
+    58,
+    53,
+    62,
+    54,
+    52,
+    60
+   ],
+   "ids_sha256": "e6d2170d04eb34b86eed2f6cadaaa440cd0a51088fc0ad2b4207271d9c6b93ab"
+  },
+  "uk_long": {
+   "source": "wikimedia/wikipedia 20231101.uk (1 article >= 2047 BitNet tokens per window, offset >= 200)",
+   "rows_fetched_until": 300,
+   "articles": [
+    {
+     "row_idx": 200,
+     "title": "1848",
+     "chars": 7056,
+     "total_bitnet_toks": 2588,
+     "sha256_16": "3d9996227e7d8113"
+    },
+    {
+     "row_idx": 210,
+     "title": "1859",
+     "chars": 6071,
+     "total_bitnet_toks": 2257,
+     "sha256_16": "3dbf1ec11e18bb75"
+    },
+    {
+     "row_idx": 211,
+     "title": "1861",
+     "chars": 6210,
+     "total_bitnet_toks": 2349,
+     "sha256_16": "b7e6a1a5be52d6a3"
+    },
+    {
+     "row_idx": 213,
+     "title": "1863",
+     "chars": 6351,
+     "total_bitnet_toks": 2380,
+     "sha256_16": "4e7ce708fadbd96b"
+    },
+    {
+     "row_idx": 214,
+     "title": "1864",
+     "chars": 5701,
+     "total_bitnet_toks": 2159,
+     "sha256_16": "a891f07ee2beded6"
+    },
+    {
+     "row_idx": 218,
+     "title": "1868",
+     "chars": 6225,
+     "total_bitnet_toks": 2340,
+     "sha256_16": "b3e92eb5903fe2a2"
+    },
+    {
+     "row_idx": 220,
+     "title": "1870",
+     "chars": 6106,
+     "total_bitnet_toks": 2249,
+     "sha256_16": "1a7947a4c8d4ad69"
+    },
+    {
+     "row_idx": 221,
+     "title": "1871",
+     "chars": 5351,
+     "total_bitnet_toks": 2047,
+     "sha256_16": "0d422fc1349feed7"
+    },
+    {
+     "row_idx": 222,
+     "title": "1872",
+     "chars": 5867,
+     "total_bitnet_toks": 2257,
+     "sha256_16": "be7b187f6d4593fa"
+    },
+    {
+     "row_idx": 224,
+     "title": "1874",
+     "chars": 5361,
+     "total_bitnet_toks": 2057,
+     "sha256_16": "32fd907e040270d8"
+    },
+    {
+     "row_idx": 226,
+     "title": "1876",
+     "chars": 6058,
+     "total_bitnet_toks": 2311,
+     "sha256_16": "88fd80149bc9558e"
+    },
+    {
+     "row_idx": 253,
+     "title": "1918",
+     "chars": 8427,
+     "total_bitnet_toks": 2889,
+     "sha256_16": "69e1c6134f81e74b"
+    }
+   ],
+   "n_source_docs_per_window": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "nl2_boundary_counts": [
+    12,
+    18,
+    18,
+    20,
+    18,
+    18,
+    17,
+    21,
+    18,
+    19,
+    18,
+    27
+   ],
+   "ids_sha256": "44f519a98eb9d06af513f71f07deb0403e86402a319f028e66c33912bacf6fb7"
+  },
+  "uk_concat": {
+   "source": "Goader/kobza (default, offset >= 300, joined by \\n\\n)",
+   "rows_fetched_until": 400,
+   "docs_used_count": 100,
+   "doc_row_indices_sample": [
+    300,
+    301,
+    302,
+    303,
+    304,
+    305,
+    306,
+    307,
+    308,
+    309,
+    310,
+    311,
+    312,
+    313,
+    314,
+    315,
+    316,
+    317,
+    318,
+    319,
+    320,
+    321,
+    322,
+    323,
+    324
+   ],
+   "n_source_docs_per_window": [
+    4,
+    3,
+    1,
+    5,
+    3,
+    4,
+    1,
+    1,
+    5,
+    6,
+    4,
+    2
+   ],
+   "nl2_boundary_counts": [
+    24,
+    15,
+    0,
+    4,
+    2,
+    4,
+    0,
+    0,
+    4,
+    13,
+    3,
+    1
+   ],
+   "ids_sha256": "b8d55136662b754cd7d0ce7c327d1bd6d6b26494e0f6a18ae871177d88e770ae"
+  }
+ }
+}

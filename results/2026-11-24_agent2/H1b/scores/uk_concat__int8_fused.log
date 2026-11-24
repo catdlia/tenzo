@@ -1,0 +1,66 @@
+
+=== CMD: nice -n 19 ionice -c3 docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference -m /app/models/bitnet-1.58b-v2 --kv-quant int8_fused -c 2048 --prefill batched --score /app/results/2026-11-24_agent2/H1b/scores/_tmp_uk_concat_int8_fused.ids --score-out /app/results/2026-11-24_agent2/H1b/scores/_tmp_uk_concat_int8_fused.txt ===
+ Container untitled-dev-run-446efabec01f Creating 
+ Container untitled-dev-run-446efabec01f Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 2048)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(4549.6 ms)
+
+score window 0 tokens=2047 ppl=141.4 running_ppl=141.4
+score window 1 tokens=2047 ppl=115.7 running_ppl=127.9
+score window 2 tokens=2047 ppl=279.1 running_ppl=165.9
+score window 3 tokens=2047 ppl=196.2 running_ppl=173.0
+PROC_RSS_KB=972852 PROC_HWM_KB=972852
+
+=== CMD: nice -n 19 ionice -c3 docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference -m /app/models/bitnet-1.58b-v2 --kv-quant int8_fused -c 2048 --prefill batched --score /app/results/2026-11-24_agent2/H1b/scores/_tmp_uk_concat_int8_fused.ids --score-out /app/results/2026-11-24_agent2/H1b/scores/_tmp_uk_concat_int8_fused.txt ===
+ Container untitled-dev-run-85418134f9f9 Creating 
+ Container untitled-dev-run-85418134f9f9 Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 2048)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(4816.8 ms)
+
+score window 0 tokens=2047 ppl=135.4 running_ppl=135.4
+score window 1 tokens=2047 ppl=115.1 running_ppl=124.9
+score window 2 tokens=2047 ppl=53.5 running_ppl=94.1
+score window 3 tokens=2047 ppl=53.7 running_ppl=81.8
+PROC_RSS_KB=972868 PROC_HWM_KB=972868
+
+=== CMD: nice -n 19 ionice -c3 docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/tenzo-inference -m /app/models/bitnet-1.58b-v2 --kv-quant int8_fused -c 2048 --prefill batched --score /app/results/2026-11-24_agent2/H1b/scores/_tmp_uk_concat_int8_fused.ids --score-out /app/results/2026-11-24_agent2/H1b/scores/_tmp_uk_concat_int8_fused.txt ===
+ Container untitled-dev-run-b1e093563bd3 Creating 
+ Container untitled-dev-run-b1e093563bd3 Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: int8_fused[0m[36m, Max Context: 2048)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(5288.8 ms)
+
+score window 0 tokens=2047 ppl=150.5 running_ppl=150.5
+score window 1 tokens=2047 ppl=176.8 running_ppl=163.2
+score window 2 tokens=2047 ppl=187.4 running_ppl=170.9
+score window 3 tokens=2047 ppl=86.3 running_ppl=144.1
+PROC_RSS_KB=972820 PROC_HWM_KB=972820

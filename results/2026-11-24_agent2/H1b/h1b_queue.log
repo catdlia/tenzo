@@ -1,0 +1,65 @@
+=== H1B START 2026-11-24T05:09:39+02:00 MemAvailable=11434488kB ===
+[seed] copied w=0..3 from engine_int8_fused_en.txt -> en_long__int8_fused.txt
+[run] en_long int8_fused: 4 windows todo ([4, 5, 6, 7])
+  done en_long int8_fused w=[4, 5, 6, 7] (8/8) chunk=416s total=416s
+[seed] copied w=0..3 from engine_ternary_rot_en.txt -> en_long__ternary_rot.txt
+[run] en_long ternary_rot: 4 windows todo ([4, 5, 6, 7])
+  done en_long ternary_rot w=[4, 5, 6, 7] (8/8) chunk=431s total=848s
+[seed] copied w=0..3 from engine_ternary_rot_alpha_en.txt -> en_long__ternary_rot_alpha.txt
+[run] en_long ternary_rot_alpha: 4 windows todo ([4, 5, 6, 7])
+  done en_long ternary_rot_alpha w=[4, 5, 6, 7] (8/8) chunk=431s total=1279s
+[run] en_concat int8_fused: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done en_concat int8_fused w=[0, 1, 2, 3] (4/8) chunk=408s total=1687s
+  done en_concat int8_fused w=[4, 5, 6, 7] (8/8) chunk=404s total=2092s
+[run] en_concat ternary_rot: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done en_concat ternary_rot w=[0, 1, 2, 3] (4/8) chunk=427s total=2519s
+  done en_concat ternary_rot w=[4, 5, 6, 7] (8/8) chunk=421s total=2940s
+[run] en_concat ternary_rot_alpha: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done en_concat ternary_rot_alpha w=[0, 1, 2, 3] (4/8) chunk=416s total=3356s
+  done en_concat ternary_rot_alpha w=[4, 5, 6, 7] (8/8) chunk=412s total=3768s
+[run] uk_long int8_fused: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done uk_long int8_fused w=[0, 1, 2, 3] (4/8) chunk=385s total=4154s
+  done uk_long int8_fused w=[4, 5, 6, 7] (8/8) chunk=387s total=4540s
+[run] uk_long ternary_rot: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done uk_long ternary_rot w=[0, 1, 2, 3] (4/8) chunk=411s total=4951s
+  done uk_long ternary_rot w=[4, 5, 6, 7] (8/8) chunk=412s total=5363s
+[run] uk_long ternary_rot_alpha: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done uk_long ternary_rot_alpha w=[0, 1, 2, 3] (4/8) chunk=416s total=5780s
+  done uk_long ternary_rot_alpha w=[4, 5, 6, 7] (8/8) chunk=413s total=6192s
+[run] uk_concat int8_fused: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done uk_concat int8_fused w=[0, 1, 2, 3] (4/8) chunk=386s total=6578s
+  done uk_concat int8_fused w=[4, 5, 6, 7] (8/8) chunk=386s total=6964s
+[run] uk_concat ternary_rot: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done uk_concat ternary_rot w=[0, 1, 2, 3] (4/8) chunk=419s total=7383s
+  done uk_concat ternary_rot w=[4, 5, 6, 7] (8/8) chunk=422s total=7805s
+[run] uk_concat ternary_rot_alpha: 8 windows todo ([0, 1, 2, 3, 4, 5, 6, 7])
+  done uk_concat ternary_rot_alpha w=[0, 1, 2, 3] (4/8) chunk=429s total=8234s
+  done uk_concat ternary_rot_alpha w=[4, 5, 6, 7] (8/8) chunk=444s total=8677s
+H1B COMPLETE up to max_windows=8 in 8677.4s
+[stage] H1b max_windows=8 exit=0 2026-11-24T07:34:17+02:00
+[run] en_long int8_fused: 4 windows todo ([8, 9, 10, 11])
+  done en_long int8_fused w=[8, 9, 10, 11] (12/12) chunk=409s total=409s
+[run] en_long ternary_rot: 4 windows todo ([8, 9, 10, 11])
+  done en_long ternary_rot w=[8, 9, 10, 11] (12/12) chunk=436s total=845s
+[run] en_long ternary_rot_alpha: 4 windows todo ([8, 9, 10, 11])
+  done en_long ternary_rot_alpha w=[8, 9, 10, 11] (12/12) chunk=435s total=1280s
+[run] en_concat int8_fused: 4 windows todo ([8, 9, 10, 11])
+  done en_concat int8_fused w=[8, 9, 10, 11] (12/12) chunk=404s total=1684s
+[run] en_concat ternary_rot: 4 windows todo ([8, 9, 10, 11])
+  done en_concat ternary_rot w=[8, 9, 10, 11] (12/12) chunk=444s total=2128s
+[run] en_concat ternary_rot_alpha: 4 windows todo ([8, 9, 10, 11])
+  done en_concat ternary_rot_alpha w=[8, 9, 10, 11] (12/12) chunk=427s total=2555s
+[run] uk_long int8_fused: 4 windows todo ([8, 9, 10, 11])
+  done uk_long int8_fused w=[8, 9, 10, 11] (12/12) chunk=398s total=2953s
+[run] uk_long ternary_rot: 4 windows todo ([8, 9, 10, 11])
+  done uk_long ternary_rot w=[8, 9, 10, 11] (12/12) chunk=424s total=3377s
+[run] uk_long ternary_rot_alpha: 4 windows todo ([8, 9, 10, 11])
+  done uk_long ternary_rot_alpha w=[8, 9, 10, 11] (12/12) chunk=433s total=3810s
+[run] uk_concat int8_fused: 4 windows todo ([8, 9, 10, 11])
+  done uk_concat int8_fused w=[8, 9, 10, 11] (12/12) chunk=404s total=4214s
+[run] uk_concat ternary_rot: 4 windows todo ([8, 9, 10, 11])
+  done uk_concat ternary_rot w=[8, 9, 10, 11] (12/12) chunk=434s total=4648s
+[run] uk_concat ternary_rot_alpha: 4 windows todo ([8, 9, 10, 11])
+  done uk_concat ternary_rot_alpha w=[8, 9, 10, 11] (12/12) chunk=438s total=5086s
+H1B COMPLETE up to max_windows=12 in 5086.3s
+[stage] H1b max_windows=12 exit=0 2026-11-24T08:59:03+02:00
