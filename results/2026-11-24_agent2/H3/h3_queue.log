@@ -1,0 +1,82 @@
+=== H3 LAYER-MAJOR QUEUE START 2026-11-24T02:25:50+02:00 MemAvailable=11530052kB ===
+mem_check need=6GB avail=11259MB
+[stage] bitnet 2026-11-24T02:25:50+02:00
+Running as unit: run-p141237-i142204.scope; invocation ID: 666e1592bec34c23bdc8d0ca62b23590
+[bitnet parity check fp32] layer_major vs B=1 ref max_abs_lp_diff=0.000e+00
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[bitnet parity check S3+s4r32] layer_major vs B=1 ref max_abs_lp_diff=0.000e+00
+[run] bitnet fp32 en: 32 todo (chunk=32)
+  bitnet fp32       en 32/32 t=271s rss=1.86GB
+[done] bitnet fp32       en ppl=24.077 t=271.3s rss=1.86GB peak=2.44GB
+[run] bitnet fp32 uk: 32 todo (chunk=32)
+  bitnet fp32       uk 32/32 t=716s rss=1.98GB
+[done] bitnet fp32       uk ppl=232.019 t=716.2s rss=1.98GB peak=2.62GB
+[kv_ptq] installed tenzo_int8: replica of engine int8_fused
+[run] bitnet tenzo_int8 en: 32 todo (chunk=32)
+  bitnet tenzo_int8 en 32/32 t=988s rss=1.98GB
+[done] bitnet tenzo_int8 en ppl=24.101 t=988.1s rss=1.98GB peak=2.62GB
+[run] bitnet tenzo_int8 uk: 32 todo (chunk=32)
+  bitnet tenzo_int8 uk 32/32 t=1459s rss=1.92GB
+[done] bitnet tenzo_int8 uk ppl=232.351 t=1458.8s rss=1.92GB peak=2.63GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 en: 32 todo (chunk=32)
+  bitnet S3+s4r32   en 32/32 t=1744s rss=1.97GB
+[done] bitnet S3+s4r32   en ppl=24.108 t=1743.8s rss=1.97GB peak=2.63GB
+[run] bitnet S3+s4r32 uk: 32 todo (chunk=32)
+  bitnet S3+s4r32   uk 32/32 t=2215s rss=1.92GB
+[done] bitnet S3+s4r32   uk ppl=248.529 t=2214.5s rss=1.92GB peak=2.63GB
+[kv_ptq] installed S13+s4r32: K INT4 asym g=32, V S10 + sinks 4 + recent 32 INT8
+[run] bitnet S13+s4r32 en: 32 todo (chunk=32)
+  bitnet S13+s4r32  en 32/32 t=2500s rss=1.97GB
+[done] bitnet S13+s4r32  en ppl=24.103 t=2500.1s rss=1.97GB peak=2.63GB
+[run] bitnet S13+s4r32 uk: 32 todo (chunk=32)
+  bitnet S13+s4r32  uk 32/32 t=2973s rss=2.03GB
+[done] bitnet S13+s4r32  uk ppl=248.582 t=2973.1s rss=2.03GB peak=2.67GB
+[stage] bitnet exit=0 2026-11-24T03:17:07+02:00
+mem_check need=8GB avail=11198MB
+[stage] eurollm 2026-11-24T03:17:07+02:00
+Running as unit: run-p145547-i145886.scope; invocation ID: f80f6affee3d47708d127cea75ae9abf
+Loading /home/illia/tenzo-refs/hf/eurollm-1.7b (bfloat16 + per-layer fp32 cache, threads=6)...
+[eurollm parity] layer_major vs B=1 ref: fp=0.000e+00, S3+s4r32=0.000e+00; rss=3.35GB
+[run] eurollm fp en: 32 windows (chunk=32)
+  eurollm fp         en 32/32 t=278s rss=3.55GB
+[run] eurollm fp uk: 32 windows (chunk=32)
+  eurollm fp         uk 32/32 t=606s rss=3.68GB
+[run] eurollm tenzo_int8 en: 32 windows (chunk=32)
+  eurollm tenzo_int8 en 32/32 t=809s rss=3.68GB
+[run] eurollm tenzo_int8 uk: 32 windows (chunk=32)
+  eurollm tenzo_int8 uk 32/32 t=1138s rss=3.68GB
+[run] eurollm S3+s4r32 en: 32 windows (chunk=32)
+  eurollm S3+s4r32   en 32/32 t=1393s rss=3.68GB
+[run] eurollm S3+s4r32 uk: 32 windows (chunk=32)
+  eurollm S3+s4r32   uk 32/32 t=1839s rss=3.69GB
+[run] eurollm S13+s4r32 en: 32 windows (chunk=32)
+  eurollm S13+s4r32  en 32/32 t=2094s rss=3.69GB
+[run] eurollm S13+s4r32 uk: 32 windows (chunk=32)
+  eurollm S13+s4r32  uk 32/32 t=2539s rss=3.70GB
+DONE eurollm in 2539.2s peak_rss=4.02GB
+[stage] eurollm exit=0 2026-11-24T03:59:30+02:00
+mem_check need=8GB avail=11142MB
+[stage] qwen 2026-11-24T03:59:30+02:00
+Running as unit: run-p149148-i146275.scope; invocation ID: 1a2df18969dc475fb8766776c3d673c3
+Loading /home/illia/tenzo-refs/hf/qwen2.5-1.5b (bfloat16 + per-layer fp32 cache, threads=6)...
+[qwen parity] layer_major vs B=1 ref: fp=0.000e+00, S3+s4r32=0.000e+00; rss=3.60GB
+[run] qwen fp en: 32 windows (chunk=32)
+  qwen fp         en 32/32 t=300s rss=3.64GB
+[run] qwen fp uk: 32 windows (chunk=32)
+  qwen fp         uk 32/32 t=908s rss=3.76GB
+[run] qwen tenzo_int8 en: 32 windows (chunk=32)
+  qwen tenzo_int8 en 32/32 t=1098s rss=3.76GB
+[run] qwen tenzo_int8 uk: 32 windows (chunk=32)
+  qwen tenzo_int8 uk 32/32 t=1703s rss=3.79GB
+[run] qwen S3+s4r32 en: 32 windows (chunk=32)
+  qwen S3+s4r32   en 32/32 t=1935s rss=3.72GB
+[run] qwen S3+s4r32 uk: 32 windows (chunk=32)
+  qwen S3+s4r32   uk 32/32 t=2791s rss=3.75GB
+[run] qwen S13+s4r32 en: 32 windows (chunk=32)
+  qwen S13+s4r32  en 32/32 t=3022s rss=3.78GB
+[run] qwen S13+s4r32 uk: 32 windows (chunk=32)
+  qwen S13+s4r32  uk 32/32 t=3877s rss=3.75GB
+DONE qwen in 3877.4s peak_rss=4.07GB
+[stage] qwen exit=0 2026-11-24T05:04:10+02:00
+=== H3 QUEUE DONE 2026-11-24T05:04:10+02:00 ===

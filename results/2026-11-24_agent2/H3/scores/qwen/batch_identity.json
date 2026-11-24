@@ -1,0 +1,5 @@
+{
+ "model": "/home/illia/tenzo-refs/hf/qwen2.5-1.5b",
+ "eager_b1_vs_lm_fp": 0.0,
+ "s3_b1_vs_lm_s3": 0.0
+}
