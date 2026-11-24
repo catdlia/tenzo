@@ -1,0 +1,13 @@
+[done] en_wiki  int8_fused         in 377.9s
+[done] en_wiki  ternary_rot        in 375.9s
+[done] en_wiki  ternary_rot_alpha  in 375.0s
+[done] uk_web   int8_fused         in 366.3s
+[done] uk_web   ternary_rot        in 372.9s
+[done] uk_web   ternary_rot_alpha  in 374.3s
+[done] en_web   int8_fused         in 369.1s
+[done] en_web   ternary_rot        in 375.4s
+[done] en_web   ternary_rot_alpha  in 376.2s
+[done] uk_wiki  int8_fused         in 365.0s
+[done] uk_wiki  ternary_rot        in 374.2s
+[done] uk_wiki  ternary_rot_alpha  in 375.9s
+Wrote /home/illia/CLionProjects/untitled/results/2026-11-24_agent2/H2/alpha_domain_transfer.{csv,md,png}
