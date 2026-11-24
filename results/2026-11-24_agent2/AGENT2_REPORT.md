@@ -1,0 +1,47 @@
+# Tenzo Agent 2 Progress Report (2026-11-24)
+
+- **Branch:** `agent2/2026-11-24` (branched from `agent2/2026-11-23@42a8d4cb0275ebdaf31985932f44dcd7671691d1`)
+- **Start weights checksum (`models/bitnet-1.58b/weights.bin`):** `68c8f32b7f5d905ed7b3aaaf688e8913ed12227c7d9afc1bf3f429e3479400d1`
+- **Initial machine state (`2026-11-24T02:03:38+02:00`):** **User at laptop ("власник за ноутом")** — `loadavg` `2.33 2.09 2.22`, `MemAvailable` `9.5 GiB`, `/` `8.5G` free (`99%` used), governor `powersave`, active `antigravity`, `Telegram`, `Hyprland`, `zen-bin`, `qemu-system-x86`, `claude-desktop`, `steam`, `jetbrains-toolbox`. Mode: `nice -n 19 ionice -c3`, builds `-j1`, Python under `systemd-run --user --scope -p MemoryMax=... -p MemorySwapMax=0`, `B1` via self-gated idle runner at end of session.
+
+## 1. Tasks
+
+| Task | Class | Status | Time | Key Result | Files |
+|---|---|---|---|---|---|
+| **L0** (Start, snapshot & L4 baseline gates) | L | **done** | ~5 min | Branched `agent2/2026-11-24` from `42a8d4c`; `weights.bin` sha256 matches `68c8f32b…00d1`; G6 (5 KV modes) & PPL4 (`16.7`, `PROC_HWM_KB=913864`) byte-identical to `results/2026-11-23_agent2/L4/` (`sha256: 46489eb1…b6eb5`) | `results/2026-11-24_agent2/L0/` |
+| **L1** (T43: Repo hygiene, licenses, `kv_alpha` header) | L + build | pending | — | — | — |
+| **H1a** (Positional UK degradation on `H3 ctx=2048`) | L (analysis) | pending | — | — | — |
+| **H3** (T45: Parallel corpus FLORES-200 EN/UK, 3 models) | H | pending | — | — | — |
+| **H1b** (T44: Long document vs concat on `ctx=2048`) | H | pending | — | — | — |
+| **H2** (Cross-domain transfer of `alpha_mix` on BitNet `2×2`) | H | pending | — | — | — |
+| **H4** (T46: Mechanism ablations & diagnostics on FLORES-12) | H | pending | — | — | — |
+| **L2** (T02: Parity gate `v2` INT8 embeddings/head diag) | L | pending | — | — | — |
+| **L3** (Paper claims registry) | L | pending | — | — | — |
+| **L4** (End-of-day wrap-up, tables, changelog, report) | L | pending | — | — | — |
+| **B1** (T38: Self-gated idle speed runner `tenzo-b1`) | B (daemon) | pending | — | — | — |
+
+## 2. Decision Log
+
+- **D1 (`2026-11-24T01:57` — Owner D1: Parity gate `v2`):** Threshold `1 - cos <= 1.5 * (1 - cos_ref)` stays strict (no relaxation, no noise floor such as `5e-4`). Report `v2` honestly as `max_abs 7/7, PPL ratio CI OK, cos 6/7` and diagnose whether INT8 embeddings + INT8 LM head account for `p4`/`p2` (`L2`).
+- **D2 (`2026-11-24T01:57` — Owner D2: `alpha_mix.txt` & provenance):** Default `--kv-quant ternary_rot` behavior stays unchanged; calibrated alpha remains opt-in (`TENZO_KV_ALPHA` or `--kv-alpha <path>`). Engine must record `# kv_alpha=<path> sha256=<hex>` in score file headers (`L1`). Default decision awaits `H2` domain-transfer results.
+- **D3 (`2026-11-24T01:57` — Owner D3: Downloads & disk):** No new models downloaded; only text corpora totaling `<= 200 MB` allowed while keeping `>= 6 GB` free on `/` (`df -h /` checked before each download).
+- **D4 (`2026-11-24T01:57` — Owner D4: Tokenizer tree hygiene):** Remove `tools/tokenizer/bitnet_b158_tokenizer.json` from git index (`git rm --cached`) without deleting files on disk (`L1`).
+- **D5 (`2026-11-24T01:57` — Owner D5: Benchmarks):** Speed benchmarks run via self-gated background runner `scripts/b1_idle_runner.sh` (`tenzo-b1` user unit) launched at the end of session (`B1`). Runner neither commits nor pushes.
+- **D6 (`2026-11-24T02:03` — `L0` Machine State):** `loadavg 2.33 2.09 2.22`, `MemAvailable 9.5 GiB`, `/` `8.5G` free (`99%`), governor `powersave`, active desktop apps (`zen-bin`, `Telegram`, `steam`, `qemu-system-x86`, `claude-desktop`, `jetbrains-toolbox`). G6 (all 5 modes) and PPL4 match `results/2026-11-23_agent2/L4/` byte-for-byte.
+
+## 3. Blockers & Disk Watch
+
+- **Disk space on `/`:** `8.5G` free (`464G / 476G`, `99%` used) at `L0` — above `6 GB` floor for text corpora (`H3` FLORES-200 ~25 MB and `H1b` Wikipedia/Kobza slices).
+- **RAM (`MemAvailable 9.5 GiB`):** Fits `4G` golden (`<= 6G` needed) and `6G` HF models (`<= 8G` needed) sequentially under `systemd-run` memory scopes; never run two heavy processes concurrently.
+
+## 4. What Must NOT Be Claimed
+
+- No post-fix speed numbers until `B1` (`tenzo-b1`) completes on an idle machine and the next session verifies `STATUS` and CSVs.
+- No `7/7` pass claim for parity gate `v2`.
+- No claim that UK positional degradation (`ctx=2048`) is a language property unless `H1b` `UK-long` slope 95% CI exceeds `0` (with `N >= 8`).
+- No claim that UK penalty is normalization-independent unless `H3` shows `CI(D) > 0` across at least two models.
+- No claim that `alpha_mix` is the default for `ternary_rot`.
+
+## 5. Questions to Owner
+
+*(To be finalized with evidence and recommendations at `L4`.)*
