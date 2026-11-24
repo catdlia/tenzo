@@ -30,6 +30,7 @@
 - **D6 (`2026-11-24T02:03` — `L0` Machine State):** `loadavg 2.33 2.09 2.22`, `MemAvailable 9.5 GiB`, `/` `8.5G` free (`99%`), governor `powersave`, active desktop apps (`zen-bin`, `Telegram`, `steam`, `qemu-system-x86`, `claude-desktop`, `jetbrains-toolbox`). G6 (all 5 modes) and PPL4 match `results/2026-11-23_agent2/L4/` byte-for-byte.
 - **D7 (`2026-11-24T02:14` — `H1a` Pre-registration Machine State):** `loadavg 2.71 3.62 3.09`, `MemAvailable 10.0 GiB`, `/` `8.5G` free, governor `powersave`. CPU-light Python OLS/bootstrap analysis over existing `ctx=2048` score files.
 - **D8 (`2026-11-24T02:16` — `H3` Pre-registration Machine State):** `loadavg 2.42 3.23 3.00`, `MemAvailable 10.0 GiB` (`MemAvailable - 2 GB = 8.0 GiB`, fits `4G` Golden and `6G` HF scopes sequentially), `/` `8.5G` free (`>= 6G` limit under D3), governor `powersave`. Pre-registering `H3/parallel_flores.md` before downloading `flores200_dataset.tar.gz`.
+- **D9 (`2026-11-24T05:07` — `H1b` Pre-registration Machine State):** `loadavg 2.55 4.34 5.30`, `MemAvailable 10.0 GiB`, `/` `8.7G` free (`>= 6G` limit under D3), governor `powersave`. Engine-only `ctx=2048` runs (`~950 MB` peak RSS) run sequentially (`1` container at a time) under `nice -n 19 ionice -c3`. Pre-registering `H1b/long_vs_concat_2048.md` before fetching Wikipedia/Kobza slices.
 
 ## 3. Blockers & Disk Watch
 
