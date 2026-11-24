@@ -1,0 +1,49 @@
+Running as unit: run-p1073568-i1075149.scope; invocation ID: 489006a4d1f544a9b4abd20b5bbbf956
+Loading /home/illia/tenzo-refs/hf/eurollm-1.7b (bfloat16 + per-layer fp32 linear cache, threads=6)... rss=0.45GB
+[eurollm parity fp] max_abs_lp_diff=0.000e+00
+[eurollm parity S3+s4r32] max_abs_lp_diff=0.000e+00
+[run] eurollm fp en: 48 windows (chunk=48)
+  eurollm fp         en 48/48 t=364s rss=3.40GB
+[done] eurollm fp         en nll=32887.528 tok=12532 t=363.6s rss=3.40GB peak=4.62GB
+[run] eurollm fp uk: 48 windows (chunk=48)
+  eurollm fp         uk 48/48 t=951s rss=3.61GB
+[done] eurollm fp         uk nll=41434.580 tok=17851 t=951.2s rss=3.61GB peak=4.83GB
+[run] eurollm fp pl: 48 windows (chunk=48)
+  eurollm fp         pl 48/48 t=1423s rss=3.68GB
+[done] eurollm fp         pl nll=37653.595 tok=15199 t=1422.7s rss=3.68GB peak=4.90GB
+[run] eurollm fp bg: 48 windows (chunk=48)
+  eurollm fp         bg 48/48 t=1988s rss=3.71GB
+[done] eurollm fp         bg nll=39491.765 tok=17376 t=1988.0s rss=3.71GB peak=4.93GB
+[run] eurollm fp de: 48 windows (chunk=48)
+  eurollm fp         de 48/48 t=2461s rss=3.74GB
+[done] eurollm fp         de nll=37362.903 tok=15251 t=2461.2s rss=3.74GB peak=4.96GB
+[run] eurollm tenzo_int8 en: 48 windows (chunk=48)
+  eurollm tenzo_int8 en 48/48 t=2827s rss=3.74GB
+[done] eurollm tenzo_int8 en nll=32890.874 tok=12532 t=2827.2s rss=3.74GB peak=4.96GB
+[run] eurollm tenzo_int8 uk: 48 windows (chunk=48)
+  eurollm tenzo_int8 uk 48/48 t=3416s rss=3.75GB
+[done] eurollm tenzo_int8 uk nll=41443.261 tok=17851 t=3416.4s rss=3.75GB peak=4.97GB
+[run] eurollm tenzo_int8 pl: 48 windows (chunk=48)
+  eurollm tenzo_int8 pl 48/48 t=3890s rss=3.75GB
+[done] eurollm tenzo_int8 pl nll=37656.624 tok=15199 t=3889.5s rss=3.75GB peak=4.97GB
+[run] eurollm tenzo_int8 bg: 48 windows (chunk=48)
+  eurollm tenzo_int8 bg 48/48 t=4457s rss=3.75GB
+[done] eurollm tenzo_int8 bg nll=39486.650 tok=17376 t=4456.5s rss=3.75GB peak=4.97GB
+[run] eurollm tenzo_int8 de: 48 windows (chunk=48)
+  eurollm tenzo_int8 de 48/48 t=4931s rss=3.77GB
+[done] eurollm tenzo_int8 de nll=37349.890 tok=15251 t=4931.1s rss=3.77GB peak=4.99GB
+[run] eurollm S3+s4r32 en: 48 windows (chunk=48)
+  eurollm S3+s4r32   en 48/48 t=5426s rss=3.73GB
+[done] eurollm S3+s4r32   en nll=33098.983 tok=12532 t=5426.2s rss=3.73GB peak=4.99GB
+[run] eurollm S3+s4r32 uk: 48 windows (chunk=48)
+  eurollm S3+s4r32   uk 48/48 t=6272s rss=3.75GB
+[done] eurollm S3+s4r32   uk nll=41933.163 tok=17851 t=6272.5s rss=3.75GB peak=4.99GB
+[run] eurollm S3+s4r32 pl: 48 windows (chunk=48)
+  eurollm S3+s4r32   pl 48/48 t=6936s rss=3.75GB
+[done] eurollm S3+s4r32   pl nll=37998.664 tok=15199 t=6935.9s rss=3.75GB peak=4.99GB
+[run] eurollm S3+s4r32 bg: 48 windows (chunk=48)
+  eurollm S3+s4r32   bg 48/48 t=7745s rss=3.75GB
+[done] eurollm S3+s4r32   bg nll=40139.588 tok=17376 t=7745.5s rss=3.75GB peak=4.99GB
+[run] eurollm S3+s4r32 de: 48 windows (chunk=48)
+  eurollm S3+s4r32   de 48/48 t=8410s rss=3.75GB
+[done] eurollm S3+s4r32   de nll=37710.926 tok=15251 t=8410.4s rss=3.75GB peak=4.99GB

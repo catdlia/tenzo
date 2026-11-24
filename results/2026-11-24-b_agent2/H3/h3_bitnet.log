@@ -1,0 +1,51 @@
+Running as unit: run-p319716-i332149.scope; invocation ID: f031da84b1a34618b6314b45a3da3e91
+[bitnet parity fp32] max_abs_lp_diff=0.000e+00
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[bitnet parity S3+s4r32] max_abs_lp_diff=0.000e+00
+[run] bitnet fp32 en: 48 windows (chunk=48)
+  bitnet fp32       en 48/48 t=522s rss=1.74GB
+[done] bitnet fp32       en nll=34313.990 tok=11391 t=522.3s rss=1.74GB peak=2.45GB
+[run] bitnet fp32 uk: 48 windows (chunk=48)
+  bitnet fp32       uk 48/48 t=1418s rss=1.98GB
+[done] bitnet fp32       uk nll=98107.450 tok=18633 t=1418.3s rss=1.98GB peak=2.64GB
+[run] bitnet fp32 pl: 48 windows (chunk=48)
+  bitnet fp32       pl 48/48 t=2502s rss=1.94GB
+[done] bitnet fp32       pl nll=90492.827 tok=21425 t=2501.6s rss=1.94GB peak=2.68GB
+[run] bitnet fp32 bg: 48 windows (chunk=48)
+  bitnet fp32       bg 48/48 t=3665s rss=1.98GB
+[done] bitnet fp32       bg nll=102403.366 tok=23115 t=3664.8s rss=1.98GB peak=2.68GB
+[run] bitnet fp32 de: 48 windows (chunk=48)
+  bitnet fp32       de 48/48 t=4511s rss=1.95GB
+[done] bitnet fp32       de nll=68801.786 tok=18052 t=4511.1s rss=1.95GB peak=2.68GB
+[kv_ptq] installed tenzo_int8: replica of engine int8_fused
+[run] bitnet tenzo_int8 en: 48 windows (chunk=48)
+  bitnet tenzo_int8 en 48/48 t=5043s rss=1.95GB
+[done] bitnet tenzo_int8 en nll=34324.734 tok=11391 t=5043.4s rss=1.95GB peak=2.68GB
+[run] bitnet tenzo_int8 uk: 48 windows (chunk=48)
+  bitnet tenzo_int8 uk 48/48 t=5965s rss=1.98GB
+[done] bitnet tenzo_int8 uk nll=98108.777 tok=18633 t=5964.7s rss=1.98GB peak=2.68GB
+[run] bitnet tenzo_int8 pl: 48 windows (chunk=48)
+  bitnet tenzo_int8 pl 48/48 t=7081s rss=1.94GB
+[done] bitnet tenzo_int8 pl nll=90473.116 tok=21425 t=7081.3s rss=1.94GB peak=2.70GB
+[run] bitnet tenzo_int8 bg: 48 windows (chunk=48)
+  bitnet tenzo_int8 bg 48/48 t=8284s rss=1.94GB
+[done] bitnet tenzo_int8 bg nll=102460.143 tok=23115 t=8283.7s rss=1.94GB peak=2.74GB
+[run] bitnet tenzo_int8 de: 48 windows (chunk=48)
+  bitnet tenzo_int8 de 48/48 t=9156s rss=1.94GB
+[done] bitnet tenzo_int8 de nll=68798.254 tok=18052 t=9155.6s rss=1.94GB peak=2.74GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 en: 48 windows (chunk=48)
+  bitnet S3+s4r32   en 48/48 t=9709s rss=1.96GB
+[done] bitnet S3+s4r32   en nll=34197.815 tok=11391 t=9709.5s rss=1.96GB peak=2.74GB
+[run] bitnet S3+s4r32 uk: 48 windows (chunk=48)
+  bitnet S3+s4r32   uk 48/48 t=10644s rss=1.96GB
+[done] bitnet S3+s4r32   uk nll=99649.562 tok=18633 t=10643.8s rss=1.96GB peak=2.74GB
+[run] bitnet S3+s4r32 pl: 48 windows (chunk=48)
+  bitnet S3+s4r32   pl 48/48 t=11748s rss=1.98GB
+[done] bitnet S3+s4r32   pl nll=91933.107 tok=21425 t=11748.5s rss=1.98GB peak=2.74GB
+[run] bitnet S3+s4r32 bg: 48 windows (chunk=48)
+  bitnet S3+s4r32   bg 48/48 t=12948s rss=2.05GB
+[done] bitnet S3+s4r32   bg nll=104433.339 tok=23115 t=12948.2s rss=2.05GB peak=2.74GB
+[run] bitnet S3+s4r32 de: 48 windows (chunk=48)
+  bitnet S3+s4r32   de 48/48 t=13802s rss=1.94GB
+[done] bitnet S3+s4r32   de nll=69584.172 tok=18052 t=13802.3s rss=1.94GB peak=2.74GB
