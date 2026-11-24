@@ -425,6 +425,8 @@ bool runTokenizerTests() {
     runtime::Tokenizer tok;
     std::string loaded_from;
     for (const char* cand : {
+             "models/bitnet-1.58b-v2/tokenizer.json",
+             "/app/models/bitnet-1.58b-v2/tokenizer.json",
              "models/bitnet-1.58b-v2/tokenizer.vocab",
              "/app/models/bitnet-1.58b-v2/tokenizer.vocab",
              "tools/tokenizer/bitnet_b158_tokenizer.json",

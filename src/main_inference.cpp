@@ -23,7 +23,9 @@
 #include <iomanip>
 #include <cmath>
 #include <algorithm>
+#include <array>
 #include <cstdio>
+#include <cstdlib>
 
 // ANSI Color Codes
 #define ANSI_RESET   "\033[0m"
@@ -81,6 +83,70 @@ static double log_prob_of(const std::vector<float>& logits, int target) {
 
 static bool valid_kv_mode(const std::string& m) {
     return m == "fp32" || m == "int8_fused" || m == "tl1_fused" || m == "popcount_fused" || m == "paged_int8" || m == "ternary_rot";
+}
+
+static std::string sha256_file_hex(const std::string& path) {
+    std::ifstream ifs(path, std::ios::binary);
+    if (!ifs.is_open()) return "unreadable";
+    std::vector<uint8_t> data((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+
+    static const uint32_t K[64] = {
+        0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u, 0xab1c5ed5u,
+        0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu, 0x9bdc06a7u, 0xc19bf174u,
+        0xe49b69c1u, 0xefbe4786u, 0x0fc19dc6u, 0x240ca1ccu, 0x2de92c6fu, 0x4a7484aau, 0x5cb0a9dcu, 0x76f988dau,
+        0x983e5152u, 0xa831c66du, 0xb00327c8u, 0xbf597fc7u, 0xc6e00bf3u, 0xd5a79147u, 0x06ca6351u, 0x14292967u,
+        0x27b70a85u, 0x2e1b2138u, 0x4d2c6dfcu, 0x53380d13u, 0x650a7354u, 0x766a0abbu, 0x81c2c92eu, 0x92722c85u,
+        0xa2bfe8a1u, 0xa81a664bu, 0xc24b8b70u, 0xc76c51a3u, 0xd192e819u, 0xd6990624u, 0xf40e3585u, 0x106aa070u,
+        0x19a4c116u, 0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
+        0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u, 0xc67178f2u
+    };
+    auto rotr = [](uint32_t x, uint32_t n) -> uint32_t { return (x >> n) | (x << (32u - n)); };
+
+    const uint64_t bit_len = static_cast<uint64_t>(data.size()) * 8ULL;
+    data.push_back(0x80u);
+    while ((data.size() % 64u) != 56u) data.push_back(0u);
+    for (int s = 56; s >= 0; s -= 8) {
+        data.push_back(static_cast<uint8_t>((bit_len >> s) & 0xffu));
+    }
+
+    uint32_t H[8] = {
+        0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
+        0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u
+    };
+    for (size_t off = 0; off < data.size(); off += 64u) {
+        uint32_t w[64];
+        for (int t = 0; t < 16; ++t) {
+            const size_t idx = off + static_cast<size_t>(t) * 4u;
+            w[t] = (static_cast<uint32_t>(data[idx]) << 24) | (static_cast<uint32_t>(data[idx + 1]) << 16) |
+                   (static_cast<uint32_t>(data[idx + 2]) << 8) | static_cast<uint32_t>(data[idx + 3]);
+        }
+        for (int t = 16; t < 64; ++t) {
+            uint32_t s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >> 3);
+            uint32_t s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >> 10);
+            w[t] = w[t - 16] + s0 + w[t - 7] + s1;
+        }
+        uint32_t a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+        for (int t = 0; t < 64; ++t) {
+            uint32_t S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+            uint32_t ch = (e & f) ^ ((~e) & g);
+            uint32_t t1 = h + S1 + ch + K[t] + w[t];
+            uint32_t S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+            uint32_t maj = (a & b) ^ (a & c) ^ (b & c);
+            uint32_t t2 = S0 + maj;
+            h = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+        }
+        H[0] += a; H[1] += b; H[2] += c; H[3] += d;
+        H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+    }
+
+    static const char HEX[] = "0123456789abcdef";
+    std::string out(64, '0');
+    for (int i = 0; i < 8; ++i) {
+        for (int b = 0; b < 8; ++b) {
+            out[static_cast<size_t>(i) * 8u + static_cast<size_t>(b)] = HEX[(H[i] >> ((7 - b) * 4)) & 0xfu];
+        }
+    }
+    return out;
 }
 
 static std::string base64_decode(const std::string& in) {
@@ -141,6 +207,7 @@ struct CliOptions {
     std::string prompt = "";
     std::string system_prompt = "You are Tenzo, a fast and helpful AI assistant powered by 1.58-bit native MLIR execution.";
     std::string kv_mode = "int8_fused";
+    std::string kv_alpha_path = "";
     std::string device = "cpu";
     int max_tokens = 128;
     int ctx_size = 8192;
@@ -195,6 +262,7 @@ void print_help(const char* prog_name) {
               << ANSI_GREEN << "rocm" << ANSI_RESET << " (AMDGCN/Vulkan), "
               << ANSI_GREEN << "riscv" << ANSI_RESET << " (RVV 1.0)\n";
     std::cout << "  --kv-quant <mode>           KV-Cache Quantization mode (default: int8_fused)\n";
+    std::cout << "  --kv-alpha <path>           Per-layer ternary_rot clip multiplier file (sets TENZO_KV_ALPHA)\n";
     std::cout << "  --prefill <sequential|batched>  prompt prefill: token by token (default) or in chunks (CPU + I2_S)\n";
     std::cout << "  --prefill-chunk <n>         chunk size for --prefill batched (default 32)\n";
     std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (14.2x comp, 84MB), " 
@@ -259,6 +327,8 @@ int main(int argc, char** argv) {
             if (opt.prefill_chunk < 1) { std::cerr << "error: --prefill-chunk must be >= 1\n"; return 2; }
         } else if (arg == "--kv-quant" && i + 1 < argc) {
             opt.kv_mode = argv[++i];
+        } else if (arg == "--kv-alpha" && i + 1 < argc) {
+            opt.kv_alpha_path = argv[++i];
         } else if (arg == "--system" && i + 1 < argc) {
             opt.system_prompt = argv[++i];
         } else if (arg == "--chat") {
@@ -380,6 +450,10 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    if (!opt.kv_alpha_path.empty()) {
+        setenv("TENZO_KV_ALPHA", opt.kv_alpha_path.c_str(), 1);
+    }
+
     // Initialize Tenzo Engine
     tenzo_config_t config = tenzo_default_config();
     config.kv_mode = opt.kv_mode.c_str();
@@ -498,6 +572,11 @@ int main(int argc, char** argv) {
             std::ofstream of(opt.score_out);
             of << std::setprecision(9);
             of << "# kv_mode=" << opt.kv_mode << " ctx=" << opt.ctx_size << " windows=" << windows.size() << "\n";
+            if (const char* alpha_env = std::getenv("TENZO_KV_ALPHA")) {
+                if (*alpha_env) {
+                    of << "# kv_alpha=" << alpha_env << " sha256=" << sha256_file_hex(alpha_env) << "\n";
+                }
+            }
             double tot_nll = 0.0; long tot_n = 0;
             for (size_t w = 0; w < windows.size(); ++w) {
                 const auto& ids = windows[w];

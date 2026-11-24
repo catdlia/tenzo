@@ -18,7 +18,7 @@ public:
     //   1. <path> directly if .json
     //   2. <dir>/tokenizer.json
     //   3. TENZO_TOKENIZER_JSON environment variable (when vocab >= 128k or explicit)
-    //   4. tools/tokenizer/bitnet_b158_tokenizer.json (when vocab >= 128k)
+    //   4. model-dir/local untracked bitnet tokenizer.json fallbacks (when vocab >= 128k)
     // Falls back to legacy tokenizer.vocab for small mock/unit-test vocabularies.
     bool load(const std::string& path);
 

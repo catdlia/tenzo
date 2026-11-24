@@ -1,0 +1,34 @@
+{
+  "total_cases": 3200,
+  "bos_exact": 3200,
+  "raw_exact": 3200,
+  "roundtrip_exact": 3200,
+  "by_category": {
+    "adversarial": {
+      "n": 34,
+      "bos_ok": 34,
+      "raw_ok": 34,
+      "rt_ok": 34
+    },
+    "wikitext2_en": {
+      "n": 900,
+      "bos_ok": 900,
+      "raw_ok": 900,
+      "rt_ok": 900
+    },
+    "kobza_uk": {
+      "n": 1306,
+      "bos_ok": 1306,
+      "raw_ok": 1306,
+      "rt_ok": 1306
+    },
+    "code": {
+      "n": 960,
+      "bos_ok": 960,
+      "raw_ok": 960,
+      "rt_ok": 960
+    }
+  },
+  "sample_mismatches": [],
+  "sample_rt_failures": []
+}

@@ -147,6 +147,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--min-cases", type=int, default=3000)
     ap.add_argument("--model-dir", default="/app/models/bitnet-1.58b-v2")
+    ap.add_argument("--hf-ref", default="microsoft/bitnet-b1.58-2B-4T",
+                    help="HF repo ID or local dir (e.g. models/bitnet-1.58b-v2) containing tokenizer.json")
     ap.add_argument("--binary", default="/app/cmake-build-debug/tenzo-inference")
     ap.add_argument("--report-json", default="")
     args = ap.parse_args()
@@ -156,7 +158,20 @@ def main() -> int:
         print(f"ERROR: collected only {len(cases)} < {args.min_cases} cases", file=sys.stderr)
         return 2
 
-    tok = AutoTokenizer.from_pretrained("microsoft/bitnet-b1.58-2B-4T", local_files_only=True)
+    local_tok_dir = ROOT / "models" / "bitnet-1.58b-v2"
+    if args.hf_ref == "microsoft/bitnet-b1.58-2B-4T" and (local_tok_dir / "tokenizer.json").is_file():
+        try:
+            tok = AutoTokenizer.from_pretrained(args.hf_ref, local_files_only=True)
+        except Exception:
+            from tokenizers import Tokenizer as FastTok  # noqa: E402
+            ft = FastTok.from_file(str(local_tok_dir / "tokenizer.json"))
+            class _Wrap:
+                def encode(self, s, add_special_tokens=True):
+                    ids = ft.encode(s, add_special_tokens=False).ids
+                    return ([128000] + ids) if add_special_tokens else ids
+            tok = _Wrap()
+    else:
+        tok = AutoTokenizer.from_pretrained(args.hf_ref, local_files_only=True)
 
     payload_lines = [base64.b64encode(s.encode("utf-8")).decode("ascii") for _, s in cases]
     payload = "\n".join(payload_lines) + "\n.\n"

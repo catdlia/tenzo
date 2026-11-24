@@ -581,6 +581,8 @@ bool Tokenizer::load(const std::string& path) {
     // 5. Upgrade valid >=128k BitNet/Llama-3 vocabs to full BPE tokenizer.json when available
     if (legacy_ok && id_to_decoded_.size() >= 128000) {
         for (const char* cand : {
+                 "models/bitnet-1.58b-v2/tokenizer.json",
+                 "/app/models/bitnet-1.58b-v2/tokenizer.json",
                  "tools/tokenizer/bitnet_b158_tokenizer.json",
                  "/app/tools/tokenizer/bitnet_b158_tokenizer.json",
                  "../tools/tokenizer/bitnet_b158_tokenizer.json",

@@ -320,6 +320,8 @@ def negative_control_truncated(model_dir: str) -> Dict[str, Any]:
     try:
         for f in ("config.json", "model.mlir", "tokenizer.vocab"):
             shutil.copy(src / f, tmp / f)
+        if (src / "tokenizer.json").is_file():
+            shutil.copy(src / "tokenizer.json", tmp / "tokenizer.json")
         with open(src / "weights.bin", "rb") as fi, open(tmp / "weights.bin", "wb") as fo:
             fo.write(fi.read(1 << 20))
         rc, out = run_tenzo(["-m", _container_path(tmp), "-p", "Test prompt", "-n", "1", "-t", "0"], timeout_sec=120)
