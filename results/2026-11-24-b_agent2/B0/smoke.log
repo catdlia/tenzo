@@ -1,0 +1,28 @@
+=== runner exit=0 ===
+=== STATUS ===
+done_with_failures 2026-11-24T12:41:03+02:00 smoke=1 valid=0
+=== b1_summary.csv ===
+item,status,attempt,load1_before,load1_after,foreign_cpu_mean,foreign_cpu_max,governor,ac_online,temp_c,out_csv,rc
+smoke_ab_gemv_pp16_tg16,invalid_proc,1,1.73,2.13,0.1195,0.1831,powersave,1,52.0,/home/illia/CLionProjects/untitled/results/2026-11-24-b_agent2/B0/smoke_out/smoke_ab_gemv.csv,0
+=== smoke_ab_gemv.csv ===
+rep,variant,kv,pp,tg,pp_ms,tg_ms,pp_tps,tg_tps,load1
+1,lut,int8_fused,16,16,643.7,766.0,24.856299518409195,20.887728459530027,1.73
+1,i2s,int8_fused,16,16,390.1,629.4,41.01512432709561,25.42103590721322,1.76
+1,i2s,int8_fused,16,16,392.6,613.8,40.75394803871625,26.067122841316394,1.78
+1,lut,int8_fused,16,16,552.9,765.7,28.938325194429375,20.895912237168602,2.05
+=== runner.log ===
+[2026-11-24T12:40:42+02:00] === B1 runner starting (dry_run=0 smoke=1 pin=0-3 foreign_thresh=0.15 sample=2s load_thresh=1.0 consec=20 interval=30s) ===
+[2026-11-24T12:40:42+02:00] SMOKE mode: skipping wait_until_idle pre-gate
+[2026-11-24T12:40:42+02:00] RUN smoke_ab_gemv_pp16_tg16 attempt=1 pinned=0-3 proc_before=1(qemu-system-x86,steam,steamwebhelper,zen-bin) cmd: scripts/ab_gemv_speed.sh '/home/illia/CLionProjects/untitled/results/2026-11-24-b_agent2/B0/smoke_out/smoke_ab_gemv.csv' 1 int8_fused 16 16
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:44+02:00] foreign_cpu=0.0647 load1=1.76 temp_c=69.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:46+02:00] foreign_cpu=0.1831 load1=1.76 temp_c=67.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:48+02:00] foreign_cpu=0.1430 load1=1.78 temp_c=72.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:50+02:00] foreign_cpu=0.0851 load1=1.78 temp_c=72.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:52+02:00] foreign_cpu=0.1020 load1=1.78 temp_c=67.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:55+02:00] foreign_cpu=0.1359 load1=1.79 temp_c=74.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:57+02:00] foreign_cpu=0.1325 load1=1.79 temp_c=74.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:40:59+02:00] foreign_cpu=0.0967 load1=2.05 temp_c=72.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:41:01+02:00] foreign_cpu=0.1119 load1=2.05 temp_c=76.0
+[monitor smoke_ab_gemv_pp16_tg16#1 2026-11-24T12:41:03+02:00] foreign_cpu=0.1405 load1=2.05 temp_c=72.0
+[2026-11-24T12:41:03+02:00] RETRY smoke_ab_gemv_pp16_tg16 attempt=1 status=invalid_proc rc=0 foreign_cpu_mean=0.1195 (max=0.1831, thresh=0.15) proc_b=1(qemu-system-x86,steam,steamwebhelper,zen-bin) proc_a=1(qemu-system-x86,steam,steamwebhelper,zen-bin) load1=1.73->2.13
+[2026-11-24T12:41:03+02:00] FAILED smoke_ab_gemv_pp16_tg16 after 1 attempts; continuing queue
