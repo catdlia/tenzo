@@ -1,0 +1,34 @@
+Running as unit: run-p210038-i195232.scope; invocation ID: 0bf0fda648354865af34665fb5ba0081
+[parity] S3+s4c120 seq=0 max_abs_lp_diff=0.000e+00
+[parity] S3+s4c120 seq=1 max_abs_lp_diff=0.000e+00
+[kv_ptq] installed S3+s4r8: S2 + randomized Hadamard (D=128) + sinks 4 + recent 8 INT8
+[done] S3+s4r8 en t=276.3s
+[kv_ptq] installed S3+s4r12: S2 + randomized Hadamard (D=128) + sinks 4 + recent 12 INT8
+[done] S3+s4r12 en t=553.1s
+[kv_ptq] installed S3+s4r16: S2 + randomized Hadamard (D=128) + sinks 4 + recent 16 INT8
+[done] S3+s4r16 en t=828.6s
+[kv_ptq] installed S3+s4r19: S2 + randomized Hadamard (D=128) + sinks 4 + recent 19 INT8
+[done] S3+s4r19 en t=1098.1s
+[kv_ptq] installed S3+s4r24: S2 + randomized Hadamard (D=128) + sinks 4 + recent 24 INT8
+[done] S3+s4r24 en t=1405.4s
+[kv_ptq] installed S3+s4r40: S2 + randomized Hadamard (D=128) + sinks 4 + recent 40 INT8
+[done] S3+s4r40 uk t=1849.7s
+[kv_ptq] installed S3+s4r48: S2 + randomized Hadamard (D=128) + sinks 4 + recent 48 INT8
+[done] S3+s4r48 uk t=2293.9s
+[kv_ptq] installed S3+s4r54: S2 + randomized Hadamard (D=128) + sinks 4 + recent 54 INT8
+[done] S3+s4r54 uk t=2738.0s
+[kv_ptq] installed S3+s4r64: S2 + randomized Hadamard (D=128) + sinks 4 + recent 64 INT8
+[done] S3+s4r64 uk t=3183.0s
+[kv_ptq] installed S3+s4r96: S2 + randomized Hadamard (D=128) + sinks 4 + recent 96 INT8
+[done] S3+s4r96 uk t=3627.3s
+[done] S3+s4c80 en t=3895.2s
+[done] S3+s4c80 uk t=4340.9s
+[done] S3+s4c120 en t=4609.2s
+[done] S3+s4c120 uk t=5053.0s
+[done] S3+s4c160 en t=5320.5s
+[done] S3+s4c160 uk t=5819.5s
+[done] S3+s4c240 en t=6161.3s
+[done] S3+s4c240 uk t=6749.2s
+[done] K8V:S3+s4c120 en t=7105.2s
+[done] K8V:S3+s4c120 uk t=7791.1s
+Wrote /home/illia/CLionProjects/untitled/results/2026-11-24-b_agent2/H1/char_window_coverage.{csv,md,png} and char_window_paired.csv
