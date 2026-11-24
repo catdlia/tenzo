@@ -1,0 +1,19 @@
+=== systemctl --user status tenzo-b1 ===
+● tenzo-b1.service - [systemd-run] /usr/bin/nice -n 0 /home/illia/CLionProjects/untitled/scripts/b1_idle_runner.sh
+     Loaded: loaded (/run/user/1000/systemd/transient/tenzo-b1.service; transient)
+  Transient: yes
+     Active: active (running) since Tue 2026-11-24 11:10:01 EET; 1h 26min ago
+ Invocation: ce76d2e98d1e4e9098fc332e69dc748e
+   Main PID: 196792 (b1_idle_runner.)
+      Tasks: 2 (limit: 23573)
+     Memory: 1.2M (max: 4G, swap max: 0B, available: 3.9G, peak: 4.4M)
+        CPU: 2.717s
+     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/tenzo-b1.service
+             ├─196792 /bin/bash /home/illia/CLionProjects/untitled/scripts/b1_idle_runner.sh
+             └─206610 sleep 30
+
+Nov 24 11:10:01 illia systemd[1469]: Started [systemd-run] /usr/bin/nice -n 0 /home/illia/CLionProjects/untitled/scripts/b1_idle_runner.sh.
+=== STATUS ===
+waiting 2026-11-24T11:10:01+02:00
+=== tail -n 30 runner.log ===
+[2026-11-24T11:10:01+02:00] === B1 runner starting (dry_run=0 load_thresh=1.0 during_thresh=1.5 consec=20 interval=30s) ===

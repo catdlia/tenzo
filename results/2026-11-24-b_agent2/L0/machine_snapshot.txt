@@ -1,0 +1,53 @@
+=== TIMESTAMP ===
+2026-11-24T12:36:07+02:00
+=== UNAME ===
+Linux illia 7.2.11-arch1-1 #1 SMP PREEMPT_DYNAMIC Fri, 16 Oct 2026 00:28:58 +0000 x86_64 GNU/Linux
+=== LSCPU -e ===
+CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE    MAXMHZ   MINMHZ       MHZ
+  0    0      0    0 0:0:0:0          yes 4400.0000 400.0000 3999.7271
+  1    0      0    0 0:0:0:0          yes 4400.0000 400.0000 4000.0000
+  2    0      0    1 4:4:1:0          yes 4400.0000 400.0000 4000.0000
+  3    0      0    1 4:4:1:0          yes 4400.0000 400.0000 3997.6350
+  4    0      0    2 8:8:2:0          yes 3300.0000 400.0000 3300.5259
+  5    0      0    3 9:9:2:0          yes 3300.0000 400.0000 3301.1819
+  6    0      0    4 10:10:2:0        yes 3300.0000 400.0000 3299.9629
+  7    0      0    5 11:11:2:0        yes 3300.0000 400.0000 3300.0439
+=== LOADAVG ===
+1.40 1.41 1.46 3/1893 206629
+=== MEMORY ===
+               total        used        free      shared  buff/cache   available
+Mem:            19Gi        11Gi       681Mi       2.0Gi       9.8Gi       7.9Gi
+Swap:          9.6Gi       3.3Gi       6.3Gi
+MemAvailable:    8318296 kB
+=== DISK ===
+Filesystem                      Size  Used Avail Use% Mounted on
+/dev/mapper/ArchinstallVg-root  476G  464G  8.5G  99% /
+=== GOVERNOR & AC ===
+powersave
+1
+=== DESKTOP PROCESSES ===
+    PID COMMAND         %CPU %MEM
+ 188644 Telegram        26.7  4.1
+   6782 antigravity     20.3  2.3
+   6646 antigravity     10.2  0.4
+   1558 Hyprland         5.2  0.4
+   4771 qemu-system-x86  3.1  5.6
+  62377 zen-bin          2.1  2.5
+   6593 antigravity      1.9  0.7
+   3916 claude-desktop   1.7  3.8
+  89458 steam            1.5  4.1
+   6682 language_server  1.2  1.7
+  89497 steamwebhelper   1.0  0.9
+  62699 WebExtensions    1.0  1.0
+   1801 pipewire         0.8  0.0
+  89531 steamwebhelper   0.8  0.4
+    823 python3          0.7  0.2
+  62833 Isolated Web Co  0.6  1.0
+   3668 claude-desktop   0.5  1.2
+   1703 jetbrains-toolb  0.5  2.0
+ 154288 kworker/u33:1+i  0.4  0.0
+  93505 Isolated Web Co  0.3  1.8
+   3724 claude-desktop   0.3  0.5
+  89648 steamwebhelper   0.2  1.8
+  63481 Isolated Web Co  0.1  1.9
+  69145 Isolated Web Co  0.1  1.9
