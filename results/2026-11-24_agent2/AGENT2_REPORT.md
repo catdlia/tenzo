@@ -28,6 +28,7 @@
 - **D4 (`2026-11-24T01:57` — Owner D4: Tokenizer tree hygiene):** Remove `tools/tokenizer/bitnet_b158_tokenizer.json` from git index (`git rm --cached`) without deleting files on disk (`L1`).
 - **D5 (`2026-11-24T01:57` — Owner D5: Benchmarks):** Speed benchmarks run via self-gated background runner `scripts/b1_idle_runner.sh` (`tenzo-b1` user unit) launched at the end of session (`B1`). Runner neither commits nor pushes.
 - **D6 (`2026-11-24T02:03` — `L0` Machine State):** `loadavg 2.33 2.09 2.22`, `MemAvailable 9.5 GiB`, `/` `8.5G` free (`99%`), governor `powersave`, active desktop apps (`zen-bin`, `Telegram`, `steam`, `qemu-system-x86`, `claude-desktop`, `jetbrains-toolbox`). G6 (all 5 modes) and PPL4 match `results/2026-11-23_agent2/L4/` byte-for-byte.
+- **D7 (`2026-11-24T02:14` — `H1a` Pre-registration Machine State):** `loadavg 2.71 3.62 3.09`, `MemAvailable 10.0 GiB`, `/` `8.5G` free, governor `powersave`. CPU-light Python OLS/bootstrap analysis over existing `ctx=2048` score files.
 
 ## 3. Blockers & Disk Watch
 
