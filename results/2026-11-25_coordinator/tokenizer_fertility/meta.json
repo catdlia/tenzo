@@ -1,0 +1,9 @@
+{
+ "script": "scripts/tokenizer_fertility.py",
+ "vocab": 32000,
+ "own_bpe_train": "uk_wiki rows 0-79 + en_wiki rows 0-79",
+ "tokenizers": {
+  "llama3_128k (BitNet-2B-4T)": "models/bitnet-1.58b-v2/tokenizer.json",
+  "llama2_32k (TinyLlama)": "models/gptq_tinyllama/tokenizer.json"
+ }
+}

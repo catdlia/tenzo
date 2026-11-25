@@ -1,0 +1,33 @@
+diff -ru a/src/main_inference.cpp b/src/main_inference.cpp
+--- a/src/main_inference.cpp	2026-11-25 20:43:26.595000000 +0000
++++ b/src/main_inference.cpp	2026-11-25 20:43:26.676000000 +0000
+@@ -2,7 +2,7 @@
+  * @file main_inference.cpp
+  * @brief Tenzo CLI — Full-Featured Native LLM Inference Engine (v1.1.0)
+  * 
+- * Provides production-grade command-line interface for 1.58-bit BitNet LLM inference:
++ * Provides a research command-line interface for 1.58-bit BitNet LLM inference (not production-validated):
+  * - Single-shot generation & Streaming token decode
+  * - Interactive multi-turn REPL chat mode with KV-Cache memory preservation
+  * - Configurable Model & KV-Cache Quantization (INT8, Ternary TL1, FP32)
+@@ -265,7 +265,7 @@
+     std::cout << "  --kv-alpha <path|auto>      Per-layer ternary_rot clip multiplier file or 'auto' (<model_dir>/kv_alpha_mix.txt)\n";
+     std::cout << "  --prefill <sequential|batched>  prompt prefill: token by token (default) or in chunks (CPU + I2_S)\n";
+     std::cout << "  --prefill-chunk <n>         chunk size for --prefill batched (default 32)\n";
+-    std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (14.2x comp, 84MB), " 
++    std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (~14x smaller than fp32, calculated; large quality loss without retraining), " 
+               << ANSI_GREEN << "int8_fused" << ANSI_RESET << " (4x comp, 309MB), " 
+               << ANSI_GREEN << "fp32" << ANSI_RESET << " (1.2GB)\n";
+     std::cout << "  -c, --ctx-size <int>        Maximum context sequence length (default: 8192)\n\n";
+diff -ru a/src/runtime/TenzoEngine.h b/src/runtime/TenzoEngine.h
+--- a/src/runtime/TenzoEngine.h	2026-11-25 20:43:26.654000000 +0000
++++ b/src/runtime/TenzoEngine.h	2026-11-25 20:43:26.676000000 +0000
+@@ -86,7 +86,7 @@
+     std::vector<float> int8_k_scales;
+     std::vector<float> int8_v_scales;
+ 
+-    // Ternary TL1 Fused Buffers (14.2x compression vs FP32)
++    // Ternary TL1 Fused Buffers (14.2x memory vs FP32, calculated; costs x2.88 / x8.87 PPL on EN / UK, see README)
+     std::vector<uint8_t> tl1_k;
+     std::vector<uint8_t> tl1_v;
+     std::vector<float> tl1_k_scales;

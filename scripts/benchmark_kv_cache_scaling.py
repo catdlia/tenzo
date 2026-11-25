@@ -4,7 +4,8 @@ benchmark_kv_cache_scaling.py
 Comprehensive Long-Context Benchmark for Tenzo KV-Cache Architectures:
 - FP32 Standard KV-Cache
 - INT8 Fused KV-Cache (4x compression)
-- TL1 Fused (1.58-bit Ternary) KV-Cache (14.2x compression)
+- TL1 Fused (1.58-bit Ternary) KV-Cache (14.2x memory vs FP32, calculated; without retraining it
+  costs x2.88 PPL on EN and x8.87 on UK, see README "Measured")
 
 Evaluates:
 - Extreme context lengths: 1K, 2K, 4K, 8K, 10K, 16K, 30K tokens
@@ -114,7 +115,7 @@ def main():
         print(f"{seq:<16} | {s_fp32:>15} | {s_i8:>15} | {s_tl1:>18} | {comp:>10}")
     print("-" * 90)
     print("💡 Key Takeaway: At 30,000 tokens, standard FP32 KV-cache requires 4.4 GB of RAM (causing severe DRAM")
-    print("   swapping on edge 15W CPUs), while Tenzo TL1 Fused requires ONLY 316 MB of RAM (14.2x reduction)!\n")
+    print("   swapping on edge 15W CPUs), while Tenzo TL1 Fused requires 316 MB of RAM (14.2x reduction, calculated; quality is NOT preserved without retraining).\n")
 
     # 2. Empirical Benchmark across KV-Cache Quantization Modes on Long Prompts
     print("🚀 2. Empirical Performance across Sequence Lengths (Alder Lake Intel Core i3-1215U):")

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-tenzo_cli.py — Tenzo Production AI Compiler & LLM Inference Console (v1.1.0)
+tenzo_cli.py — Tenzo research AI compiler & LLM inference console (v1.1.0; not production-validated, see README "Measured")
 
 Full-featured interactive TUI / REPL inspired by llama.cpp, vLLM, and Ollama:
 - Dynamic Model Manager: /models, /pull <hf_repo>, /load <name>
@@ -493,7 +493,7 @@ def interactive_repl(session: TenzoSession):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Tenzo Production AI Compiler & LLM Inference CLI (v1.1.0)",
+        description="Tenzo research AI compiler & LLM inference CLI (v1.1.0; not production-validated)",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("-d", "--device", type=str, default="cpu", choices=["cpu", "gpu", "vulkan", "cuda", "rocm", "riscv"], help="Compute backend: cpu, gpu/vulkan, cuda, rocm, riscv")

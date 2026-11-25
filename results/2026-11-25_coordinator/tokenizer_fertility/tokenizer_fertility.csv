@@ -1,0 +1,13 @@
+tokenizer,vocab,corpus,tokens,words,chars,tokens_per_word,chars_per_token
+llama3_128k (BitNet-2B-4T),128256,uk_wiki_80_99,185850,72236,538207,2.573,2.896
+llama3_128k (BitNet-2B-4T),128256,en_wiki_80_99,141428,101999,658178,1.387,4.654
+llama3_128k (BitNet-2B-4T),128256,uk_web (Kobza),119705,49748,357788,2.406,2.989
+llama3_128k (BitNet-2B-4T),128256,en_web (FineWeb-Edu),77707,60287,369106,1.289,4.75
+llama2_32k (TinyLlama),32000,uk_wiki_80_99,221885,72236,538207,3.072,2.426
+llama2_32k (TinyLlama),32000,en_wiki_80_99,170171,101999,658178,1.668,3.868
+llama2_32k (TinyLlama),32000,uk_web (Kobza),147410,49748,357788,2.963,2.427
+llama2_32k (TinyLlama),32000,en_web (FineWeb-Edu),90998,60287,369106,1.509,4.056
+"own_bpe_32k (uk+en wiki, 160 articles)",32000,uk_wiki_80_99,155261,72236,538207,2.149,3.466
+"own_bpe_32k (uk+en wiki, 160 articles)",32000,en_wiki_80_99,154577,101999,658178,1.515,4.258
+"own_bpe_32k (uk+en wiki, 160 articles)",32000,uk_web (Kobza),111285,49748,357788,2.237,3.215
+"own_bpe_32k (uk+en wiki, 160 articles)",32000,en_web (FineWeb-Edu),88021,60287,369106,1.46,4.193

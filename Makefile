@@ -1,7 +1,7 @@
 # Tenzo Compiler Makefile
 # Convenience wrapper for common operations
 
-.PHONY: paper-tables build build-local build-sdk build-pybind build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help audit verify-references
+.PHONY: paper-tables paper-figures build build-local build-sdk build-pybind build-docker all q configure clean test cpu large parallel stability hw-analyze conv2d gpu gpu-bench hetero hetero-bench diag paper-bench bench version docker-build dev docker-shell compile-commands format watch help audit verify-references
 
 # Default target
 all: build
@@ -115,6 +115,10 @@ diag:
 
 # Run Paper Micro-Benchmark (Baseline vs Tenzo Packed Attention)
 # Usage: make paper-bench [ARGS="--context 4096"]
+# Rebuild paper figures and tables from committed score files / CSVs (no model runs). ARGS=--strict to fail on errors.
+paper-figures:
+	@bash scripts/build_paper_figures.sh $(ARGS)
+
 paper-bench:
 	@echo "📄 Running Paper Micro-Benchmark (Baseline vs. Tenzo)..."
 	docker compose run --rm -e OMP_PLACES=cores -e OMP_PROC_BIND=spread dev /app/cmake-build-debug/paper_benchmark $(ARGS)

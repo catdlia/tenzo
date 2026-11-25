@@ -22,7 +22,7 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 
 | Напрямок / Стрім | Опис та Архітектура | Ключові файли та тести | Статус |
 |---|---|---|---|
-| **Implicit Shuffle у LLM** | **Zero-Copy GQA Virtual Routing via floorDiv**: Віртуальна маршрутизація Grouped-Query Attention без копіювання пам'яті через `AffineExpr::floorDiv` на вимір голів ($H_q \to H_{kv}$). Повністю усуває інструкції `memref.copy`, `linalg.transpose` та векторні gather-операції під час авторегресивного декодування. Чисельна еквівалентність підтверджена тестами. | `src/passes/LinalgLowering.cpp`<br>`src/tests/BitwiseAttentionTest.cpp`<br>`src/dialect/TenzoOps.td` | **Complete / Verified ✅**<br>*(Production Ready)* |
+| **Implicit Shuffle у LLM** | **Zero-Copy GQA Virtual Routing via floorDiv**: Віртуальна маршрутизація Grouped-Query Attention без копіювання пам'яті через `AffineExpr::floorDiv` на вимір голів ($H_q \to H_{kv}$). Повністю усуває інструкції `memref.copy`, `linalg.transpose` та векторні gather-операції під час авторегресивного декодування. Чисельна еквівалентність підтверджена тестами. | `src/passes/LinalgLowering.cpp`<br>`src/tests/BitwiseAttentionTest.cpp`<br>`src/dialect/TenzoOps.td` | **Complete / Verified in unit tests ✅**<br>*(not production-validated; zero-copy GQA itself is standard practice, see FlashAttention-2 / vLLM / ggml)* |
 | **Підготовка до пре-трейну** | **PyTorch QAT STE & FX Export Pipeline**: Шари Quantization-Aware Training для 1.58-бітних тернарних ваг $\{-1, 0, 1\}$ через Straight-Through Estimator (`TernaryQuantizeSTE`), повнозв'язні шари `BitLinear`, та компілятор `fx_to_mlir.py` для експорту натренованих графів у діалект Tenzo (`tenzo.ternary_pack`, `tenzo.packed_attention`). | `tenzo-frontend/qat.py`<br>`tenzo-frontend/fx_to_mlir.py`<br>`tenzo-frontend/test_fx_qat_export.py` | **In Progress / QAT Ready 🔄**<br>*(Ready for Pre-training)* |
 
 ### ✅ What Works
@@ -59,6 +59,13 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 
 ---
 
+## 🔬 Research findings (2026-11)
+
+Verified quality results live in `results/paper/claims.md` and `results/paper/tables.md`; every number there links to a CSV and a script. In short:
+- INT8 KV cache is lossless on BitNet-b1.58-2B-4T (×1.004 EN, ×1.002 UK PPL vs an fp32 reference).
+- Ternary KV without retraining is not: the best post-training scheme (Hadamard rotation, g32, INT8 sinks and recent window; 2.9 bits/element) costs about +7% PPL on English and +16% on Ukrainian.
+- On parallel corpora (same content in each language), Ukrainian and other high-fertility languages lose more than English under low-bit KV caches, in three models; see `results/2026-11-24*_agent2/` and `results/2026-11-25_coordinator/`.
+
 ## 📊 Performance Metrics
 
 **Hardware:** Intel Core i3-1215U (Alder Lake, 15W, 2 P-Cores, 4 E-Cores, 20 GB RAM)  
@@ -66,7 +73,7 @@ Our primary focus is the **1.58-bit (ternary) BitNet architecture**, enabling mo
 
 | Engine / Configuration | Model Format | KV-Cache | Decode Speed | Latency / Token | Note |
 |---|---|---|---|---|---|
-| **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms | Official Microsoft C++ Reference Engine |
+| **Microsoft BitNet.cpp** | TL1 + INT8 LM | FP32 | 12.31 tok/sec | 81.23 ms | Official Microsoft C++ Reference Engine **(UNVERIFIED, historical: that local build was later found to compute a broken model; a valid build exists since 2026-11-19, clean-machine comparison pending)** |
 | **Tenzo Native Engine (v1.1.0)** | **TL1 + INT8 LM** | **INT8 Fused** | **20.32 tok/sec** | **49.21 ms** | 1.65x vs BitNet.cpp **(UNVERIFIED, historical; superseded; see README 'Measured (2026-11-19/20)')** |
 
 ---
