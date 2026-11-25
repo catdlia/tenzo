@@ -90,7 +90,10 @@ Thumbs.db
 tools/tokenizer/bitnet_b158_tokenizer.json
 results/2026-11-24_B1/
 results/2026-11-24-b_B1/
+results/2026-11-26_B1/
 results/2026-11-24_agent2/B1_dryrun/
 results/2026-11-24-b_agent2/B0/smoke_out/
+results/2026-11-26_agent2/B0/dryrun_out/
+results/2026-11-26_agent2/B0/smoke_out/
 results/2026-11-24_agent2/H1b/scores/_tmp_*
 results/2026-11-24_agent2/L2/dumps/

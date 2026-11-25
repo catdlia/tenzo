@@ -7,6 +7,9 @@
 # load1_before/after are logged for provenance only. Invalid runs wait for idle again (up to 3 tries/item);
 # exhausting 3 tries marks the item failed and advances to the next queue item (final STATUS: done or done_with_failures).
 # Never commits or pushes. Resumes cleanly via item_done_<item>.ok markers.
+# v2 (2026-11-25, coordinator): while waiting, logs the blocking reason every BLOCK_LOG_SEC; default timeout 168 h;
+# probes systemd-inhibit once at start (falls back to idle:sleep, then to no inhibit) and smoke uses the same path;
+# after a valid item that ended < 5 min ago the next item needs only CONSEC_NEXT idle checks; forbidden regex is an option.
 
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,7 +23,12 @@ FOREIGN_THRESH=0.15
 SAMPLE_SEC=2
 CONSEC_REQ=20
 INTERVAL_SEC=30
-TIMEOUT_HOURS=48
+TIMEOUT_HOURS=168
+CONSEC_NEXT=4
+BLOCK_LOG_SEC=900
+FORBIDDEN_RE='^(firefox|zen-bin|neko|steam|qemu-system|clion|idea|java)'
+INHIBIT_WHAT=""
+LAST_VALID_END=0
 FAKE_CMD=""
 PIN_CPUS="0-3"
 FOREIGN_CPUS_REGEX="^cpu[4-7] "
@@ -35,6 +43,9 @@ while [ $# -gt 0 ]; do
     --sample-sec) SAMPLE_SEC="$2"; shift 2 ;;
     --during-threshold) shift 2 ;; # legacy compatibility no-op
     --consec) CONSEC_REQ="$2"; shift 2 ;;
+    --consec-next) CONSEC_NEXT="$2"; shift 2 ;;
+    --block-log-sec) BLOCK_LOG_SEC="$2"; shift 2 ;;
+    --forbidden-regex) FORBIDDEN_RE="$2"; shift 2 ;;
     --interval) INTERVAL_SEC="$2"; shift 2 ;;
     --timeout-hours) TIMEOUT_HOURS="$2"; shift 2 ;;
     --fake-cmd) FAKE_CMD="$2"; shift 2 ;;
@@ -123,11 +134,39 @@ has_forbidden_procs() {
   if [ "$DRY_RUN" -eq 1 ]; then
     return 1
   fi
-  ps -eo comm= | grep -qE '^(firefox|zen-bin|neko|steam|qemu-system|clion|idea|java)'
+  ps -eo comm= | grep -qE "$FORBIDDEN_RE"
 }
 
 forbidden_procs_list() {
-  ps -eo comm= | grep -E '^(firefox|zen-bin|neko|steam|qemu-system|clion|idea|java)' | sort -u | tr '\n' ',' | sed 's/,$//'
+  ps -eo comm= | grep -E "$FORBIDDEN_RE" | sort -u | tr '\n' ',' | sed 's/,$//'
+}
+
+# "comm(pid) comm(pid) ..." for the blocking log
+forbidden_procs_pids() {
+  if [ "$DRY_RUN" -eq 1 ]; then
+    echo "dry-run: not checked"
+    return
+  fi
+  ps -eo pid=,comm= | awk -v re="$FORBIDDEN_RE" '$2 ~ re { printf "%s(%s) ", $2, $1 }' | sed 's/ $//'
+}
+
+# Decide once which systemd-inhibit locks this context may take (a user unit is not in a session, and polkit may
+# refuse handle-lid-switch there). Sets INHIBIT_WHAT ("" = run without inhibit).
+probe_inhibit() {
+  INHIBIT_WHAT=""
+  if ! command -v systemd-inhibit >/dev/null 2>&1; then
+    log "inhibit=none (systemd-inhibit not found)"
+    return
+  fi
+  local w
+  for w in "idle:sleep:handle-lid-switch" "idle:sleep"; do
+    if systemd-inhibit --what="$w" --why="tenzo B1 probe" true >/dev/null 2>&1; then
+      INHIBIT_WHAT="$w"
+      log "inhibit=$w"
+      return
+    fi
+  done
+  log "inhibit=none (all probes failed; running without inhibit)"
 }
 
 # Returns 0 when idle gate met; 1 on timeout (gave_up).
@@ -136,9 +175,13 @@ wait_until_idle() {
     log "SMOKE mode: skipping wait_until_idle pre-gate"
     return 0
   fi
-  local consec=0
+  local consec=0 req="$CONSEC_REQ" last_block_log=0
   local start_ts now_ts max_wait_sec
   start_ts=$(date +%s)
+  if [ "$LAST_VALID_END" -gt 0 ] && [ $((start_ts - LAST_VALID_END)) -lt 300 ]; then
+    req="$CONSEC_NEXT"
+    log "previous item valid $((start_ts - LAST_VALID_END))s ago: short re-gate ($req checks)"
+  fi
   max_wait_sec=$((TIMEOUT_HOURS * 3600))
   echo "waiting $(date -Is)" > "$STATUS_FILE"
   while true; do
@@ -159,8 +202,8 @@ wait_until_idle() {
     fi
     if [ "$ac" = "1" ] && [ "$ok_l1" -eq 1 ] && [ "$ok_proc" -eq 1 ]; then
       consec=$((consec + 1))
-      log "idle check $consec/$CONSEC_REQ OK (load1=$l1 < $LOAD_THRESH, ac=$ac)"
-      if [ "$consec" -ge "$CONSEC_REQ" ]; then
+      log "idle check $consec/$req OK (load1=$l1 < $LOAD_THRESH, ac=$ac)"
+      if [ "$consec" -ge "$req" ]; then
         return 0
       fi
     else
@@ -168,6 +211,10 @@ wait_until_idle() {
         log "idle streak reset ($consec -> 0): ac=$ac load1=$l1 ok_proc=$ok_proc"
       fi
       consec=0
+      if [ $((now_ts - last_block_log)) -ge "$BLOCK_LOG_SEC" ]; then
+        log "blocked: ac=$ac load1=$l1 (need < $LOAD_THRESH) procs=[$(forbidden_procs_pids)]"
+        last_block_log=$now_ts
+      fi
     fi
     sleep "$INTERVAL_SEC"
   done
@@ -228,8 +275,8 @@ run_item() {
 
     log "RUN $item attempt=$attempt pinned=$PIN_CPUS proc_before=$proc_before($procs_b_str) cmd: $cmd_str"
     local rc=0
-    if command -v systemd-inhibit >/dev/null 2>&1 && [ "$DRY_RUN" -eq 0 ] && [ "$SMOKE" -eq 0 ]; then
-      systemd-inhibit --what=idle:sleep:handle-lid-switch --why="tenzo B1" taskset -c "$PIN_CPUS" bash -c "$cmd_str" >> "$LOG_FILE" 2>&1 || rc=$?
+    if [ -n "$INHIBIT_WHAT" ]; then
+      systemd-inhibit --what="$INHIBIT_WHAT" --why="tenzo B1" taskset -c "$PIN_CPUS" bash -c "$cmd_str" >> "$LOG_FILE" 2>&1 || rc=$?
     else
       taskset -c "$PIN_CPUS" bash -c "$cmd_str" >> "$LOG_FILE" 2>&1 || rc=$?
     fi
@@ -268,6 +315,7 @@ run_item() {
     if [ "$rc" -eq 0 ] && [ "$ok_fcpu" -eq 1 ] && [ "$proc_before" -eq 0 ] && [ "$proc_after" -eq 0 ]; then
       echo "$item,valid,$attempt,$lb,$la,$fmean,$fmax,$gov,$ac,$tc,$out_csv,$rc" >> "$SUMMARY_CSV"
       touch "$done_flag"
+      LAST_VALID_END=$(date +%s)
       log "OK $item attempt=$attempt foreign_cpu_mean=$fmean foreign_cpu_max=$fmax load1=$lb->$la temp=${tc}C"
       return 0
     else
@@ -289,7 +337,10 @@ run_item() {
   return 1
 }
 
-log "=== B1 runner starting (dry_run=$DRY_RUN smoke=$SMOKE pin=$PIN_CPUS foreign_thresh=$FOREIGN_THRESH sample=${SAMPLE_SEC}s load_thresh=$LOAD_THRESH consec=$CONSEC_REQ interval=${INTERVAL_SEC}s) ==="
+log "=== B1 runner starting (dry_run=$DRY_RUN smoke=$SMOKE pin=$PIN_CPUS foreign_thresh=$FOREIGN_THRESH sample=${SAMPLE_SEC}s load_thresh=$LOAD_THRESH consec=$CONSEC_REQ consec_next=$CONSEC_NEXT interval=${INTERVAL_SEC}s timeout=${TIMEOUT_HOURS}h block_log=${BLOCK_LOG_SEC}s forbidden=$FORBIDDEN_RE) ==="
+if [ "$DRY_RUN" -eq 0 ]; then
+  probe_inhibit
+fi
 
 if [ "$DRY_RUN" -eq 1 ]; then
   FAKE="${FAKE_CMD:-echo DRY_RUN_BENCH_OK; sleep 2}"
