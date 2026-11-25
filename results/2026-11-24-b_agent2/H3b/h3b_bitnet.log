@@ -1,0 +1,17 @@
+Running as unit: run-p1137144-i1109936.scope; invocation ID: 381fe18981554a288c7855276c4bbc67
+[bitnet parity S3+s4c120] max_abs_lp_diff=0.000e+00
+[run] bitnet S3+s4c120 en: 48 windows (chunk=48)
+  bitnet S3+s4c120  en 48/48 t=556s rss=1.88GB
+[done] bitnet S3+s4c120  en nll=34241.375 tok=11391 t=556.4s rss=1.88GB peak=2.49GB
+[run] bitnet S3+s4c120 uk: 48 windows (chunk=48)
+  bitnet S3+s4c120  uk 48/48 t=1507s rss=1.81GB
+[done] bitnet S3+s4c120  uk nll=99379.942 tok=18633 t=1507.0s rss=1.81GB peak=2.66GB
+[run] bitnet S3+s4c120 pl: 48 windows (chunk=48)
+  bitnet S3+s4c120  pl 48/48 t=2661s rss=1.81GB
+[done] bitnet S3+s4c120  pl nll=91659.295 tok=21425 t=2661.3s rss=1.81GB peak=2.67GB
+[run] bitnet S3+s4c120 bg: 48 windows (chunk=48)
+  bitnet S3+s4c120  bg 48/48 t=3915s rss=1.86GB
+[done] bitnet S3+s4c120  bg nll=103887.776 tok=23115 t=3915.3s rss=1.86GB peak=2.69GB
+[run] bitnet S3+s4c120 de: 48 windows (chunk=48)
+  bitnet S3+s4c120  de 48/48 t=4835s rss=1.82GB
+[done] bitnet S3+s4c120  de nll=69540.032 tok=18052 t=4834.6s rss=1.82GB peak=2.69GB
