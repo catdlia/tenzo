@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2026-11-24-b
+
+### Added
+- **`--kv-alpha auto` & `TENZO_KV_ALPHA=auto` resolution (`src/main_inference.cpp`) + `scripts/install_kv_alpha_mix.sh` (`L2`, `D1`).**
+  Added installer script copying `alpha_mix.txt` (`sha256: d67ed67b...043eeb`) into `models/bitnet-1.58b-v2/kv_alpha_mix.txt` with checksum checks; `--kv-alpha auto` / `TENZO_KV_ALPHA=auto` resolves `<model_dir>/kv_alpha_mix.txt` with fallback warning if absent, preserving default uncalibrated `ternary_rot` behavior when omitted. Verified `JOBS=1` Docker build (`0` warnings), `tenzo-cli test`, `G6 5/5`, `PPL4` byte-identity (`46489eb1...ab6eb5`), and `--kv-alpha auto` exact score parity (`ppl=17.4338` vs `18.3939` default).
+- **Equal-character recent-window causality test (`H1`, `T47`, `results/2026-11-24-b_agent2/H1/`).**
+  Tested `S3+s4r<r>` token sweeps and equal-character `S3+s4c<C>` masks on `FLORES-200` `N=32` BitNet (`0.000e+00` B=1 parity). Equalizing character span at `C*=120` (`117.2` EN vs `118.5` UK chars; `r_eff` `22.7/37.5`) lowers UK-minus-EN `R` from `+1.26%` to `+0.98% [+0.55%, +1.40%]` (`~22%` reduction -> **`PARTIAL`**, triggering `H3b`), leaving `78%` of `R > 0`.
+- **Exploratory morphological / subword position breakdown (`H2`, `T47b`, `results/2026-11-24-b_agent2/H2/`).**
+  Aligned FLORES `N=32` target offsets to alphabetic word positions on BitNet and EuroLLM-1.7B: `word_suffix` shows no excess per-token penalty over `word_prefix` or `single_token_word` (`uk_suffix_minus_prefix`: `+0.0072` BitNet, `+0.0013` EuroLLM), while split words carry `70.9%` / `55.5%` of `D` due to UK's `73.3%` / `68.6%` multi-token share.
+- **5-language parallel `FLORES-200` evaluation (`H3`, `T48`, `results/2026-11-24-b_agent2/H3/`).**
+  Packed `N=48` out-of-sample parallel windows (`sents 209..633`, `0` 32-gram overlap) across `en, de, pl, uk, bg`: `S3+s4r32` loss correlates strongly with token multiplier across Latin and Cyrillic scripts (`BitNet ρ=1.000, r=0.971` where Latin Polish `×1.88` loses `+1.59%` vs Cyrillic Ukrainian `×1.64` `+1.57%`; `EuroLLM ρ=0.900, r=0.857`) -> pre-registered verdict **`fertility_dominates`**.
+- **Coherent single-document parallel `NTREX-128` at `ctx=1024` (`H4`, `T49`, `results/2026-11-24-b_agent2/H4/`).**
+  Evaluated `N=24` single news articles (`DOCUMENT_IDS.tsv`, `0` splicing, `0` 32-gram overlap): replicates EN/UK gap under `S3+s4r32` (`BitNet R=+1.51 pp`, `EuroLLM R=+1.38 pp`), recovers `45.0%` / `61.4%` with `S3+s4r128`, and shows **`flat_or_bounded`** positional `Δ/tok` across `129..1023`.
+- **Conditional 5-language equal-character window (`H3b`, `results/2026-11-24-b_agent2/H3b/`).**
+  Triggered by `H1=PARTIAL`: `S3+s4c120` reduces mean non-EN `R_L` across `{de, pl, uk, bg}` by `22.0%` on BitNet (`4/4` significant) and `34.7%` on EuroLLM-1.7B (`uk` `-71.1%` to `R=+0.16 [-0.10, +0.39]`) -> **`partially_explains`**.
+
+### Fixed
+- **E-core `/proc/stat` idle gating & `taskset -c 0-3` pinning in `scripts/b1_idle_runner.sh` (`B0`, `T38`).**
+  Replaced broken whole-system `load1` invalidation (which falsely rejected clean 4-thread P-core benchmarks) with `cpu4..7` `/proc/stat` sampling every `2s` (`foreign_cpu_mean < 0.15` + process checks + 3 retries/item), verified in `--smoke` (`foreign_cpu_mean=0.1195`, `invalid_proc` caught), and restarted live `tenzo-b1` into `results/2026-11-24-b_B1/`.
+
+---
+
 ## [Unreleased] — 2026-11-24
 
 ### Added

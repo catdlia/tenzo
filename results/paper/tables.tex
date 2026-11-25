@@ -9,7 +9,7 @@ tl1\_fused & 54.93 & 2.881 [2.700, 3.099] & 1258.5 & 8.868 [7.527, 10.611] \\
 popcount\_fused & 207.71 & 10.894 [9.280, 12.908] & 4162.5 & 29.332 [25.129, 34.025] \\
 ternary\_rot (S3+s4r32 in the engine) & 20.50 & 1.075 [1.059, 1.092] & 165.6 & 1.167 [1.126, 1.210] \\
 \bottomrule\end{tabular}
-\\[2pt]{\scriptsize Source: `results/2026-11-19\_overnight/ppl\_kv\_v2.csv`, `results/2026-11-19\_overnight/ppl\_kv\_v2\_uk.csv`, `results/2026-11-20\_overnight/part2/ppl\_ternary\_rot/ternary\_rot.txt`, `results/2026-11-20\_overnight/part2/ppl\_ternary\_rot\_uk/ternary\_rot.txt`. Commit 0cce329 (+uncommitted changes), generated 2026-11-24 11:09 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.20 3.09 5.04.}
+\\[2pt]{\scriptsize Source: `results/2026-11-19\_overnight/ppl\_kv\_v2.csv`, `results/2026-11-19\_overnight/ppl\_kv\_v2\_uk.csv`, `results/2026-11-20\_overnight/part2/ppl\_ternary\_rot/ternary\_rot.txt`, `results/2026-11-20\_overnight/part2/ppl\_ternary\_rot\_uk/ternary\_rot.txt`. Commit 2b86909 (+uncommitted changes), generated 2026-11-25 06:10 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.80 3.65 4.42.}
 \end{table}
 
 \begin{table}[t]\centering\small
@@ -35,7 +35,7 @@ S9 & 5.00 & -0.4\% & - & r1 & yes \\
 K8V:S3 & 5.31 & +4.3\% & +29.6\% & r1 &  \\
 KV8:S3 & 5.31 & +10.9\% & - & r1 &  \\
 \bottomrule\end{tabular}
-\\[2pt]{\scriptsize Source: `results/2026-11-19\_overnight/kv\_ptq/screen4`, `results/2026-11-19\_overnight/kv\_ptq/final\_uk8`, `results/2026-11-20\_overnight/kv\_ptq2/screen\_en4`, `results/2026-11-20\_overnight/kv\_ptq2/screen\_uk4`, `results/reference/golden/nll\_golden\_float32.txt`. Commit 0cce329 (+uncommitted changes), generated 2026-11-24 11:09 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.20 3.09 5.04.}
+\\[2pt]{\scriptsize Source: `results/2026-11-19\_overnight/kv\_ptq/screen4`, `results/2026-11-19\_overnight/kv\_ptq/final\_uk8`, `results/2026-11-20\_overnight/kv\_ptq2/screen\_en4`, `results/2026-11-20\_overnight/kv\_ptq2/screen\_uk4`, `results/reference/golden/nll\_golden\_float32.txt`. Commit 2b86909 (+uncommitted changes), generated 2026-11-25 06:10 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.80 3.65 4.42.}
 \end{table}
 
 \begin{table}[t]\centering\small
@@ -47,7 +47,7 @@ S3+s4r32 calibrated on EN & 1.040 [1.029, 1.051] & 1.126 [1.108, 1.146] & +0.039
 S3+s4r32 calibrated on UK & 1.049 [1.037, 1.062] & 1.117 [1.097, 1.136] & +0.0476 & +0.1103 \\
 S13+s4r32 (K INT4, V ternary) & 1.010 [1.001, 1.020] & 1.096 [1.079, 1.114] & +0.0103 & +0.0917 \\
 \bottomrule\end{tabular}
-\\[2pt]{\scriptsize Source: `results/2026-11-20\_overnight/part2/kv\_calib.csv`. Commit 0cce329 (+uncommitted changes), generated 2026-11-24 11:09 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.20 3.09 5.04.}
+\\[2pt]{\scriptsize Source: `results/2026-11-20\_overnight/part2/kv\_calib.csv`. Commit 2b86909 (+uncommitted changes), generated 2026-11-25 06:10 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.80 3.65 4.42.}
 \end{table}
 
 \begin{table}[t]\centering\small
@@ -63,7 +63,7 @@ Qwen2.5-1.5B & ternary g32 & 7.5109 & 8.4849 & 2.00 vs 2.41 & +0.5055 [-0.0037, 
 Qwen2.5-1.5B & ternary g32 + Hadamard & 7.5609 & 6.8379 & 2.00 vs 2.41 & -0.7910 [-1.6160, +0.1919] \\
 Qwen2.5-1.5B & ternary g32 + Hadamard + 4 sink / 32 recent INT8 & 0.6709 & 1.0202 & 2.00 vs 2.41 & +0.3698 [+0.1567, +0.5323] \\
 \bottomrule\end{tabular}
-\\[2pt]{\scriptsize Source: `results/2026-11-20\_overnight/part2/kv\_calib.csv`, `results/2026-11-20\_overnight/part2/second\_model.csv`. Commit 0cce329 (+uncommitted changes), generated 2026-11-24 11:09 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.20 3.09 5.04.}
+\\[2pt]{\scriptsize Source: `results/2026-11-20\_overnight/part2/kv\_calib.csv`, `results/2026-11-20\_overnight/part2/second\_model.csv`. Commit 2b86909 (+uncommitted changes), generated 2026-11-25 06:10 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.80 3.65 4.42.}
 \end{table}
 
 \begin{table}[t]\centering\small
@@ -78,7 +78,7 @@ tl1\_fused & golden & 7 & 0/7 & 0/7 & 5/7 & 5.57-18.11 \\
 tl1\_fused & hf & 7 & 0/7 & 0/7 & 5/7 & 5.52-18.72 \\
 (golden fp32 vs HF bf16) & - & 7 & 6/7 & 0/7 & 7/7 & 0.53-1.63 \\
 \bottomrule\end{tabular}
-\\[2pt]{\scriptsize Source: `results/2026-11-19\_overnight/parity\_v2/parity\_fp32.json`, `results/2026-11-19\_overnight/parity\_v2/parity\_int8\_fused.json`, `results/2026-11-19\_overnight/parity\_v2/parity\_tl1\_fused.json`, `results/reference/golden`, `results/reference/hf`. Commit 0cce329 (+uncommitted changes), generated 2026-11-24 11:09 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.20 3.09 5.04.}
+\\[2pt]{\scriptsize Source: `results/2026-11-19\_overnight/parity\_v2/parity\_fp32.json`, `results/2026-11-19\_overnight/parity\_v2/parity\_int8\_fused.json`, `results/2026-11-19\_overnight/parity\_v2/parity\_tl1\_fused.json`, `results/reference/golden`, `results/reference/hf`. Commit 2b86909 (+uncommitted changes), generated 2026-11-25 06:10 on 12th Gen Intel(R) Core(TM) i3-1215U, governor `powersave`, load average at generation 1.80 3.65 4.42.}
 \end{table}
 
 % Speed: not available
