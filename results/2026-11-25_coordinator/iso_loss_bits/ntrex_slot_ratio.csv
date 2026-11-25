@@ -1,0 +1,4 @@
+model,rel_en_r32,rel_en_r128,rel_uk_r32,rel_uk_r128,r_en_equiv,flag,slot_ratio,slot_ratio_lo,slot_ratio_hi,left_share,censored_share
+bitnet,0.0190464,0.0101688,0.0341369,0.018473,38.2002,interior,3.35076,1.70461,4,0.3784,0
+eurollm,0.0251203,0.0111396,0.0389612,0.0164761,91.3561,interior,1.40111,1.17271,1.78757,0,0.0002
+bitnet-eurollm,,,,,,,1.94965,0.354905,2.75259,,

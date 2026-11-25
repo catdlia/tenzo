@@ -1,0 +1,37 @@
+{
+  "script": "scripts/analyze_iso_loss_bits.py",
+  "source": "results/2026-11-24-b_agent2/H1",
+  "n_windows": 32,
+  "boot": 10000,
+  "seed": 0,
+  "targets": [
+    0.01,
+    0.0075,
+    0.005
+  ],
+  "bits_constants": "kv_ptq.bits: INT8 ring 8.125, S3 ternary g32 2.5",
+  "inputs_sha256_16": {
+    "fp32_en.txt": "c333fb79652b8fac",
+    "fp32_uk.txt": "3c2b86e342fa328a",
+    "S3_s4r8_en.txt": "8d55382608fb11db",
+    "S3_s4r12_en.txt": "74eea7f0b7263ece",
+    "S3_s4r16_en.txt": "f62dd5d10e2d2d9a",
+    "S3_s4r19_en.txt": "3f96fce8c40e6fac",
+    "S3_s4r24_en.txt": "b7a34898cdb62095",
+    "S3_s4r32_en.txt": "9efe71e45ec6c9bc",
+    "S3_s4r32_uk.txt": "0ff7369ed0c35972",
+    "S3_s4r40_uk.txt": "0f6a689d78640c65",
+    "S3_s4r48_uk.txt": "770e3dc0765a0204",
+    "S3_s4r54_uk.txt": "cab0de1c9e4a5acf",
+    "S3_s4r64_uk.txt": "5561b915a133b5dd",
+    "S3_s4r96_uk.txt": "b679463acedb0a75",
+    "S3_s4c80_en.txt": "f6d8a84275738fb3",
+    "S3_s4c120_en.txt": "ba72e314cb4d3bad",
+    "S3_s4c160_en.txt": "9b47f18beec1e735",
+    "S3_s4c240_en.txt": "5c9e2254177636e9",
+    "S3_s4c80_uk.txt": "5f8608dfa7173e35",
+    "S3_s4c120_uk.txt": "c195a93fad51586b",
+    "S3_s4c160_uk.txt": "c746bdef4ed008d8",
+    "S3_s4c240_uk.txt": "2a09960d57d674fc"
+  }
+}

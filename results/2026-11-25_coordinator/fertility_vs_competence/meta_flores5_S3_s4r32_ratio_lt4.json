@@ -1,0 +1,11 @@
+{
+ "script": "scripts/analyze_fertility_vs_competence.py",
+ "args": {
+  "set": "flores5",
+  "scheme": "S3_s4r32",
+  "response": "ratio_lt4",
+  "boot": 10000,
+  "out": "results/2026-11-25_coordinator/fertility_vs_competence"
+ },
+ "seed": 0
+}

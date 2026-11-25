@@ -1,0 +1,27 @@
+{
+ "script": "scripts/analyze_disparity_decomposition.py",
+ "boot": 10000,
+ "seed": 0,
+ "sets": [
+  [
+   "flores32",
+   "results/2026-11-24_agent2/H3/scores",
+   "results/2026-11-24_agent2/H3/scores"
+  ],
+  [
+   "flores5",
+   "results/2026-11-24-b_agent2/H3/scores",
+   "results/2026-11-24-b_agent2/H3/scores"
+  ],
+  [
+   "flores5",
+   "results/2026-11-24-b_agent2/H3/scores",
+   "results/2026-11-24-b_agent2/H3b/scores"
+  ],
+  [
+   "ntrex",
+   "results/2026-11-24-b_agent2/H4/scores",
+   "results/2026-11-24-b_agent2/H4/scores"
+  ]
+ ]
+}

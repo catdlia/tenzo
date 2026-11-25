@@ -1,0 +1,8 @@
+{
+  "script": "scripts/analyze_ntrex_slot_ratio.py",
+  "source": "results/2026-11-24-b_agent2/H4/scores",
+  "n_windows": 24,
+  "boot": 10000,
+  "seed": 0,
+  "p_bitnet_minus_eurollm_le_0": 0.0010002000400080016
+}

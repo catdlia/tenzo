@@ -1,0 +1,3 @@
+set,model,scheme,response,n_langs,n_windows,beta_logphi,beta_logphi_lo,beta_logphi_hi,beta_logkappa,beta_logkappa_lo,beta_logkappa_hi,corr_logphi_logkappa,vif,spearman_y_phi,spearman_y_kappa,fit_share,verdict
+flores5,bitnet,S3_s4r32,R,4,48,0.474428,-0.031905,0.995685,0.606555,-0.0360905,0.9974,0.655543,1.75358,1,0.8,1,too_few_languages
+flores5,eurollm,S3_s4r32,R,4,48,2.7236,1.62003,3.97552,-2.04294,-3.41027,-0.78992,0.954306,11.1982,0.8,0.6,1,too_few_languages
