@@ -1,0 +1,20 @@
+ Container untitled-dev-run-93b9744bd27c Creating 
+ Container untitled-dev-run-93b9744bd27c Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: ternary_rot[0m[36m, Max Context: 8192)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(4479.3 ms)
+
+score window 0 tokens=511 ppl=14.1 running_ppl=14.1
+score window 1 tokens=511 ppl=22.0 running_ppl=17.7
+score window 2 tokens=511 ppl=32.5 running_ppl=21.6
+score window 3 tokens=511 ppl=11.3 running_ppl=18.4
+PROC_RSS_KB=1010916 PROC_HWM_KB=1010916

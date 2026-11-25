@@ -1,0 +1,20 @@
+ Container untitled-dev-run-1ff11426178e Creating 
+ Container untitled-dev-run-1ff11426178e Created 
+[36m[1m  _____ _____ _   _ _____ ____  
+ |_   _| ____| \ | |__  / __ \ 
+   | | |  _| |  \| | / / |  | |
+   | | | |___| |\  |/ /| |__| |
+   |_| |_____|_| \_/____\____/ 
+[0m[1m ⚡ Tenzo Native LLM Inference Engine [32mv1.1.0-beta (Release)[0m
+[2m Heterogeneous MLIR runtime: CPU (AVX2/NEON/RVV), GPU (Vulkan/CUDA/ROCm)
+[0m────────────────────────────────────────────────────────────────────────────
+
+[36m📖 Loading vocabulary...[0m[32m [OK] [0m(128256 tokens, BPE)
+[36m⚙️  Initializing Execution Engine ([1mBackend: cpu, KV-Cache: ternary_rot[0m[36m, Max Context: 8192)...[0m[32m [OK]
+[0m[36m📦 Mapping weights & MLIR graph from /app/models/bitnet-1.58b-v2...[0m[32m [OK] [0m(4597.1 ms)
+
+score window 0 tokens=511 ppl=13.2 running_ppl=13.2
+score window 1 tokens=511 ppl=21.0 running_ppl=16.6
+score window 2 tokens=511 ppl=30.9 running_ppl=20.5
+score window 3 tokens=511 ppl=10.8 running_ppl=17.4
+PROC_RSS_KB=1010168 PROC_HWM_KB=1010168

@@ -262,7 +262,7 @@ void print_help(const char* prog_name) {
               << ANSI_GREEN << "rocm" << ANSI_RESET << " (AMDGCN/Vulkan), "
               << ANSI_GREEN << "riscv" << ANSI_RESET << " (RVV 1.0)\n";
     std::cout << "  --kv-quant <mode>           KV-Cache Quantization mode (default: int8_fused)\n";
-    std::cout << "  --kv-alpha <path>           Per-layer ternary_rot clip multiplier file (sets TENZO_KV_ALPHA)\n";
+    std::cout << "  --kv-alpha <path|auto>      Per-layer ternary_rot clip multiplier file or 'auto' (<model_dir>/kv_alpha_mix.txt)\n";
     std::cout << "  --prefill <sequential|batched>  prompt prefill: token by token (default) or in chunks (CPU + I2_S)\n";
     std::cout << "  --prefill-chunk <n>         chunk size for --prefill batched (default 32)\n";
     std::cout << "                              Modes: " << ANSI_GREEN << "tl1_fused" << ANSI_RESET << " (14.2x comp, 84MB), " 
@@ -450,7 +450,23 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    if (!opt.kv_alpha_path.empty()) {
+    std::string kv_alpha_req = opt.kv_alpha_path;
+    if (kv_alpha_req.empty()) {
+        if (const char* env_alpha = std::getenv("TENZO_KV_ALPHA")) {
+            kv_alpha_req = env_alpha;
+        }
+    }
+    if (kv_alpha_req == "auto") {
+        const std::string sep = (!opt.model_dir.empty() && opt.model_dir.back() == '/') ? "" : "/";
+        const std::string candidate = opt.model_dir + sep + "kv_alpha_mix.txt";
+        std::ifstream kf(candidate);
+        if (kf.good()) {
+            setenv("TENZO_KV_ALPHA", candidate.c_str(), 1);
+        } else {
+            std::cerr << "[warn] --kv-alpha auto: " << candidate << " not found; using default scale\n";
+            unsetenv("TENZO_KV_ALPHA");
+        }
+    } else if (!opt.kv_alpha_path.empty()) {
         setenv("TENZO_KV_ALPHA", opt.kv_alpha_path.c_str(), 1);
     }
 
