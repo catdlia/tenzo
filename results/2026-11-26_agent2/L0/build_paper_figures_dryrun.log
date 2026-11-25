@@ -1,0 +1,18 @@
+python3 scripts/analyze_matched_difficulty.py
+python3 scripts/plot_matched_difficulty.py
+python3 scripts/analyze_disparity_decomposition.py
+python3 scripts/plot_disparity_decomposition.py
+python3 scripts/analyze_iso_loss_bits.py
+python3 scripts/plot_iso_loss_bits.py
+python3 scripts/analyze_ntrex_slot_ratio.py
+python3 scripts/analyze_fertility_vs_competence.py --set flores5 --response R
+python3 scripts/analyze_fertility_vs_competence.py --set flores5 --response ratio_lt4
+python3 scripts/analyze_fertility_vs_competence.py --set flores5 --response fragility
+python3 scripts/analyze_h3_flores.py
+python3 scripts/analyze_h3_multilang.py
+python3 scripts/analyze_h3b_char_window.py
+python3 scripts/analyze_h4_ntrex.py
+python3 scripts/analyze_h1b_ctx2048.py
+python3 scripts/run_h1_char_window.py --analyze-only
+python3 scripts/analyze_disparity_bpc.py
+python3 scripts/build_paper_tables.py

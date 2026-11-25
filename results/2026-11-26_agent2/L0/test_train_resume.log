@@ -1,0 +1,2 @@
+kv=s3 steps=20 killed after 17 logged steps; resumed at step 10
+PASS: bit-identical loss curve after SIGKILL + resume

@@ -1,0 +1,102 @@
+=== Coordinator Scripts Repro (2026-11-26T01:27:00+02:00) ===
+rows 100 350 12
+flores32 bitnet  S3_s4r32   uk all phi 1.69 D +20.85 [+15.01,+26.85] | fert  +0.16 [-0.81,+1.18] (  +1%) | comp  -8.98 [-11.66,-6.30] ( -43%) | frag +29.67 [+22.81,+37.03] (+142%)
+flores32 bitnet  S3_s4r32   uk lt4 phi 0.98 D +15.01 [+11.44,+18.78] | fert  -0.06 [-0.19,+0.08] (  -0%) | comp  -0.10 [-0.53,+0.35] (  -1%) | frag +15.17 [+11.64,+18.85] (+101%)
+flores32 eurollm S3_s4r32   uk all phi 1.48 D  +3.66 [+0.92,+6.42] | fert  +0.64 [-0.21,+1.47] ( +18%) | comp  -0.16 [-0.53,+0.18] (  -4%) | frag  +3.18 [-0.12,+6.49] ( +87%)
+flores32 eurollm S3_s4r32   uk lt4 phi 1.53 D  +3.81 [+2.27,+5.31] | fert  +1.81 [+1.21,+2.41] ( +47%) | comp  -0.94 [-1.25,-0.66] ( -25%) | frag  +2.94 [+1.06,+4.85] ( +77%)
+flores32 qwen    S3_s4r32   uk all phi 2.53 D +453.63 [+422.49,+485.28] | fert +191.80 [+163.41,+222.58] ( +42%) | comp +49.33 [+36.74,+62.93] ( +11%) | frag +212.50 [+153.56,+267.94] ( +47%)
+flores32 qwen    S3_s4r32   uk lt4 phi 2.75 D +452.39 [+423.49,+481.68] | fert +196.24 [+170.64,+224.63] ( +43%) | comp  +7.71 [+0.53,+15.90] (  +2%) | frag +248.44 [+197.80,+296.62] ( +55%)
+flores5  bitnet  S3_s4r32   de all phi 1.58 D +18.72 [+12.74,+26.48] | fert  -1.42 [-5.33,+1.17] (  -8%) | comp  -5.11 [-7.35,-3.53] ( -27%) | frag +25.24 [+16.18,+38.70] (+135%)
+flores5  bitnet  S3_s4r32   de lt4 phi 1.32 D +14.02 [+11.71,+16.46] | fert  +0.84 [+0.40,+1.33] (  +6%) | comp  -0.60 [-0.76,-0.44] (  -4%) | frag +13.79 [+11.27,+16.42] ( +98%)
+flores5  bitnet  S3_s4r32   pl all phi 1.88 D +32.43 [+26.18,+40.47] | fert  -2.13 [-8.02,+1.76] (  -7%) | comp  -8.63 [-12.31,-6.14] ( -27%) | frag +43.19 [+32.30,+59.81] (+133%)
+flores5  bitnet  S3_s4r32   pl lt4 phi 1.45 D +25.63 [+22.25,+29.13] | fert  +1.18 [+0.56,+1.86] (  +5%) | comp  -0.49 [-0.84,-0.17] (  -2%) | frag +24.94 [+21.47,+28.55] ( +97%)
+flores5  bitnet  S3_s4r32   uk all phi 1.64 D +34.55 [+26.60,+43.65] | fert  -1.54 [-5.75,+1.28] (  -4%) | comp -15.82 [-22.82,-11.20] ( -46%) | frag +51.91 [+38.67,+71.05] (+150%)
+flores5  bitnet  S3_s4r32   uk lt4 phi 0.96 D +24.21 [+20.32,+28.18] | fert  -0.10 [-0.26,-0.00] (  -0%) | comp  -0.30 [-0.69,+0.08] (  -1%) | frag +24.60 [+20.73,+28.56] (+102%)
+flores5  bitnet  S3_s4r32   bg all phi 2.03 D +44.71 [+37.81,+52.74] | fert  -2.49 [-9.35,+2.06] (  -6%) | comp -13.32 [-18.03,-9.95] ( -30%) | frag +60.52 [+47.67,+78.53] (+135%)
+flores5  bitnet  S3_s4r32   bg lt4 phi 1.54 D +40.61 [+36.19,+45.10] | fert  +1.41 [+0.67,+2.24] (  +3%) | comp  -0.63 [-1.03,-0.24] (  -2%) | frag +39.83 [+35.34,+44.51] ( +98%)
+flores5  eurollm S3_s4r32   de all phi 1.22 D  +2.85 [+1.31,+4.36] | fert  +0.96 [+0.61,+1.38] ( +34%) | comp  -0.57 [-0.89,-0.25] ( -20%) | frag  +2.46 [+0.64,+4.25] ( +86%)
+flores5  eurollm S3_s4r32   de lt4 phi 1.23 D  +3.01 [+1.78,+4.21] | fert  +1.55 [+1.23,+1.99] ( +51%) | comp  -0.80 [-1.00,-0.61] ( -27%) | frag  +2.26 [+0.86,+3.66] ( +75%)
+flores5  eurollm S3_s4r32   pl all phi 1.21 D  +2.78 [+0.71,+4.94] | fert  +0.94 [+0.59,+1.36] ( +34%) | comp  -1.35 [-1.69,-1.02] ( -48%) | frag  +3.20 [+0.76,+5.71] (+115%)
+flores5  eurollm S3_s4r32   pl lt4 phi 1.21 D  +3.15 [+1.77,+4.57] | fert  +1.42 [+1.11,+1.81] ( +45%) | comp  -1.18 [-1.41,-0.97] ( -38%) | frag  +2.91 [+1.26,+4.58] ( +93%)
+flores5  eurollm S3_s4r32   uk all phi 1.42 D  +5.98 [+4.12,+7.91] | fert  +1.87 [+1.20,+2.70] ( +31%) | comp  -0.94 [-1.49,-0.39] ( -16%) | frag  +5.05 [+2.91,+7.22] ( +84%)
+flores5  eurollm S3_s4r32   uk lt4 phi 1.44 D  +7.40 [+5.95,+8.94] | fert  +2.90 [+2.35,+3.63] ( +39%) | comp  -1.54 [-1.93,-1.15] ( -21%) | frag  +6.04 [+4.20,+7.89] ( +82%)
+flores5  eurollm S3_s4r32   bg all phi 1.39 D  +9.09 [+6.79,+11.51] | fert  +1.70 [+1.09,+2.45] ( +19%) | comp  -0.25 [-0.59,+0.12] (  -3%) | frag  +7.64 [+5.19,+10.17] ( +84%)
+flores5  eurollm S3_s4r32   bg lt4 phi 1.43 D  +7.63 [+5.97,+9.31] | fert  +2.84 [+2.27,+3.58] ( +37%) | comp  -1.07 [-1.30,-0.83] ( -14%) | frag  +5.86 [+4.14,+7.57] ( +77%)
+flores5  bitnet  S3_s4c120  de all phi 1.58 D +16.89 [+11.03,+24.44] | fert  -0.88 [-4.70,+1.62] (  -5%) | comp  -5.43 [-7.59,-3.89] ( -32%) | frag +23.20 [+14.33,+36.22] (+137%)
+flores5  bitnet  S3_s4c120  de lt4 phi 1.32 D +12.27 [+9.97,+14.69] | fert  +1.23 [+0.79,+1.71] ( +10%) | comp  -0.70 [-0.88,-0.53] (  -6%) | frag +11.74 [+9.24,+14.43] ( +96%)
+flores5  bitnet  S3_s4c120  pl all phi 1.88 D +25.81 [+19.85,+33.85] | fert  -1.33 [-7.09,+2.45] (  -5%) | comp  -8.49 [-11.99,-6.12] ( -33%) | frag +35.64 [+25.41,+51.68] (+138%)
+flores5  bitnet  S3_s4c120  pl lt4 phi 1.45 D +19.71 [+16.40,+23.14] | fert  +1.73 [+1.12,+2.38] (  +9%) | comp  -0.59 [-0.96,-0.25] (  -3%) | frag +18.57 [+15.16,+22.15] ( +94%)
+flores5  bitnet  S3_s4c120  uk all phi 1.64 D +28.02 [+20.81,+36.38] | fert  -0.96 [-5.08,+1.77] (  -3%) | comp -14.41 [-21.06,-10.11] ( -51%) | frag +43.40 [+31.12,+61.58] (+155%)
+flores5  bitnet  S3_s4c120  uk lt4 phi 0.96 D +17.26 [+14.08,+20.51] | fert  -0.15 [-0.34,-0.00] (  -1%) | comp  -0.38 [-0.78,-0.01] (  -2%) | frag +17.78 [+14.61,+21.05] (+103%)
+flores5  bitnet  S3_s4c120  bg all phi 2.03 D +32.44 [+25.27,+40.55] | fert  -1.56 [-8.25,+2.84] (  -5%) | comp -12.24 [-16.66,-9.15] ( -38%) | frag +46.24 [+33.40,+63.94] (+143%)
+flores5  bitnet  S3_s4c120  bg lt4 phi 1.54 D +29.49 [+25.46,+33.69] | fert  +2.08 [+1.33,+2.88] (  +7%) | comp  -0.64 [-1.00,-0.30] (  -2%) | frag +28.05 [+23.82,+32.54] ( +95%)
+flores5  eurollm S3_s4c120  de all phi 1.22 D  +3.66 [+2.02,+5.36] | fert  +1.11 [+0.73,+1.54] ( +30%) | comp  -0.71 [-1.09,-0.35] ( -19%) | frag  +3.27 [+1.41,+5.23] ( +89%)
+flores5  eurollm S3_s4c120  de lt4 phi 1.23 D  +3.50 [+2.16,+4.84] | fert  +1.86 [+1.51,+2.29] ( +53%) | comp  -0.98 [-1.22,-0.77] ( -28%) | frag  +2.63 [+1.14,+4.16] ( +75%)
+flores5  eurollm S3_s4c120  pl all phi 1.21 D  +2.07 [-0.07,+4.24] | fert  +1.09 [+0.72,+1.52] ( +53%) | comp  -1.45 [-1.86,-1.06] ( -70%) | frag  +2.43 [+0.02,+4.86] (+118%)
+flores5  eurollm S3_s4c120  pl lt4 phi 1.21 D  +2.14 [+0.70,+3.61] | fert  +1.70 [+1.38,+2.08] ( +80%) | comp  -1.27 [-1.51,-1.04] ( -59%) | frag  +1.71 [+0.11,+3.32] ( +80%)
+flores5  eurollm S3_s4c120  uk all phi 1.42 D  +2.72 [+0.72,+4.72] | fert  +2.17 [+1.43,+3.00] ( +80%) | comp  -0.75 [-1.27,-0.25] ( -28%) | frag  +1.31 [-0.88,+3.44] ( +48%)
+flores5  eurollm S3_s4c120  uk lt4 phi 1.44 D  +3.24 [+1.83,+4.70] | fert  +3.48 [+2.94,+4.15] (+107%) | comp  -1.36 [-1.72,-1.00] ( -42%) | frag  +1.12 [-0.52,+2.80] ( +35%)
+flores5  eurollm S3_s4c120  bg all phi 1.39 D  +6.56 [+4.41,+8.83] | fert  +1.97 [+1.30,+2.74] ( +30%) | comp  -0.15 [-0.54,+0.26] (  -2%) | frag  +4.73 [+2.42,+7.23] ( +72%)
+flores5  eurollm S3_s4c120  bg lt4 phi 1.43 D  +4.69 [+3.12,+6.31] | fert  +3.41 [+2.83,+4.11] ( +73%) | comp  -1.03 [-1.30,-0.77] ( -22%) | frag  +2.32 [+0.64,+4.07] ( +49%)
+ntrex    bitnet  S3_s4r32   uk all phi 1.64 D +133.55 [+115.85,+153.02] | fert +19.83 [+16.48,+23.09] ( +15%) | comp -49.52 [-57.16,-41.82] ( -37%) | frag +163.25 [+144.31,+184.82] (+122%)
+ntrex    bitnet  S3_s4r32   uk lt4 phi 1.03 D +109.07 [+95.38,+124.53] | fert  +0.92 [-0.18,+1.96] (  +1%) | comp  -0.92 [-2.10,+0.25] (  -1%) | frag +109.07 [+95.73,+124.17] (+100%)
+ntrex    bitnet  S3_s4r128  uk all phi 1.64 D +72.50 [+60.22,+85.75] | fert +10.59 [+8.03,+13.16] ( +15%) | comp -26.86 [-32.18,-21.59] ( -37%) | frag +88.77 [+74.11,+105.29] (+122%)
+ntrex    bitnet  S3_s4r128  uk lt4 phi 1.03 D +64.56 [+53.93,+76.03] | fert  +0.45 [-0.09,+0.93] (  +1%) | comp  -0.65 [-1.36,+0.06] (  -1%) | frag +64.76 [+54.18,+76.31] (+100%)
+ntrex    eurollm S3_s4r32   uk all phi 1.43 D +37.59 [+29.60,+46.12] | fert +17.47 [+14.79,+20.33] ( +46%) | comp  -7.27 [-9.28,-5.29] ( -19%) | frag +27.40 [+18.63,+36.38] ( +73%)
+ntrex    eurollm S3_s4r32   uk lt4 phi 1.47 D +40.06 [+31.20,+49.46] | fert +21.64 [+18.96,+24.58] ( +54%) | comp -10.69 [-12.62,-8.93] ( -27%) | frag +29.11 [+19.48,+38.86] ( +73%)
+ntrex    eurollm S3_s4r128  uk all phi 1.43 D +15.06 [+10.20,+20.13] | fert  +7.75 [+5.85,+9.63] ( +51%) | comp  -3.80 [-4.66,-2.94] ( -25%) | frag +11.11 [+5.34,+16.95] ( +74%)
+ntrex    eurollm S3_s4r128  uk lt4 phi 1.47 D +16.82 [+11.63,+22.44] | fert  +9.28 [+7.71,+10.98] ( +55%) | comp  -5.23 [-6.22,-4.36] ( -31%) | frag +12.77 [+7.08,+18.77] ( +76%)
+bitnet   n=4 b_logphi +0.47 [-0.03,+1.00] b_logkappa +0.61 [-0.04,+1.00] corr +0.66 VIF 1.8 rho(y,phi) +1.00 rho(y,kappa) +0.80 -> too_few_languages
+eurollm  n=4 b_logphi +2.72 [+1.62,+3.98] b_logkappa -2.04 [-3.41,-0.79] corr +0.95 VIF 11.2 rho(y,phi) +0.80 rho(y,kappa) +0.60 -> too_few_languages
+   bitnet   de: phi 1.58 kappa 2.01 y +1.476 [+0.807,+2.461]
+   bitnet   pl: phi 1.88 kappa 2.64 y +1.930 [+1.296,+2.893]
+   bitnet   uk: phi 1.64 kappa 2.86 y +1.910 [+1.207,+2.919]
+   bitnet   bg: phi 2.03 kappa 2.98 y +2.321 [+1.675,+3.269]
+   eurollm  de: phi 1.22 kappa 1.14 y +0.289 [+0.074,+0.498]
+   eurollm  pl: phi 1.21 kappa 1.14 y +0.273 [-0.017,+0.562]
+   eurollm  uk: phi 1.42 kappa 1.26 y +0.560 [+0.316,+0.786]
+   eurollm  bg: phi 1.39 kappa 1.20 y +0.997 [+0.719,+1.281]
+bitnet   n=4 b_logphi -0.24 [-0.48,+0.04] b_logkappa +1.11 [+0.92,+1.23] corr +0.66 VIF 1.8 rho(y,phi) +0.80 rho(y,kappa) +1.00 -> too_few_languages
+eurollm  n=4 b_logphi +0.95 [-0.93,+2.34] b_logkappa +0.02 [-1.58,+1.77] corr +0.95 VIF 11.2 rho(y,phi) +0.80 rho(y,kappa) +1.00 -> too_few_languages
+   bitnet   de: phi 1.58 kappa 2.01 y +5.073 [+3.255,+10.574]
+   bitnet   pl: phi 1.88 kappa 2.64 y +7.584 [+4.829,+15.829]
+   bitnet   uk: phi 1.64 kappa 2.86 y +10.759 [+6.735,+23.426]
+   bitnet   bg: phi 2.03 kappa 2.98 y +10.917 [+6.963,+22.997]
+   eurollm  de: phi 1.22 kappa 1.14 y +1.305 [+1.115,+1.550]
+   eurollm  pl: phi 1.21 kappa 1.14 y +1.419 [+1.185,+1.709]
+   eurollm  uk: phi 1.42 kappa 1.26 y +1.708 [+1.451,+2.026]
+   eurollm  bg: phi 1.39 kappa 1.20 y +1.679 [+1.451,+1.966]
+bitnet   n=4 b_logphi +0.09 [-0.14,+0.34] b_logkappa +0.92 [+0.71,+1.07] corr +0.66 VIF 1.8 rho(y,phi) +0.80 rho(y,kappa) +1.00 -> too_few_languages
+eurollm  n=4 b_logphi +2.43 [+0.66,+3.79] b_logkappa -1.70 [-3.25,+0.19] corr +0.95 VIF 11.2 rho(y,phi) +0.60 rho(y,kappa) +0.80 -> too_few_languages
+   bitnet   de: phi 1.58 kappa 2.01 y +0.106 [+0.068,+0.164]
+   bitnet   pl: phi 1.88 kappa 2.64 y +0.182 [+0.136,+0.253]
+   bitnet   uk: phi 1.64 kappa 2.86 y +0.219 [+0.163,+0.300]
+   bitnet   bg: phi 2.03 kappa 2.98 y +0.255 [+0.201,+0.333]
+   eurollm  de: phi 1.22 kappa 1.14 y +0.009 [+0.002,+0.016]
+   eurollm  pl: phi 1.21 kappa 1.14 y +0.012 [+0.003,+0.022]
+   eurollm  uk: phi 1.42 kappa 1.26 y +0.019 [+0.011,+0.027]
+   eurollm  bg: phi 1.39 kappa 1.20 y +0.029 [+0.020,+0.039]
+token_r  t=1.00%  EN 2.644 [2.630,2.697] r=9.1 ch=46 (interior, cens 0.00)  UK 2.965 [2.877,3.085] r=38.3 ch=123 (interior, cens 0.00)  tax +0.321 [+0.220,+0.431] slots x4.22 chars x2.68
+token_r  t=0.75%  EN 2.674 [2.630,2.726] r=11.8 ch=60 (interior, cens 0.00)  UK 3.092 [2.938,3.226] r=49.9 ch=164 (interior, cens 0.00)  tax +0.418 [+0.256,+0.555] slots x4.21 chars x2.73
+token_r  t=0.50%  EN 2.715 [2.658,2.776] r=15.5 ch=80 (interior, cens 0.00)  UK 3.254 [3.056,3.399] r=64.6 ch=221 (interior, cens 0.02)  tax +0.539 [+0.343,+0.696] slots x4.16 chars x2.77
+char_C   t=1.00%  EN 2.714 [2.714,2.714] r=15.4 ch=77 (left, cens 0.00)  UK 2.985 [2.856,3.095] r=40.2 ch=128 (interior, cens 0.00)  tax +0.272 [+0.142,+0.381] slots x2.60 chars x1.65
+char_C   t=0.75%  EN 2.714 [2.714,2.714] r=15.4 ch=77 (left, cens 0.00)  UK 3.078 [2.961,3.219] r=48.6 ch=158 (interior, cens 0.00)  tax +0.365 [+0.248,+0.505] slots x3.15 chars x2.04
+char_C   t=0.50%  EN 2.714 [2.714,2.761] r=15.4 ch=77 (left, cens 0.00)  UK 3.249 [3.062,3.304] r=64.2 ch=218 (interior, cens 0.20)  tax +0.536 [+0.344,+0.588] slots x4.16 chars x2.82
+bitnet   EN r32 1.90% r128 1.02% | UK r32 3.41% r128 1.85% | EN-equivalent r 38.2 (interior) slot ratio 3.35 [1.70, 4.00] left 0.38 cens 0.00
+eurollm  EN r32 2.51% r128 1.11% | UK r32 3.90% r128 1.65% | EN-equivalent r 91.4 (interior) slot ratio 1.40 [1.17, 1.79] left 0.00 cens 0.00
+difference bitnet - eurollm: +1.95 [+0.35, +2.75], P(<=0) 0.0010
+=== CSV Diffs ===
+--- matched_difficulty/matched_bins.csv ---
+--- matched_difficulty/matched_cross_model.csv ---
+--- matched_difficulty/matched_difficulty.csv ---
+--- decomposition/decomposition.csv ---
+--- fertility_vs_competence/languages_flores5_S3_s4r32_fragility.csv ---
+--- fertility_vs_competence/languages_flores5_S3_s4r32_ratio_lt4.csv ---
+--- fertility_vs_competence/languages_flores5_S3_s4r32_R.csv ---
+--- fertility_vs_competence/regression_flores5_S3_s4r32_fragility.csv ---
+--- fertility_vs_competence/regression_flores5_S3_s4r32_ratio_lt4.csv ---
+--- fertility_vs_competence/regression_flores5_S3_s4r32_R.csv ---
+--- iso_loss_bits/iso_loss_bits.csv ---
+--- iso_loss_bits/iso_loss_curves.csv ---
+--- iso_loss_bits/ntrex_slot_ratio.csv ---
+ALL_CSV_DIFFS_ZERO=OK
