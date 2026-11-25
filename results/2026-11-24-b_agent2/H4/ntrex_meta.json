@@ -1,0 +1,750 @@
+{
+  "dataset": "MicrosoftTranslator/NTREX (NTREX-128 newstest2019 eng/ukr)",
+  "source_sha256": {
+    "DOCUMENT_IDS.tsv": "88a8b0ff1eae47e83f60dcde01075b8c87d75ced59ca09e0af1eb539958e05d5",
+    "newstest2019-src.eng.txt": "389e8f5796c66db4f646dfad33e1ec622d74767af5ef112b42a1f2cd814df3cc",
+    "newstest2019-ref.ukr.txt": "310112858e242ee930f53b2c00092b513dc7b4d2327ae6bb19e411a03c044db9"
+  },
+  "n_windows": 24,
+  "max_scored_tokens": 1023,
+  "bos_ids": {
+    "bitnet": 128000,
+    "eurollm": 1
+  },
+  "overlap_32grams_vs_calib_and_prior_eval": 0,
+  "overlap_32grams_self": 0,
+  "ids_sha256": {
+    "ntrex_bitnet_en.ids": "c89f2149f98271f008d17b3659229131a2bf67fd30e9669b6a657c287c217bc7",
+    "ntrex_bitnet_uk.ids": "377e2c4070154cf8c882f9ce782b390716530e20d3051c01f2b7064905ca2650",
+    "ntrex_eurollm_en.ids": "476b8c434163d634d305a3d5b5166ccb64fea7e6d6ef8300e7fbaf2e8879a597",
+    "ntrex_eurollm_uk.ids": "fe7308586383f4aa8747c0414aaeb51753ff6162fd79de98ead51e592da82472"
+  },
+  "summary_stats": {
+    "bitnet": {
+      "en": {
+        "total_scored_tokens": 14408,
+        "mean_scored_tokens": 600.3333333333334,
+        "min_scored_tokens": 566,
+        "max_scored_tokens": 734
+      },
+      "uk": {
+        "total_scored_tokens": 23673,
+        "mean_scored_tokens": 986.375,
+        "min_scored_tokens": 932,
+        "max_scored_tokens": 1017
+      }
+    },
+    "eurollm": {
+      "en": {
+        "total_scored_tokens": 16146,
+        "mean_scored_tokens": 672.75,
+        "min_scored_tokens": 632,
+        "max_scored_tokens": 806
+      },
+      "uk": {
+        "total_scored_tokens": 23096,
+        "mean_scored_tokens": 962.3333333333334,
+        "min_scored_tokens": 881,
+        "max_scored_tokens": 1021
+      }
+    }
+  },
+  "windows": [
+    {
+      "wid": 0,
+      "doc_id": "scotsman.133758",
+      "sents_used": 24,
+      "doc_total_sents": 24,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 3178,
+          "bytes": 3180,
+          "words": 594
+        },
+        "uk": {
+          "chars": 2981,
+          "bytes": 5374,
+          "words": 461
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 734,
+          "uk": 1012
+        },
+        "eurollm": {
+          "en": 806,
+          "uk": 1000
+        }
+      }
+    },
+    {
+      "wid": 1,
+      "doc_id": "independent.226301",
+      "sents_used": 24,
+      "doc_total_sents": 24,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2999,
+          "bytes": 2999,
+          "words": 546
+        },
+        "uk": {
+          "chars": 2976,
+          "bytes": 5373,
+          "words": 473
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 648,
+          "uk": 1016
+        },
+        "eurollm": {
+          "en": 708,
+          "uk": 975
+        }
+      }
+    },
+    {
+      "wid": 2,
+      "doc_id": "reuters.218932",
+      "sents_used": 19,
+      "doc_total_sents": 26,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2942,
+          "bytes": 2942,
+          "words": 505
+        },
+        "uk": {
+          "chars": 2878,
+          "bytes": 5220,
+          "words": 424
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 631,
+          "uk": 998
+        },
+        "eurollm": {
+          "en": 683,
+          "uk": 916
+        }
+      }
+    },
+    {
+      "wid": 3,
+      "doc_id": "scotsman.133744",
+      "sents_used": 22,
+      "doc_total_sents": 30,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 3308,
+          "bytes": 3308,
+          "words": 524
+        },
+        "uk": {
+          "chars": 3084,
+          "bytes": 5575,
+          "words": 443
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 627,
+          "uk": 939
+        },
+        "eurollm": {
+          "en": 707,
+          "uk": 978
+        }
+      }
+    },
+    {
+      "wid": 4,
+      "doc_id": "guardian.221762",
+      "sents_used": 24,
+      "doc_total_sents": 24,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2893,
+          "bytes": 2897,
+          "words": 488
+        },
+        "uk": {
+          "chars": 2965,
+          "bytes": 5435,
+          "words": 414
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 613,
+          "uk": 980
+        },
+        "eurollm": {
+          "en": 683,
+          "uk": 934
+        }
+      }
+    },
+    {
+      "wid": 5,
+      "doc_id": "rt.com.91350",
+      "sents_used": 19,
+      "doc_total_sents": 20,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2879,
+          "bytes": 2883,
+          "words": 463
+        },
+        "uk": {
+          "chars": 3133,
+          "bytes": 5722,
+          "words": 408
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 610,
+          "uk": 984
+        },
+        "eurollm": {
+          "en": 683,
+          "uk": 981
+        }
+      }
+    },
+    {
+      "wid": 6,
+      "doc_id": "guardian.221679",
+      "sents_used": 24,
+      "doc_total_sents": 27,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 3051,
+          "bytes": 3051,
+          "words": 534
+        },
+        "uk": {
+          "chars": 3175,
+          "bytes": 5759,
+          "words": 484
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 603,
+          "uk": 1013
+        },
+        "eurollm": {
+          "en": 667,
+          "uk": 999
+        }
+      }
+    },
+    {
+      "wid": 7,
+      "doc_id": "dailymail.co.uk.298759",
+      "sents_used": 20,
+      "doc_total_sents": 21,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 3037,
+          "bytes": 3037,
+          "words": 510
+        },
+        "uk": {
+          "chars": 2992,
+          "bytes": 5457,
+          "words": 439
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 603,
+          "uk": 943
+        },
+        "eurollm": {
+          "en": 662,
+          "uk": 916
+        }
+      }
+    },
+    {
+      "wid": 8,
+      "doc_id": "nytimes.184853",
+      "sents_used": 21,
+      "doc_total_sents": 21,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2818,
+          "bytes": 2818,
+          "words": 477
+        },
+        "uk": {
+          "chars": 2741,
+          "bytes": 4994,
+          "words": 395
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 601,
+          "uk": 944
+        },
+        "eurollm": {
+          "en": 681,
+          "uk": 926
+        }
+      }
+    },
+    {
+      "wid": 9,
+      "doc_id": "cbsnews.248384",
+      "sents_used": 25,
+      "doc_total_sents": 27,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2940,
+          "bytes": 2940,
+          "words": 485
+        },
+        "uk": {
+          "chars": 3059,
+          "bytes": 5435,
+          "words": 440
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 600,
+          "uk": 1017
+        },
+        "eurollm": {
+          "en": 712,
+          "uk": 1021
+        }
+      }
+    },
+    {
+      "wid": 10,
+      "doc_id": "bbc.381646",
+      "sents_used": 21,
+      "doc_total_sents": 26,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2687,
+          "bytes": 2687,
+          "words": 491
+        },
+        "uk": {
+          "chars": 2964,
+          "bytes": 5304,
+          "words": 456
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 599,
+          "uk": 1008
+        },
+        "eurollm": {
+          "en": 664,
+          "uk": 993
+        }
+      }
+    },
+    {
+      "wid": 11,
+      "doc_id": "nytimes.184822",
+      "sents_used": 27,
+      "doc_total_sents": 27,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2656,
+          "bytes": 2656,
+          "words": 481
+        },
+        "uk": {
+          "chars": 2701,
+          "bytes": 4850,
+          "words": 422
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 595,
+          "uk": 932
+        },
+        "eurollm": {
+          "en": 682,
+          "uk": 933
+        }
+      }
+    },
+    {
+      "wid": 12,
+      "doc_id": "nytimes.184825",
+      "sents_used": 20,
+      "doc_total_sents": 24,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2608,
+          "bytes": 2608,
+          "words": 456
+        },
+        "uk": {
+          "chars": 2828,
+          "bytes": 5036,
+          "words": 408
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 590,
+          "uk": 981
+        },
+        "eurollm": {
+          "en": 680,
+          "uk": 976
+        }
+      }
+    },
+    {
+      "wid": 13,
+      "doc_id": "cnbc.com.6772",
+      "sents_used": 20,
+      "doc_total_sents": 20,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2917,
+          "bytes": 2917,
+          "words": 489
+        },
+        "uk": {
+          "chars": 3102,
+          "bytes": 5535,
+          "words": 450
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 587,
+          "uk": 933
+        },
+        "eurollm": {
+          "en": 664,
+          "uk": 944
+        }
+      }
+    },
+    {
+      "wid": 14,
+      "doc_id": "rt.com.91335",
+      "sents_used": 17,
+      "doc_total_sents": 17,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2975,
+          "bytes": 2975,
+          "words": 489
+        },
+        "uk": {
+          "chars": 3247,
+          "bytes": 5942,
+          "words": 423
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 586,
+          "uk": 1006
+        },
+        "eurollm": {
+          "en": 637,
+          "uk": 952
+        }
+      }
+    },
+    {
+      "wid": 15,
+      "doc_id": "guardian.221754",
+      "sents_used": 16,
+      "doc_total_sents": 18,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2691,
+          "bytes": 2693,
+          "words": 454
+        },
+        "uk": {
+          "chars": 2991,
+          "bytes": 5211,
+          "words": 415
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 581,
+          "uk": 1001
+        },
+        "eurollm": {
+          "en": 663,
+          "uk": 966
+        }
+      }
+    },
+    {
+      "wid": 16,
+      "doc_id": "reuters.218861",
+      "sents_used": 15,
+      "doc_total_sents": 25,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2845,
+          "bytes": 2845,
+          "words": 481
+        },
+        "uk": {
+          "chars": 2764,
+          "bytes": 5068,
+          "words": 403
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 581,
+          "uk": 952
+        },
+        "eurollm": {
+          "en": 632,
+          "uk": 881
+        }
+      }
+    },
+    {
+      "wid": 17,
+      "doc_id": "bbc.381789",
+      "sents_used": 24,
+      "doc_total_sents": 24,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2622,
+          "bytes": 2622,
+          "words": 464
+        },
+        "uk": {
+          "chars": 2857,
+          "bytes": 5121,
+          "words": 431
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 581,
+          "uk": 1015
+        },
+        "eurollm": {
+          "en": 635,
+          "uk": 1001
+        }
+      }
+    },
+    {
+      "wid": 18,
+      "doc_id": "abcnews.306815",
+      "sents_used": 25,
+      "doc_total_sents": 27,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2889,
+          "bytes": 2889,
+          "words": 480
+        },
+        "uk": {
+          "chars": 2846,
+          "bytes": 5191,
+          "words": 413
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 579,
+          "uk": 992
+        },
+        "eurollm": {
+          "en": 667,
+          "uk": 959
+        }
+      }
+    },
+    {
+      "wid": 19,
+      "doc_id": "bbc.381680",
+      "sents_used": 19,
+      "doc_total_sents": 19,
+      "is_full_doc": true,
+      "langs": {
+        "en": {
+          "chars": 2723,
+          "bytes": 2723,
+          "words": 486
+        },
+        "uk": {
+          "chars": 3072,
+          "bytes": 5472,
+          "words": 421
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 579,
+          "uk": 972
+        },
+        "eurollm": {
+          "en": 637,
+          "uk": 917
+        }
+      }
+    },
+    {
+      "wid": 20,
+      "doc_id": "euronews-en.153826",
+      "sents_used": 26,
+      "doc_total_sents": 29,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2405,
+          "bytes": 2405,
+          "words": 431
+        },
+        "uk": {
+          "chars": 2782,
+          "bytes": 5012,
+          "words": 407
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 573,
+          "uk": 1014
+        },
+        "eurollm": {
+          "en": 654,
+          "uk": 996
+        }
+      }
+    },
+    {
+      "wid": 21,
+      "doc_id": "independent.226317",
+      "sents_used": 25,
+      "doc_total_sents": 28,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2609,
+          "bytes": 2609,
+          "words": 467
+        },
+        "uk": {
+          "chars": 3013,
+          "bytes": 5478,
+          "words": 403
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 571,
+          "uk": 1017
+        },
+        "eurollm": {
+          "en": 640,
+          "uk": 954
+        }
+      }
+    },
+    {
+      "wid": 22,
+      "doc_id": "reuters.218865",
+      "sents_used": 22,
+      "doc_total_sents": 27,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2403,
+          "bytes": 2403,
+          "words": 381
+        },
+        "uk": {
+          "chars": 2793,
+          "bytes": 5091,
+          "words": 355
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 570,
+          "uk": 993
+        },
+        "eurollm": {
+          "en": 652,
+          "uk": 1011
+        }
+      }
+    },
+    {
+      "wid": 23,
+      "doc_id": "guardian.221756",
+      "sents_used": 22,
+      "doc_total_sents": 23,
+      "is_full_doc": false,
+      "langs": {
+        "en": {
+          "chars": 2886,
+          "bytes": 2886,
+          "words": 485
+        },
+        "uk": {
+          "chars": 3152,
+          "bytes": 5752,
+          "words": 448
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 566,
+          "uk": 1011
+        },
+        "eurollm": {
+          "en": 647,
+          "uk": 967
+        }
+      }
+    }
+  ]
+}

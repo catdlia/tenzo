@@ -1,0 +1,33 @@
+Running as unit: run-p1088567-i1064720.scope; invocation ID: e3ce8612eca04ba39b97fb10d52f0558
+[bitnet parity fp32] max_abs_lp_diff=0.000e+00
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[bitnet parity S3+s4r32] max_abs_lp_diff=0.000e+00
+[kv_ptq] installed S3+s4r128: S2 + randomized Hadamard (D=128) + sinks 4 + recent 128 INT8
+[bitnet parity S3+s4r128] max_abs_lp_diff=0.000e+00
+[run] bitnet fp32 en: 24 windows (chunk=24)
+  bitnet fp32       en 24/24 t=828s rss=1.84GB
+[done] bitnet fp32       en nll=38858.661 tok=14408 t=828.1s rss=1.84GB peak=2.56GB
+[run] bitnet fp32 uk: 24 windows (chunk=24)
+  bitnet fp32       uk 24/24 t=2145s rss=2.02GB
+[done] bitnet fp32       uk nll=115575.817 tok=23673 t=2145.4s rss=2.02GB peak=2.85GB
+[kv_ptq] installed tenzo_int8: replica of engine int8_fused
+[run] bitnet tenzo_int8 en: 24 windows (chunk=24)
+  bitnet tenzo_int8 en 24/24 t=2834s rss=1.95GB
+[done] bitnet tenzo_int8 en nll=38862.715 tok=14408 t=2834.0s rss=1.95GB peak=2.85GB
+[run] bitnet tenzo_int8 uk: 24 windows (chunk=24)
+  bitnet tenzo_int8 uk 24/24 t=4293s rss=1.87GB
+[done] bitnet tenzo_int8 uk nll=115597.492 tok=23673 t=4293.1s rss=1.87GB peak=2.85GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 en: 24 windows (chunk=24)
+  bitnet S3+s4r32   en 24/24 t=5094s rss=1.96GB
+[done] bitnet S3+s4r32   en nll=39598.779 tok=14408 t=5093.7s rss=1.96GB peak=2.85GB
+[run] bitnet S3+s4r32 uk: 24 windows (chunk=24)
+  bitnet S3+s4r32   uk 24/24 t=6555s rss=1.92GB
+[done] bitnet S3+s4r32   uk nll=119521.222 tok=23673 t=6554.8s rss=1.92GB peak=2.85GB
+[kv_ptq] installed S3+s4r128: S2 + randomized Hadamard (D=128) + sinks 4 + recent 128 INT8
+[run] bitnet S3+s4r128 en: 24 windows (chunk=24)
+  bitnet S3+s4r128  en 24/24 t=7430s rss=1.72GB
+[done] bitnet S3+s4r128  en nll=39253.807 tok=14408 t=7430.4s rss=1.72GB peak=2.85GB
+[run] bitnet S3+s4r128 uk: 24 windows (chunk=24)
+  bitnet S3+s4r128  uk 24/24 t=8899s rss=1.95GB
+[done] bitnet S3+s4r128  uk nll=117710.852 tok=23673 t=8899.4s rss=1.95GB peak=2.85GB
