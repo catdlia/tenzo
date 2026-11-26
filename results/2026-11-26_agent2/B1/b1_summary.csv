@@ -1,0 +1,7 @@
+item,status,attempt,load1_before,load1_after,foreign_cpu_mean,foreign_cpu_max,governor,ac_online,temp_c,out_csv,rc
+ab_gemv_pp128,valid,1,0.90,4.89,0.1274,0.2313,powersave,1,50.0,/home/illia/CLionProjects/untitled/results/2026-11-26_B1/ab_gemv_pp128.csv,0
+ab_gemv_pp512,valid,1,0.92,4.43,0.1197,0.3420,powersave,1,50.0,/home/illia/CLionProjects/untitled/results/2026-11-26_B1/ab_gemv_pp512.csv,0
+e2e_fair_v3,valid,1,0.79,4.65,0.1399,0.5482,powersave,1,51.0,/home/illia/CLionProjects/untitled/results/2026-11-26_B1/e2e_fair_v3.csv,0
+ab_prefill_pp128,valid,1,0.87,3.38,0.1199,0.2268,powersave,1,49.0,/home/illia/CLionProjects/untitled/results/2026-11-26_B1/ab_prefill_pp128.csv,0
+ab_prefill_pp512,valid,1,0.90,4.23,0.1190,0.3474,powersave,1,51.0,/home/illia/CLionProjects/untitled/results/2026-11-26_B1/ab_prefill_pp512.csv,0
+decode_kv_modes,valid,1,0.87,4.09,0.1140,0.2802,powersave,1,50.0,/home/illia/CLionProjects/untitled/results/2026-11-26_B1/decode_kv_modes.csv,0

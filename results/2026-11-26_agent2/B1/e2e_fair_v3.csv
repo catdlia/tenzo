@@ -1,0 +1,61 @@
+engine,kv,prompt_len,gen_len,rep,pp_tps,tg_tps,pg_tps,rss_mb,threads,cpus,governor,load1,note
+tenzo,fp32,16,128,0,34.65453757851419,23.354254853306085,24.232225494320573,1023.60546875,4,0-3,powersave,1.52,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,1,35.85032489356934,23.14731093348765,24.095982329612955,1023.53125,4,0-3,powersave,1.97,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,2,32.8879753340185,22.306257950961083,23.133273358180183,1022.38671875,4,0-3,powersave,2.45,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,3,34.013605442176875,22.211425001735265,23.102098440608355,1021.92578125,4,0-3,powersave,2.62,token-by-token prefill; tg after the prompt
+tenzo,fp32,16,128,4,32.08985158443642,22.411710118536934,23.188779207394642,1022.0078125,4,0-3,powersave,2.87,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,0,34.27592116538132,22.405041134255207,23.301724974918283,911.06640625,4,0-3,powersave,2.97,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,1,33.64879074658255,22.570577136710693,23.427585982494385,911.71484375,4,0-3,powersave,3.14,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,2,34.77504890241252,22.548311519016334,23.464998044583496,911.9140625,4,0-3,powersave,3.03,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,3,34.71468865263615,22.594880847308033,23.506750028567232,911.45703125,4,0-3,powersave,3.41,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,16,128,4,34.850795033761706,22.480592925638412,23.40359830323912,910.98828125,4,0-3,powersave,3.51,token-by-token prefill; tg after the prompt
+bitnet.cpp,f16,16,128,0,46.655418,14.575244,15.851706,,4,0-3,powersave,3.96,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,1,40.837242,14.915304,16.02367,,4,0-3,powersave,4.32,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,2,45.008589,14.793874,15.739143,,4,0-3,powersave,4.41,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,3,43.143869,14.576052,15.705056,,4,0-3,powersave,4.44,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,16,128,4,49.982174,14.074136,14.25639,,4,0-3,powersave,4.83,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,0,38.160791,14.58834,16.170203,,4,0-3,powersave,5.14,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,1,43.50449,14.98649,16.270164,,4,0-3,powersave,5.47,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,2,43.265822,14.927519,16.130388,,4,0-3,powersave,5.15,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,3,46.769926,15.005828,16.263253,,4,0-3,powersave,4.69,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,16,128,4,39.109745,15.09291,16.304,,4,0-3,powersave,4.65,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+tenzo,fp32,128,128,0,36.646816307833255,24.662337912564304,29.483237167305848,1021.9453125,4,0-3,powersave,4.58,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,1,36.31926907470987,24.704701613525827,29.40669691574292,1022.0703125,4,0-3,powersave,4.43,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,2,36.421579786023216,24.479804161566705,29.27989752035868,1023.62109375,4,0-3,powersave,4.35,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,3,36.67621776504298,24.80956718934739,29.597770917877753,1023.57421875,4,0-3,powersave,4.15,token-by-token prefill; tg after the prompt
+tenzo,fp32,128,128,4,35.63970485869414,24.673271907166814,29.159500187942093,1021.765625,4,0-3,powersave,4.29,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,0,37.10037390220573,24.201172244280585,29.29363435594054,910.7265625,4,0-3,powersave,4.02,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,1,36.87698069720542,24.461559042177083,29.41277847352275,911.23046875,4,0-3,powersave,3.78,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,2,36.535936518810296,24.66186274132018,29.446949480077297,911.234375,4,0-3,powersave,3.98,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,3,37.2493670517708,24.531881863656402,29.58169632539866,910.45703125,4,0-3,powersave,4.48,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,128,128,4,36.92272189690484,24.49854539886694,29.454064315710752,911.828125,4,0-3,powersave,4.31,token-by-token prefill; tg after the prompt
+bitnet.cpp,f16,128,128,0,53.007707,14.70411,23.04683,,4,0-3,powersave,4.36,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,1,52.38023,14.757081,23.579631,,4,0-3,powersave,4.69,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,2,51.426397,14.797329,23.202701,,4,0-3,powersave,4.89,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,3,53.437407,14.725579,23.264811,,4,0-3,powersave,4.73,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,128,128,4,53.34502,14.38092,23.204357,,4,0-3,powersave,4.42,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,0,54.00557,14.86306,23.451097,,4,0-3,powersave,4.20,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,1,53.946633,14.87125,23.772232,,4,0-3,powersave,4.66,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,2,51.295302,14.711769,23.296973,,4,0-3,powersave,4.92,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,3,54.720735,14.776264,23.442581,,4,0-3,powersave,5.01,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,128,128,4,53.021355,14.947267,23.192265,,4,0-3,powersave,4.88,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+tenzo,fp32,512,128,0,34.112183779390115,22.530847899174454,30.93221977342149,1023.74609375,4,0-3,powersave,4.73,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,1,34.0534213046717,21.668839193512888,30.560158148818417,1022.95703125,4,0-3,powersave,4.62,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,2,32.768629157679825,22.794052177010062,30.131543017485708,1022.66015625,4,0-3,powersave,4.72,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,3,34.60605200370393,22.356126102523795,31.18817188581231,1022.05859375,4,0-3,powersave,4.75,token-by-token prefill; tg after the prompt
+tenzo,fp32,512,128,4,34.3702589852718,22.674130234535536,31.15598438306283,1023.38671875,4,0-3,powersave,4.51,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,0,35.46934534118462,23.227117659867893,32.08695564981099,911.8515625,4,0-3,powersave,4.20,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,1,35.831758695500035,23.233863355841137,32.32617106605651,911.265625,4,0-3,powersave,4.36,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,2,35.737968101071445,23.061816478388554,32.19834178539805,910.51171875,4,0-3,powersave,4.32,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,3,35.52890887390013,23.14479965282801,32.094357410787715,912.1171875,4,0-3,powersave,3.97,token-by-token prefill; tg after the prompt
+tenzo,int8_fused,512,128,4,35.34154287923132,23.007099847218477,31.91908511922277,911.18359375,4,0-3,powersave,4.36,token-by-token prefill; tg after the prompt
+bitnet.cpp,f16,512,128,0,49.675725,14.757661,32.37115,,4,0-3,powersave,4.65,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,1,47.967603,14.683306,32.830242,,4,0-3,powersave,4.84,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,2,47.080469,14.516068,32.654178,,4,0-3,powersave,5.03,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,3,48.440362,14.617384,33.057259,,4,0-3,powersave,4.94,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,f16,512,128,4,48.81533,14.523433,32.183728,,4,0-3,powersave,5.05,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,0,46.763893,14.920723,32.361233,,4,0-3,powersave,5.15,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,1,45.836617,13.269611,31.93646,,4,0-3,powersave,5.14,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,2,48.152279,14.764521,32.310949,,4,0-3,powersave,4.92,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,3,47.294203,14.961261,32.477382,,4,0-3,powersave,4.65,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
+bitnet.cpp,q8_0,512,128,4,47.553222,14.729231,32.302037,,4,0-3,powersave,4.65,tg_tps measured from an EMPTY context (llama-bench -n); pg_tps = llama-bench -pg
