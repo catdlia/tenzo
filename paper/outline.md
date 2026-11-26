@@ -20,7 +20,7 @@ Simple, measurable remedies shrink the gap.
 - in a model that knows it (EuroLLM), the gap is the extra tokens plus a token-defined cache window, and a window defined in characters largely removes the second part;
 - in a model that does not (BitNet), it is per-token fragility at equal difficulty that no window definition removes and only more bits reduce.
 
-Pending: whether that fragility is about competence or about ternary weights (H4, SmolLM2), and which language property predicts it (H2, 11 languages).
+Pending: whether that fragility is about competence or about ternary weights (H4, SmolLM2 — tokenizer fertility check done `[2026-11-26-H4-tok]`, weights pending), while H2 (`10` FLORES languages, `9` non-EN; `fi` pending) already separates `R -> tokenization` from `ratio_lt4 -> competence` and `fragility -> both` (`κ` ~4× `φ`) in BitNet `[2026-11-26-H2]`.
 
 ## Contributions
 
@@ -31,14 +31,14 @@ Pending: whether that fragility is about competence or about ternary weights (H4
    - INT8 KV is neutral, except for Qwen.
 3. **Mechanism.**
    - The disparity is carried by **V**-quantization and by the **token-defined recent window** [2026-11-24-H4, 2026-11-24-b-H1, 2026-11-24-b-H3b].
-   - The residual is a **per-token fragility at equal difficulty** that is ×5–11 for BitNet but only ×1.3–1.7 for EuroLLM and tracks the model's cost-of-content κ [coordinator 2026-11-25 matched-difficulty; TODO 11-language regression, T50].
-   - Exact decomposition of the extra nats into fertility, difficulty composition and fragility: for BitNet ~100% fragility in every language and corpus (fertility ≈ 0); for EuroLLM 18–46% fertility, and a character window removes its Ukrainian fragility; Qwen 42% / 47% [coordinator 2026-11-25 decomposition, exploratory].
+   - The residual is a **per-token fragility at equal difficulty** that is ×5–11 for BitNet (`×4.5–10.9` across 9 non-EN FLORES languages `[2026-11-26-H2]`) but only ×1.3–1.7 for EuroLLM (`×1.2–1.7`) and tracks the model's cost-of-content κ [2026-11-25-coord-MD; 2026-11-26-H2 separates `ratio_lt4 -> competence` (`β_logκ=+0.98`) vs `R -> tokenization` (`β_logφ=+0.67`) at `VIF=1.5` in BitNet; `fi` pending].
+   - Exact decomposition of the extra nats into fertility, difficulty composition and fragility: for BitNet 122–158% fragility across all tested languages and both corpora (fertility ≈ 0); for EuroLLM 18–46% fertility (up to 140% in `es`, where fragility vanishes), and a character window removes its Ukrainian fragility; Qwen 42% / 47% [2026-11-25-coord-DEC, 2026-11-26-H2].
    - Positional degradation appears only in multi-document contexts, in any language [2026-11-24-H1b].
 4. **Practice.**
    - Character-defined recent windows; spending bits on V [TODO T51].
-   - Iso-loss budget: for equal relative loss UK needs ~4.2× the INT8 recent slots of EN (16 → 65 at 0.5%; +0.54 [0.34, 0.70] bits/elem at ctx 512), and ×2.7–2.8 the covered characters, so equal text coverage is not enough for BitNet. On NTREX the same comparison gives ×3.35 for BitNet but ×1.40 for EuroLLM, i.e. its plain fertility: a character-defined window equalizes only when the model knows the language [coordinator 2026-11-25 iso-loss + NTREX slot ratio, exploratory].
+   - Iso-loss budget: for equal relative loss UK needs ~4.2× the INT8 recent slots of EN (16 → 65 at 0.5%; +0.54 [0.34, 0.70] bits/elem at ctx 512), and ×2.7–2.8 the covered characters, so equal text coverage is not enough for BitNet. On NTREX the same comparison gives ×3.35 for BitNet but ×1.40 for EuroLLM, i.e. its plain fertility: a character-defined window equalizes only when the model knows the language [2026-11-25-coord-ISO].
    - Mixed-language clip calibration that transfers out of domain [2026-11-23-H1-sim, 2026-11-24-H2].
-   - All of it validated in a CPU runtime whose engine matches the simulator [2026-11-23-H1-eng, 2026-11-23-H3, T10-03].
+   - All of it validated in a CPU runtime whose engine matches the simulator [2026-11-23-H1-eng, 2026-11-23-H3, T10-03] and achieves 22.2–24.2 tok/s decode (`i3-1215U`, `powersave`, within ~1.6–4.7% of `int8_fused`, `6/6` clean `B1` items) [2026-11-26-B1].
 
 ## Sections (1–2 sentences each)
 
@@ -70,35 +70,37 @@ Pending: whether that fragility is about competence or about ternary weights (H4
 
 | # | What | Claim ID | Script / file |
 |---|---|---|---|
-| T1 | D and R on FLORES-32 and NTREX-24, 3 models, INT8 / S3 / S13 / r128 | 2026-11-24-H3, 2026-11-24-b-H4 | `scripts/analyze_h3_flores.py`, `scripts/analyze_h4_ntrex.py` |
-| F1 | Extra NLL per base-difficulty bin, EN vs UK, BitNet vs EuroLLM | coordinator 2026-11-25 (to be added to claims) | `scripts/plot_matched_difficulty.py` → `matched_bins.png` |
-| F2 | R and matched ratio vs fertility φ and cost κ, 11 languages | TODO T50 (preview: `matched_ratio_vs_kappa.png`, 5 languages) | TODO |
+| T1 | D and R on FLORES-32, NTREX-24, and FLORES-10/H3b (pooled convention) | 2026-11-24-H3, 2026-11-24-b-H4, 2026-11-24-b-H3b, 2026-11-26-H2 | `scripts/build_paper_tables.py` → `results/paper/tables.md` |
+| F1 | Extra NLL per base-difficulty bin, EN vs UK, BitNet vs EuroLLM | 2026-11-25-coord-MD | `scripts/plot_matched_difficulty.py` → `matched_bins.png` |
+| F2 | R, ratio_lt4, and fragility vs fertility φ and cost κ, 10 FLORES languages (`fi` pending) | 2026-11-26-H2 | `scripts/plot_h2_flores11.py` → `results/2026-11-26_agent2/H2/fertility_vs_competence.png` |
 | F3 | Token- vs character-defined recent window (coverage curves) | 2026-11-24-b-H1, 2026-11-24-b-H3b | `char_window_coverage.png`, `multilang_char_window.png` |
 | F4 | Mechanism ablations (K/V, layers, r) | 2026-11-24-H4 | `mechanism.png` |
 | F5 | Bits per element vs disparity, Pareto | TODO T51 | TODO |
-| F2a | Decomposition of D: fertility / composition / fragility, 3 models | coordinator 2026-11-25 decomposition (to be added to claims) | `scripts/plot_disparity_decomposition.py` → `decomposition.png` |
-| F5a | Iso-loss budget EN vs UK (token r, character C) | coordinator 2026-11-25 iso-loss (to be added to claims) | `scripts/plot_iso_loss_bits.py` → `iso_loss_bits.png` |
+| F2a | Decomposition of D: fertility / composition / fragility, 3 models | 2026-11-25-coord-DEC | `scripts/plot_disparity_decomposition.py` → `decomposition.png` |
+| F5a | Iso-loss budget EN vs UK (token r, character C) | 2026-11-25-coord-ISO | `scripts/plot_iso_loss_bits.py` → `iso_loss_bits.png` |
 | F6 | Long vs concatenated context at 2048 | 2026-11-24-H1b | `long_vs_concat_2048.png` |
 | T2 | BPC vs BPB vs parallel nats (EuroLLM sign flip) | 2026-11-23-L3, 2026-11-23-H2-eurollm, 2026-11-24-H3 | existing analyses |
 | T3 | α calibration in- and out-of-domain | 2026-11-23-H1-sim, 2026-11-24-H2 | existing |
+| T4 | Clean idle CPU speed benchmarks (`B1`, 6/6 valid on i3-1215U `powersave`) | 2026-11-26-B1 | `scripts/analyze_b1_speed.py`, `scripts/build_paper_tables.py` |
 | A1 | Engine ↔ simulator parity at 512 and 2048 | 2026-11-23-H1-eng, 2026-11-23-H3, T10-03 | existing |
 
 ## Limitations (to state plainly)
 
-- **Data size:** 24–48 windows per corpus; FLORES windows are short (~180–480 tokens).
-- **Models:** three models ≤ 2B parameters; only one of them is native-ternary. The BitNet vs EuroLLM contrast mixes competence with architecture.
+- **Data size:** 24–48 windows per corpus; FLORES windows are short (~180–605 tokens).
+- **Models:** three models ≤ 2B parameters; only one of them is native-ternary. The BitNet vs EuroLLM contrast mixes competence with architecture (`H4` SmolLM2 tokenizer check done `[2026-11-26-H4-tok]`, weights pending).
 - **Method:** PTQ only, no KV-aware fine-tuning; perplexity/NLL only, no downstream task or generation-quality evaluation yet.
 - **Competence proxy:** κ is a proxy measured on the same data.
-- **Speed:** no speed claims (the CPU speed runs have not completed yet).
+- **Speed:** `6/6` clean idle items completed on a single Intel i3-1215U laptop under `powersave` governor [2026-11-26-B1]; not yet benchmarked across multiple CPUs or governors.
 
 ## TODO before submission
 
-1. T50 part 2: 11 languages, regression of R on log φ and log κ (both models).
-2. T51: bits vs disparity Pareto (V INT4 / V 2-bit, r128, character window).
-3. One downstream check on parallel data, e.g. a small multilingual reading-comprehension or QA set with en/uk/pl/bg, to show NLL gaps matter.
-4. Ideally a second ternary-native model, to separate "ternary weights" from "weak language competence".
-5. Related work: read and verify every entry in `paper/related_work.md`.
-6. Venue decision. Candidates (owner decides):
+1. T50 part 2 finish: run `fi` (11th language; `10` languages done in `[2026-11-26-H2]`).
+2. `H4`: run `SmolLM2-1.7B` weights (`FLORES-32` + trimmed `NTREX-24`, tokenizer pre-check done `[2026-11-26-H4-tok]`).
+3. T51: bits vs disparity Pareto (V INT4 / V 2-bit, r128, character window).
+4. One downstream check on parallel data, e.g. a small multilingual reading-comprehension or QA set with en/uk/pl/bg, to show NLL gaps matter.
+5. Ideally a second ternary-native model, to separate "ternary weights" from "weak language competence".
+6. Related work: read and verify every entry in `paper/related_work.md`.
+7. Venue decision. Candidates (owner decides):
    - SlavicNLP 2027 @ EACL (direct submission 9 Jan 2027) — the language set is Slavic-heavy;
    - UNLP 2027 (~March);
    - ACL 2027 SRW;

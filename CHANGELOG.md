@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — 2026-11-26
+
+### Added
+- **Clean-machine `B1` idle CPU speed suite (`tenzo-b1.service`, `6/6` `valid`, `results/2026-11-26_agent2/B1/`).**
+  Completed all 6 benchmark items on attempt `1` (`rc=0`, pinned CPUs `0-3`, `powersave`, `AC=1`, `foreign_cpu_mean 0.1140–0.1399`) and summarized medians/IQRs via `scripts/analyze_b1_speed.py` and `scripts/build_paper_tables.py`: `i2s` outperforms `lut` (`34.24/22.19` vs `23.11/16.97` tok/s `@pp128`, `1.48×/1.31×`), batched prefill speeds up `pp` by `1.47×`/`1.45×`, `tenzo` decodes faster than `bitnet.cpp q8_0` (`24.50` vs `14.86` tok/s `@pp128`), and `ternary_rot`/`ternary_rot_alpha` decode (`24.20`/`22.20` tok/s) stays within `1.6–4.7%` of `int8_fused`.
+- **10-language parallel `FLORES-200` fertility vs competence study (`H2`, `T50` part 2, `results/2026-11-26_agent2/H2/`).**
+  Prepared `48` fixed-boundary windows across `11` languages (`0` dropped, `0` 32-gram overlap, `10/10` old5 `.ids` byte-identical) and evaluated `10` languages (`9` non-EN: `de,pl,uk,bg,fr,cs,hu,el,es` + `en`; `fi` deferred past `08:30` cutoff) sequentially on `BitNet-b1.58-2B-4T` (`0.000e+00` parity) and `EuroLLM-1.7B` (`<=5.007e-06` parity). Collinearity dropped to `VIF=1.5` (BitNet) / `2.4` (EuroLLM), cleanly separating BitNet responses: **`R` -> `tokenization`** (`β_logφ=+0.67 [+0.32,+0.93]`), **`ratio_lt4` -> `competence`** (`β_logκ=+0.98 [+0.85,+1.06]`), and **`fragility` -> `both`** (`β_logκ=+0.83`, `β_logφ=+0.21`), while EuroLLM yields **`competence`** on `fragility` (`β_logκ=+0.75 [+0.38,+0.97]`) and **`collinear`** on `R`/`ratio_lt4`.
+- **`SmolLM2-1.7B` tokenizer-only fertility pre-check (`H4-tok`, `results/2026-11-26_agent2/H4/`).**
+  Checked `HuggingFaceTB/SmolLM2-1.7B` `tokenizer.json` without downloading weights (`df -h / = 11.45 GiB >= 9.5 GB`): `φ_UK = 3.9214×` (`FLORES-32`, `0 > 1023`) and `3.7037×` (`NTREX-24`, `24/24 > 2047` -> requires aligned sentence trim for full `H4`).
+- **Unified pooled `R` tables & paper audits (`L3`, `results/paper/{claims.md,tables.md,tables.tex}`, `paper/{outline,method_draft,results_draft}.md`).**
+  Added `t_parallel_en_uk()` and `t_parallel_multilang()` to `scripts/build_paper_tables.py` using pooled `ΣΔ/ΣB` (marking cells differing by `> 0.1 pp` from window-mean), registered coordinator (`2026-11-25-coord-{MD,ISO,DEC}`) and session (`2026-11-26-{B1,H2,H4-tok}`) claims, and audited `paper/{method_draft,results_draft}.md` with `[check]` markers.
+
+### Fixed
+- **`b1_idle_runner.sh` v2 runner hardening (`B0`).**
+  Applied `results/2026-11-25_coordinator/b1_runner_v2.patch` (unit-context `systemd-inhibit --what=idle:sleep:handle-lid-switch`, `idle_block_log`, `120s` short re-gate), verified `--dry-run` and `--smoke` (`valid=1`), and archived idle-starved `2026-11-24-b_B1` (`0` runs).
+
+---
+
 ## [Unreleased] — 2026-11-24-b
 
 ### Added

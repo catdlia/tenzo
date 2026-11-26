@@ -12,7 +12,7 @@ _Prose draft for the Method / Setup sections. It only describes procedures that 
   - A patched eager-attention function receives post-RoPE K and V and applies the same quantizers as the golden path (`tools/reference/second_model_kv.py`).
   - Compute is fp32 from the bf16 checkpoints.
   - A check is run that the patch without quantization reproduces HF's own eager attention (`--check-windows`).
-  - `[TODO]` SmolLM2-1.7B (or 360M) as a full-precision model with low Ukrainian competence.
+  - `[TODO]` SmolLM2-1.7B (`tokenizer.json` fertility check done `[2026-11-26-H4-tok]`; weights run pending — `NTREX-24` will require aligned EN/UK sentence trimming to fit `ctx=2048`).
 
 ## 3.2 KV-cache quantization
 
@@ -33,7 +33,7 @@ All schemes act on post-RoPE keys and on values, per layer and KV head, on vecto
   - K-only and V-only variants, in which the other tensor stays INT8.
   - S3 restricted to one third of the layers.
   - `[TODO T51]` V with 2-bit or 4-bit codes while K stays ternary.
-- **Effective bits.** Bits per element are (n₈·8.125 + (T − n₈)·b)/T, where n₈ is the number of INT8 positions (sinks plus active recent slots) and b the bits of the main scheme. We report them at a standardized context of 512 and asymptotically (T → ∞).
+- **Effective bits.** Bits per element are (n₈·8.125 + (T − n₈)·b)/T, where n₈ is the number of INT8 positions (sinks plus active recent slots) and b the bits of the main scheme (`[check]` `tools/reference/kv_ptq.py` also includes `fp16` zero-points for asymmetric schemes (`int2_rot`, `int4_g32`, `S13`) and accounts for the trailing incomplete group `incomplete_group_mask`, keeping average `15.5` tokens in INT8). We report them at a standardized context of 512 and asymptotically (T → ∞).
 - **Engine check.** The same S3+s4r32 scheme is implemented in the Tenzo C++ runtime (`ternary_rot`). There it reproduces the simulator: the confidence interval of the PPL ratio contains 1 at contexts 512 and 2048 [claims 2026-11-23-H1-eng, 2026-11-23-H3].
 
 ## 3.3 Optional clip calibration
@@ -48,9 +48,9 @@ Static clip multipliers α ∈ [0.5, 1.5] per layer, KV head and 32-group are fi
 Comparing per-token NLL across languages is confounded by tokenization and by text difficulty. We therefore evaluate on **content-matched** text:
 
 - **FLORES-200 devtest.**
-  - Windows are runs of consecutive sentences. Sentences are added while the longest tokenization of the window, across all models of the comparison, stays at or below 511 scored tokens.
+  - Windows are runs of consecutive sentences. Sentences are added while the longest tokenization of the window, across all models of the comparison, stays at or below 511 scored tokens (`[check]` `H2` reuses `flores5_meta.json` boundaries and evaluates `10` languages under `<= 1023` scored tokens, reaching `605` BitNet / `523` EuroLLM tokens on high-fertility languages).
   - Each window has identical content in every language and for every model.
-  - Two sets: 32 EN/UK windows (three tokenizers), and 48 windows over sentences 209–633 for en, de, pl, uk, bg (`[TODO]` + fr, es, cs, hu, fi, el).
+  - Two sets: 32 EN/UK windows (three tokenizers), and 48 windows over sentences 209–633 for en, de, pl, uk, bg (`+ fr, cs, hu, el, es` completed in `[2026-11-26-H2]`; `[TODO]` `+ fi`).
 - **NTREX-128** (newstest2019 EN→UK). 24 complete articles of at most 1023 tokens: coherent long-form text rather than sentence concatenations.
 - **Leakage control.** Every evaluation window shares no 32-gram with the calibration windows or with any other evaluation set. Raw text is not redistributed; scripts rebuild the windows from the official archives (sha256 recorded).
 
@@ -85,4 +85,4 @@ On parallel text, totals over the same content are directly comparable across la
 
 - We measure next-token NLL only; no downstream task accuracy (`[TODO]` a long-context multilingual check, e.g. OneRuler `[check]`).
 - All quantization is post-training: no KV-aware fine-tuning.
-- Evaluated models: one ternary model and two (`[TODO]` three) full-precision models of 1.5–2B parameters.
+- Evaluated models: one ternary model and two (`[TODO]` three — `SmolLM2-1.7B` weights pending; `[check]` multilingual set is `10` FLORES languages completed in `[2026-11-26-H2]` rather than `5` / `11`) full-precision models of 1.5–2B parameters.

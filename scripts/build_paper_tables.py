@@ -227,7 +227,149 @@ def t_parity():
                  files + [ROOT / "results/reference/golden", ROOT / "results/reference/hf"], "The last row compares the two references with each other: the max_abs gate is not met even there.")
 
 
+def parse_win_nll(p):
+    wins = {}
+    with open(p) as f:
+        for line in f:
+            if line.startswith("w "):
+                parts = line.split()
+                wins[int(parts[1])] = float(parts[3])
+    return wins
+
+
+def parallel_R_stats(fp_en, q_en, fp_l, q_l):
+    be, qe = parse_win_nll(fp_en), parse_win_nll(q_en)
+    bl, ql = parse_win_nll(fp_l), parse_win_nll(q_l)
+    ws = sorted(set(be) & set(qe) & set(bl) & set(ql))
+    de = np.array([qe[w] - be[w] for w in ws], float)
+    dl = np.array([ql[w] - bl[w] for w in ws], float)
+    be_a = np.array([be[w] for w in ws], float)
+    bl_a = np.array([bl[w] for w in ws], float)
+    re_pool = 100.0 * de.sum() / be_a.sum()
+    rl_pool = 100.0 * dl.sum() / bl_a.sum()
+    r_pool = rl_pool - re_pool
+    re_mean = 100.0 * float(np.mean(de / be_a))
+    rl_mean = 100.0 * float(np.mean(dl / bl_a))
+    r_mean = rl_mean - re_mean
+    rng = np.random.default_rng(0)
+    idx = rng.integers(0, len(ws), size=(10000, len(ws)))
+    boot = (dl[idx].sum(1) / bl_a[idx].sum(1) - de[idx].sum(1) / be_a[idx].sum(1)) * 100.0
+    lo, hi = np.percentile(boot, [2.5, 97.5])
+    return len(ws), re_pool, rl_pool, r_pool, lo, hi, re_mean, rl_mean, r_mean
+
+
+def fmt_rel(pool_val, mean_val):
+    s = "%+.2f%%" % pool_val
+    if abs(pool_val - mean_val) > 0.1:
+        s += " (mean %+.2f%%)" % mean_val
+    return s
+
+
+def fmt_R_cell(r_pool, lo, hi, r_mean):
+    s = "%+.2f [%+.2f, %+.2f]" % (r_pool, lo, hi)
+    if abs(r_pool - r_mean) > 0.1:
+        s += " (mean %+.2f)" % r_mean
+    return s
+
+
+def t_parallel_en_uk():
+    rows, srcs = [], []
+    # FLORES-32
+    f32_dir = ROOT / "results/2026-11-24_agent2/H3/scores"
+    for model_label, mdir, fpre in (("BitNet-b1.58-2B-4T", "bitnet", "fp32"), ("EuroLLM-1.7B", "eurollm", "fp"), ("Qwen2.5-1.5B", "qwen", "fp")):
+        d = f32_dir / mdir
+        for scheme in ("tenzo_int8", "S3_s4r32", "S13_s4r32"):
+            files = [d / f"{fpre}_en.txt", d / f"{scheme}_en.txt", d / f"{fpre}_uk.txt", d / f"{scheme}_uk.txt"]
+            if all(p.exists() for p in files):
+                srcs.extend(files)
+                n, rep, rlp, rp, lo, hi, rem, rlm, rm = parallel_R_stats(*files)
+                rows.append(["FLORES-32", model_label, scheme, n, fmt_rel(rep, rem), fmt_rel(rlp, rlm), fmt_R_cell(rp, lo, hi, rm)])
+    # NTREX-24
+    ntrex_dir = ROOT / "results/2026-11-24-b_agent2/H4/scores"
+    for model_label, mdir, fpre in (("BitNet-b1.58-2B-4T", "bitnet", "fp32"), ("EuroLLM-1.7B", "eurollm", "fp")):
+        d = ntrex_dir / mdir
+        for scheme in ("tenzo_int8", "S3_s4r32", "S3_s4r128"):
+            files = [d / f"{fpre}_en.txt", d / f"{scheme}_en.txt", d / f"{fpre}_uk.txt", d / f"{scheme}_uk.txt"]
+            if all(p.exists() for p in files):
+                srcs.extend(files)
+                n, rep, rlp, rp, lo, hi, rem, rlm, rm = parallel_R_stats(*files)
+                rows.append(["NTREX-24", model_label, scheme, n, fmt_rel(rep, rem), fmt_rel(rlp, rlm), fmt_R_cell(rp, lo, hi, rm)])
+    # FLORES-32 H1 char-window
+    h1_dir = ROOT / "results/2026-11-24-b_agent2/H1/scores"
+    for scheme in ("S3_s4r32", "S3_s4c80", "S3_s4c120", "S3_s4c160", "S3_s4c240", "K8V_S3_s4c120"):
+        files = [h1_dir / "fp32_en.txt", h1_dir / f"{scheme}_en.txt", h1_dir / "fp32_uk.txt", h1_dir / f"{scheme}_uk.txt"]
+        if all(p.exists() for p in files):
+            srcs.extend(files)
+            n, rep, rlp, rp, lo, hi, rem, rlm, rm = parallel_R_stats(*files)
+            rows.append(["FLORES-32 (H1)", "BitNet-b1.58-2B-4T", scheme, n, fmt_rel(rep, rem), fmt_rel(rlp, rlm), fmt_R_cell(rp, lo, hi, rm)])
+    uniq_srcs = [f32_dir.parent, ntrex_dir.parent, h1_dir.parent]
+    return Table(
+        "Parallel-corpus EN vs UK KV-quantization disparity R (pooled Sum(dNLL)/Sum(B) convention)",
+        ["corpus", "model", "scheme", "windows", "EN rel", "UK rel", "R = rel_UK - rel_EN (pp) [95% CI]"],
+        rows,
+        uniq_srcs,
+        "Pooled convention: rel_L = 100 * Sum_w(dNLL_w) / Sum_w(B_w), matching H3-multilang and H4-NTREX. Where pooled differs from window-mean (mean_w(dNLL_w/B_w)) by > 0.1 pp, both values are shown; 95% CIs use 10,000 paired window-bootstrap replicates (seed 0)."
+    )
+
+
+def t_parallel_multilang():
+    rows, srcs = [], []
+    h2_dir = ROOT / "results/2026-11-26_agent2/H2/scores"
+    for model_label, mdir, fpre in (("BitNet-b1.58-2B-4T", "bitnet", "fp32"), ("EuroLLM-1.7B", "eurollm", "fp")):
+        d = h2_dir / mdir
+        for lang in ("de", "pl", "uk", "bg", "fr", "cs", "hu", "el", "es"):
+            files = [d / f"{fpre}_en.txt", d / "S3_s4r32_en.txt", d / f"{fpre}_{lang}.txt", d / f"S3_s4r32_{lang}.txt"]
+            if all(p.exists() for p in files):
+                n, rep, rlp, rp, lo, hi, rem, rlm, rm = parallel_R_stats(*files)
+                rows.append(["FLORES-10 (H2)", model_label, lang, "S3_s4r32", n, fmt_rel(rep, rem), fmt_rel(rlp, rlm), fmt_R_cell(rp, lo, hi, rm)])
+    h3b_dir = ROOT / "results/2026-11-24-b_agent2/H3b/scores"
+    h3_fp = ROOT / "results/2026-11-24-b_agent2/H3/scores"
+    for model_label, mdir, fpre in (("BitNet-b1.58-2B-4T", "bitnet", "fp32"), ("EuroLLM-1.7B", "eurollm", "fp")):
+        dfp, dc = h3_fp / mdir, h3b_dir / mdir
+        for lang in ("de", "pl", "uk", "bg"):
+            files = [dfp / f"{fpre}_en.txt", dc / "S3_s4c120_en.txt", dfp / f"{fpre}_{lang}.txt", dc / f"S3_s4c120_{lang}.txt"]
+            if all(p.exists() for p in files):
+                n, rep, rlp, rp, lo, hi, rem, rlm, rm = parallel_R_stats(*files)
+                rows.append(["FLORES-5 (H3b)", model_label, lang, "S3_s4c120", n, fmt_rel(rep, rem), fmt_rel(rlp, rlm), fmt_R_cell(rp, lo, hi, rm)])
+    return Table(
+        "Multilingual parallel FLORES-200 disparity R vs EN across 9 non-English languages (N=48 windows)",
+        ["corpus", "model", "lang", "scheme", "windows", "EN rel", "lang rel", "R = rel_L - rel_EN (pp) [95% CI]"],
+        rows,
+        [h2_dir.parent, h3b_dir.parent, h3_fp.parent],
+        "Pooled convention: rel_L = 100 * Sum_w(dNLL_w) / Sum_w(B_w). Cells where |R_pooled - R_mean| > 0.1 pp show both values; 95% CIs use 10,000 paired window-bootstrap replicates (seed 0)."
+    )
+
+
 def t_speed():
+    b1_dir = ROOT / "results/2026-11-26_agent2/B1"
+    b1_sum_p, spd_sum_p = b1_dir / "b1_summary.csv", b1_dir / "speed_summary.csv"
+    if b1_sum_p.exists() and spd_sum_p.exists():
+        valid_meta = {
+            r["item"]: r for r in read_csv(b1_sum_p)
+            if r.get("status") == "valid" and r.get("rc") == "0"
+        }
+        grouped = {}
+        for r in read_csv(spd_sum_p):
+            item = r["item"]
+            if item not in valid_meta:
+                continue
+            grouped.setdefault((item, r["group"]), {})[r["metric"]] = r
+        rows = []
+        for (item, grp), ms in grouped.items():
+            vm = valid_meta[item]
+            n = next(iter(ms.values()))["n"]
+            pp = "%s [%s]" % (f3(ms["pp_tps"]["median"], 2), f3(ms["pp_tps"]["iqr"], 2)) if "pp_tps" in ms else "-"
+            tg = "%s [%s]" % (f3(ms["tg_tps"]["median"], 2), f3(ms["tg_tps"]["iqr"], 2)) if "tg_tps" in ms else "-"
+            pg = "%s [%s]" % (f3(ms["pg_tps"]["median"], 2), f3(ms["pg_tps"]["iqr"], 2)) if "pg_tps" in ms else "-"
+            tel = "load0=%s, fcpu=%s, %s, ac=%s" % (vm["load1_before"], vm["foreign_cpu_mean"], vm["governor"], vm["ac_online"])
+            rows.append([item, grp, n, pp, tg, pg, tel])
+        return Table(
+            "Clean-machine CPU speed benchmarks on Intel i3-1215U (6/6 valid items, B1)",
+            ["item", "variant", "n", "prefill tok/s [IQR]", "decode tok/s [IQR]", "pg tok/s [IQR]", "telemetry"],
+            rows,
+            [b1_sum_p, spd_sum_p],
+            "Medians [IQR] over n valid repetitions from tenzo-b1.service; filtered strictly to status==valid and rc==0 (load1_before < 1.0, foreign_cpu_mean < 0.15 on E-cores cpu4..7, governor=powersave, AC=1)."
+        )
     files = sorted(glob.glob(str(P2 / "bench/*.csv")))
     clean, srcs = [], []
     for f in files:
@@ -249,7 +391,7 @@ def t_speed():
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
-    tables = [t_ppl_v2(), t_pareto(), t_full(), t_disparity(), t_parity(), t_speed()]
+    tables = [t_ppl_v2(), t_pareto(), t_full(), t_disparity(), t_parallel_en_uk(), t_parallel_multilang(), t_parity(), t_speed()]
     (OUT / "tables.md").write_text("# Paper tables (generated by scripts/build_paper_tables.py)\n\n" + "\n".join(t.md() for t in tables))
     (OUT / "tables.tex").write_text("% generated by scripts/build_paper_tables.py; requires booktabs\n" + "\n".join(t.tex() for t in tables))
     print("wrote", OUT / "tables.md", OUT / "tables.tex")
