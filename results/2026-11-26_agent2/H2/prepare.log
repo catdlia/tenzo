@@ -1,0 +1,3 @@
+Prepared 48 parallel 11-lang windows (0 dropped, 0 overlap, 10/10 old5 .ids byte-identical, 20 reused score files verified).
+bitnet {'en': '237.3(max=273)', 'de': '376.1(max=427)', 'pl': '446.4(max=498)', 'uk': '388.2(max=464)', 'bg': '481.6(max=510)', 'fr': '377.4(max=478)', 'cs': '355.1(max=428)', 'hu': '500.3(max=576)', 'el': '529.8(max=605)', 'es': '365.1(max=427)', 'fi': '471.4(max=551)'}
+eurollm {'en': '261.1(max=308)', 'de': '317.7(max=360)', 'pl': '316.6(max=371)', 'uk': '371.9(max=430)', 'bg': '362.0(max=414)', 'fr': '348.3(max=449)', 'cs': '345.6(max=415)', 'hu': '370.4(max=423)', 'el': '455.4(max=523)', 'es': '323.8(max=386)', 'fi': '351.9(max=404)'}

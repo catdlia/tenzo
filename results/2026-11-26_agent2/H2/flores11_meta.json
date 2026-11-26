@@ -1,0 +1,5122 @@
+{
+  "dataset": "facebook/flores200 (devtest, fixed sent_start..sent_end from flores5_meta.json)",
+  "archive_sha256": "b8b0b76783024b85797e5cc75064eb83fc5288b41e9654dabc7be6ae944011f6",
+  "langs": {
+    "en": "eng_Latn",
+    "de": "deu_Latn",
+    "pl": "pol_Latn",
+    "uk": "ukr_Cyrl",
+    "bg": "bul_Cyrl",
+    "fr": "fra_Latn",
+    "cs": "ces_Latn",
+    "hu": "hun_Latn",
+    "el": "ell_Grek",
+    "es": "spa_Latn",
+    "fi": "fin_Latn"
+  },
+  "old_langs": [
+    "en",
+    "de",
+    "pl",
+    "uk",
+    "bg"
+  ],
+  "new_langs": [
+    "fr",
+    "cs",
+    "hu",
+    "el",
+    "es",
+    "fi"
+  ],
+  "sent_start": 209,
+  "sent_end": 633,
+  "n_windows": 48,
+  "max_scored_tokens": 1023,
+  "dropped_windows": {},
+  "reused_old5_ids_byte_identical": true,
+  "overlap_32grams_vs_calib_and_prior_eval": 0,
+  "overlap_32grams_self": 0,
+  "ids_sha256": {
+    "flores11_bitnet_en.ids": "4d324d50cfed0ad107dfd4b025730f1070d7916c8cc1f6bd417790cc67dc8ebc",
+    "flores11_bitnet_de.ids": "c226fb392fa8ec10aac57be8e76e6c9c91e8d113bb09d5c53a67f075e5779102",
+    "flores11_bitnet_pl.ids": "e17b872a83b98bdab6e45ce4ac91314e8cf72401df0a7d2167792f0ff7eb4a26",
+    "flores11_bitnet_uk.ids": "cc8b4fa3dabc6173330141701371feec0f510d10ade06254c8d2e7d9685d45f6",
+    "flores11_bitnet_bg.ids": "0014dba6edf20bd783addcc38aa54ec6284e13f406053e9acc844a38f8750c7e",
+    "flores11_bitnet_fr.ids": "5136a13441d7bc8f3489148a13ef56e2ad620a876a81d2ab78e97146081279bc",
+    "flores11_bitnet_cs.ids": "13e03e4e9c9e14dd233892d7aed9cfe6585189497f02aa23d320e24e392e90a9",
+    "flores11_bitnet_hu.ids": "1d4820fb31a673787cdafeeab99bcbe9a83b221862e091c65662ff89b8c48765",
+    "flores11_bitnet_el.ids": "dba2905bb68871c9ee1481745c97e5e6b15db12b30f7d792634c66a05923471c",
+    "flores11_bitnet_es.ids": "1efbe276f972a9e124f909ff1890d6617f09f19d6034f134430f692941304b3b",
+    "flores11_bitnet_fi.ids": "63e80caafd985a8e42ee8c750a2d26c02a63204daa5e07afd064cf7c9de02ba0",
+    "flores11_eurollm_en.ids": "e218b2fb5cda6de0ff1c002d24aa386b63d6b93fa80ea956bbaece3fb9914552",
+    "flores11_eurollm_de.ids": "017feedd0073a5620e16fbfecb533e8f8b8b7f49d91e5c9cfa9e4f890ea71289",
+    "flores11_eurollm_pl.ids": "8d2ed176810b53c220db9100eaea1fbb8edb383a3084c139d170b3d0aea20ae9",
+    "flores11_eurollm_uk.ids": "2185052a4c653f8166b397e6d72541401250c93bb8844a484d19b4f50b0f6072",
+    "flores11_eurollm_bg.ids": "685c81865fd6135de684c7cb6d6bea16d6e123f153d2110d1cddafa2eacab716",
+    "flores11_eurollm_fr.ids": "e020a94e51435eae51d6b36860b3116431d4c030f5b42d124e732087fdd64dde",
+    "flores11_eurollm_cs.ids": "42ce4f0691fc1f7e727b21cd31e79188c7f25021eac0fcf504ea349ca22cd49c",
+    "flores11_eurollm_hu.ids": "bf653469bc1c4d12de6dc6c14c97c3ba88bf84c1e8602bad3a1fe57f0be5de30",
+    "flores11_eurollm_el.ids": "99acd55c9767cbee98a12f549397b2879e123973f68731822e2b89809148817d",
+    "flores11_eurollm_es.ids": "6b9ccb6673b53890e35651dec5cae982512843020d6c7a58954d44960538531c",
+    "flores11_eurollm_fi.ids": "0b29c8cdd9a03690968aae12bc800e6c5af8c105fa9563344321aa0752350927"
+  },
+  "copied_scores_sha256": {
+    "bitnet/fp32_bg.txt": "4598ad29f1b90e2e9c455ecdebbbf1fc0277a65d754acf70b4ec35c827623149",
+    "bitnet/S3_s4r32_bg.txt": "69eee60f7155b03d67b87a0e438599fdde319ae6b686894bc643d64e83e19d40",
+    "bitnet/fp32_de.txt": "c7b498ba97cd9aab344ace92c0115afac1658071968d8e895cd71ce95d299918",
+    "bitnet/S3_s4r32_de.txt": "962cae39ee308c85fc77c27b6df5862b4819545a1e1daaac04b958d3777bb636",
+    "bitnet/fp32_en.txt": "fac370218fccbca71765fd118b12ec2639d3992568d8c5f7c0d2fee951a86242",
+    "bitnet/S3_s4r32_en.txt": "8be17507ceeffffc37249caba56aecf0cc1e8e02e91339b361e74134f897bde6",
+    "bitnet/fp32_pl.txt": "9b8613b3fe49c9f240a8cc0a790814697877d3acd5a76be691e7c59356db211c",
+    "bitnet/S3_s4r32_pl.txt": "09d300776347635b017859dd8ae266822c16137e73dc8681440caf9c339388fc",
+    "bitnet/fp32_uk.txt": "bb63b38bc3d3a22b98bea95482f4f5b5df39b7764ba6b4e027385a9a2a3a418a",
+    "bitnet/S3_s4r32_uk.txt": "6d39a7dbb8d10f81dd3302c9389322f845d1c44ea3e8877f46c706bc5fda5b31",
+    "eurollm/fp_bg.txt": "aa5b308eeaea3e87f9a342c3bb25f4342fa43e43f69db65a60b55a0b189c2da6",
+    "eurollm/S3_s4r32_bg.txt": "05105214d62899fb5cfb55644bf194297e2931ce856112c31e212889ed2abdeb",
+    "eurollm/fp_de.txt": "2e56b1352064601ddde0ceaa75326a3118317e850eabd339f5786228f1eb5bf7",
+    "eurollm/S3_s4r32_de.txt": "3779d2226bbeec329bb1a94913c19dc9f3a969efff8d5f84aba0b9bce210fd7b",
+    "eurollm/fp_en.txt": "4fed2f1086076b84faa6e1273539b32796f0ba59b4cb252b25fcce46aa3f8e0e",
+    "eurollm/S3_s4r32_en.txt": "e865a9c5eeb257674be697fd1383141b7a3327745e1354ae418fba8b8f4c479c",
+    "eurollm/fp_pl.txt": "2e0e9cf40a993ecd219d3b39ce915e92ad5ef06c134c5501c7bbcb64ea8a2694",
+    "eurollm/S3_s4r32_pl.txt": "8219efc4df596d198b6eebd94975260b679386517d38b7a708ac35ec415a511b",
+    "eurollm/fp_uk.txt": "61ba692c6876215f1f1a54c47c2e5c73716b22bc24bbf09639f82435c572d60e",
+    "eurollm/S3_s4r32_uk.txt": "2ea14a534b3ba9b7ca0fdd0293847fd505b5515d4cb5378406bcee287bbb29f6"
+  },
+  "summary_stats": {
+    "bitnet": {
+      "en": {
+        "total_scored_tokens": 11391,
+        "mean_scored_tokens": 237.3125,
+        "min_scored_tokens": 190,
+        "max_scored_tokens": 273
+      },
+      "de": {
+        "total_scored_tokens": 18052,
+        "mean_scored_tokens": 376.0833333333333,
+        "min_scored_tokens": 313,
+        "max_scored_tokens": 427
+      },
+      "pl": {
+        "total_scored_tokens": 21425,
+        "mean_scored_tokens": 446.3541666666667,
+        "min_scored_tokens": 390,
+        "max_scored_tokens": 498
+      },
+      "uk": {
+        "total_scored_tokens": 18633,
+        "mean_scored_tokens": 388.1875,
+        "min_scored_tokens": 334,
+        "max_scored_tokens": 464
+      },
+      "bg": {
+        "total_scored_tokens": 23115,
+        "mean_scored_tokens": 481.5625,
+        "min_scored_tokens": 416,
+        "max_scored_tokens": 510
+      },
+      "fr": {
+        "total_scored_tokens": 18115,
+        "mean_scored_tokens": 377.3958333333333,
+        "min_scored_tokens": 322,
+        "max_scored_tokens": 478
+      },
+      "cs": {
+        "total_scored_tokens": 17047,
+        "mean_scored_tokens": 355.1458333333333,
+        "min_scored_tokens": 317,
+        "max_scored_tokens": 428
+      },
+      "hu": {
+        "total_scored_tokens": 24013,
+        "mean_scored_tokens": 500.2708333333333,
+        "min_scored_tokens": 411,
+        "max_scored_tokens": 576
+      },
+      "el": {
+        "total_scored_tokens": 25430,
+        "mean_scored_tokens": 529.7916666666666,
+        "min_scored_tokens": 479,
+        "max_scored_tokens": 605
+      },
+      "es": {
+        "total_scored_tokens": 17525,
+        "mean_scored_tokens": 365.1041666666667,
+        "min_scored_tokens": 310,
+        "max_scored_tokens": 427
+      },
+      "fi": {
+        "total_scored_tokens": 22629,
+        "mean_scored_tokens": 471.4375,
+        "min_scored_tokens": 412,
+        "max_scored_tokens": 551
+      }
+    },
+    "eurollm": {
+      "en": {
+        "total_scored_tokens": 12532,
+        "mean_scored_tokens": 261.0833333333333,
+        "min_scored_tokens": 209,
+        "max_scored_tokens": 308
+      },
+      "de": {
+        "total_scored_tokens": 15251,
+        "mean_scored_tokens": 317.7291666666667,
+        "min_scored_tokens": 260,
+        "max_scored_tokens": 360
+      },
+      "pl": {
+        "total_scored_tokens": 15199,
+        "mean_scored_tokens": 316.6458333333333,
+        "min_scored_tokens": 272,
+        "max_scored_tokens": 371
+      },
+      "uk": {
+        "total_scored_tokens": 17851,
+        "mean_scored_tokens": 371.8958333333333,
+        "min_scored_tokens": 317,
+        "max_scored_tokens": 430
+      },
+      "bg": {
+        "total_scored_tokens": 17376,
+        "mean_scored_tokens": 362.0,
+        "min_scored_tokens": 283,
+        "max_scored_tokens": 414
+      },
+      "fr": {
+        "total_scored_tokens": 16719,
+        "mean_scored_tokens": 348.3125,
+        "min_scored_tokens": 285,
+        "max_scored_tokens": 449
+      },
+      "cs": {
+        "total_scored_tokens": 16589,
+        "mean_scored_tokens": 345.6041666666667,
+        "min_scored_tokens": 303,
+        "max_scored_tokens": 415
+      },
+      "hu": {
+        "total_scored_tokens": 17777,
+        "mean_scored_tokens": 370.3541666666667,
+        "min_scored_tokens": 319,
+        "max_scored_tokens": 423
+      },
+      "el": {
+        "total_scored_tokens": 21859,
+        "mean_scored_tokens": 455.3958333333333,
+        "min_scored_tokens": 409,
+        "max_scored_tokens": 523
+      },
+      "es": {
+        "total_scored_tokens": 15543,
+        "mean_scored_tokens": 323.8125,
+        "min_scored_tokens": 262,
+        "max_scored_tokens": 386
+      },
+      "fi": {
+        "total_scored_tokens": 16893,
+        "mean_scored_tokens": 351.9375,
+        "min_scored_tokens": 295,
+        "max_scored_tokens": 404
+      }
+    }
+  },
+  "windows": [
+    {
+      "wid": 0,
+      "sent_start": 209,
+      "sent_end": 219,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1062,
+          "bytes": 1064,
+          "words": 170,
+          "sha256_16": "697ae0d5a3870b83"
+        },
+        "de": {
+          "chars": 1237,
+          "bytes": 1265,
+          "words": 171,
+          "sha256_16": "3fcff0e0e95601df"
+        },
+        "pl": {
+          "chars": 1170,
+          "bytes": 1234,
+          "words": 153,
+          "sha256_16": "0127df71d840823c"
+        },
+        "uk": {
+          "chars": 1125,
+          "bytes": 2049,
+          "words": 157,
+          "sha256_16": "8c20955b41e2bbcb"
+        },
+        "bg": {
+          "chars": 1186,
+          "bytes": 2165,
+          "words": 180,
+          "sha256_16": "c42b59d3a0662457"
+        },
+        "fr": {
+          "chars": 1280,
+          "bytes": 1352,
+          "words": 218,
+          "sha256_16": "6bb81f32d69f36de"
+        },
+        "cs": {
+          "chars": 1076,
+          "bytes": 1182,
+          "words": 154,
+          "sha256_16": "1373fec2cdbc772f"
+        },
+        "hu": {
+          "chars": 1138,
+          "bytes": 1263,
+          "words": 150,
+          "sha256_16": "765571da8be06725"
+        },
+        "el": {
+          "chars": 1327,
+          "bytes": 2401,
+          "words": 194,
+          "sha256_16": "6e55ddfbde1849f6"
+        },
+        "es": {
+          "chars": 1307,
+          "bytes": 1334,
+          "words": 201,
+          "sha256_16": "801d4a6dca550a52"
+        },
+        "fi": {
+          "chars": 1143,
+          "bytes": 1171,
+          "words": 132,
+          "sha256_16": "c9fa901fdf267242"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 209,
+          "de": 345,
+          "pl": 416,
+          "uk": 368,
+          "bg": 494,
+          "fr": 354,
+          "cs": 336,
+          "hu": 465,
+          "el": 521,
+          "es": 341,
+          "fi": 421
+        },
+        "eurollm": {
+          "en": 236,
+          "de": 294,
+          "pl": 294,
+          "uk": 361,
+          "bg": 378,
+          "fr": 330,
+          "cs": 334,
+          "hu": 345,
+          "el": 457,
+          "es": 300,
+          "fi": 321
+        }
+      }
+    },
+    {
+      "wid": 1,
+      "sent_start": 219,
+      "sent_end": 231,
+      "n_sents": 12,
+      "langs": {
+        "en": {
+          "chars": 1130,
+          "bytes": 1130,
+          "words": 191,
+          "sha256_16": "de1111263f081322"
+        },
+        "de": {
+          "chars": 1426,
+          "bytes": 1446,
+          "words": 204,
+          "sha256_16": "d2fd59016e574f8c"
+        },
+        "pl": {
+          "chars": 1293,
+          "bytes": 1367,
+          "words": 189,
+          "sha256_16": "ae01bd6e9bede026"
+        },
+        "uk": {
+          "chars": 1255,
+          "bytes": 2271,
+          "words": 184,
+          "sha256_16": "3915f7805e07645b"
+        },
+        "bg": {
+          "chars": 1216,
+          "bytes": 2187,
+          "words": 187,
+          "sha256_16": "7e5a23f14e7c21f5"
+        },
+        "fr": {
+          "chars": 1352,
+          "bytes": 1391,
+          "words": 248,
+          "sha256_16": "e0c7527e2548043b"
+        },
+        "cs": {
+          "chars": 1110,
+          "bytes": 1228,
+          "words": 174,
+          "sha256_16": "0de9f5c54bbc732b"
+        },
+        "hu": {
+          "chars": 1337,
+          "bytes": 1460,
+          "words": 181,
+          "sha256_16": "9c2cc18f26a0267d"
+        },
+        "el": {
+          "chars": 1503,
+          "bytes": 2704,
+          "words": 230,
+          "sha256_16": "2598651d4b10a21b"
+        },
+        "es": {
+          "chars": 1450,
+          "bytes": 1481,
+          "words": 241,
+          "sha256_16": "dd7cb01c8eb27bbe"
+        },
+        "fi": {
+          "chars": 1259,
+          "bytes": 1304,
+          "words": 151,
+          "sha256_16": "54db199d866b0f11"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 235,
+          "de": 411,
+          "pl": 474,
+          "uk": 427,
+          "bg": 506,
+          "fr": 381,
+          "cs": 367,
+          "hu": 540,
+          "el": 584,
+          "es": 398,
+          "fi": 483
+        },
+        "eurollm": {
+          "en": 263,
+          "de": 342,
+          "pl": 338,
+          "uk": 412,
+          "bg": 376,
+          "fr": 358,
+          "cs": 364,
+          "hu": 404,
+          "el": 486,
+          "es": 352,
+          "fi": 375
+        }
+      }
+    },
+    {
+      "wid": 2,
+      "sent_start": 231,
+      "sent_end": 240,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1111,
+          "bytes": 1111,
+          "words": 173,
+          "sha256_16": "3843f308137403c7"
+        },
+        "de": {
+          "chars": 1244,
+          "bytes": 1269,
+          "words": 175,
+          "sha256_16": "c964efaf5389aa65"
+        },
+        "pl": {
+          "chars": 1135,
+          "bytes": 1190,
+          "words": 153,
+          "sha256_16": "9eff302f5d8791a9"
+        },
+        "uk": {
+          "chars": 1114,
+          "bytes": 2043,
+          "words": 150,
+          "sha256_16": "e0564752149bf0f8"
+        },
+        "bg": {
+          "chars": 1157,
+          "bytes": 2117,
+          "words": 165,
+          "sha256_16": "f2c2d7a038b3f4f4"
+        },
+        "fr": {
+          "chars": 1301,
+          "bytes": 1351,
+          "words": 211,
+          "sha256_16": "2d448e34c9be2d97"
+        },
+        "cs": {
+          "chars": 1039,
+          "bytes": 1132,
+          "words": 147,
+          "sha256_16": "1da927c7df893766"
+        },
+        "hu": {
+          "chars": 1164,
+          "bytes": 1279,
+          "words": 153,
+          "sha256_16": "252129b44173ac50"
+        },
+        "el": {
+          "chars": 1313,
+          "bytes": 2340,
+          "words": 189,
+          "sha256_16": "33bf1bc2d43a8853"
+        },
+        "es": {
+          "chars": 1342,
+          "bytes": 1367,
+          "words": 207,
+          "sha256_16": "6c914521b0605a12"
+        },
+        "fi": {
+          "chars": 1154,
+          "bytes": 1195,
+          "words": 130,
+          "sha256_16": "7df672802f60457a"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 264,
+          "de": 365,
+          "pl": 423,
+          "uk": 414,
+          "bg": 465,
+          "fr": 381,
+          "cs": 355,
+          "hu": 470,
+          "el": 520,
+          "es": 369,
+          "fi": 430
+        },
+        "eurollm": {
+          "en": 278,
+          "de": 325,
+          "pl": 318,
+          "uk": 388,
+          "bg": 368,
+          "fr": 344,
+          "cs": 330,
+          "hu": 360,
+          "el": 447,
+          "es": 335,
+          "fi": 334
+        }
+      }
+    },
+    {
+      "wid": 3,
+      "sent_start": 240,
+      "sent_end": 248,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1066,
+          "bytes": 1068,
+          "words": 194,
+          "sha256_16": "94091ce31544a9d9"
+        },
+        "de": {
+          "chars": 1114,
+          "bytes": 1140,
+          "words": 176,
+          "sha256_16": "8b66c3b790d57ac1"
+        },
+        "pl": {
+          "chars": 1097,
+          "bytes": 1178,
+          "words": 157,
+          "sha256_16": "7168a41f2a86160b"
+        },
+        "uk": {
+          "chars": 1095,
+          "bytes": 1991,
+          "words": 163,
+          "sha256_16": "3db0a254b547bb1c"
+        },
+        "bg": {
+          "chars": 1073,
+          "bytes": 1942,
+          "words": 175,
+          "sha256_16": "5721d4590698ff9b"
+        },
+        "fr": {
+          "chars": 1235,
+          "bytes": 1288,
+          "words": 225,
+          "sha256_16": "d99f76f2501770a0"
+        },
+        "cs": {
+          "chars": 983,
+          "bytes": 1097,
+          "words": 149,
+          "sha256_16": "5e6bfc30a973bc98"
+        },
+        "hu": {
+          "chars": 1090,
+          "bytes": 1190,
+          "words": 156,
+          "sha256_16": "749e421f1fbe0294"
+        },
+        "el": {
+          "chars": 1258,
+          "bytes": 2282,
+          "words": 200,
+          "sha256_16": "36967cde92ed61dd"
+        },
+        "es": {
+          "chars": 1365,
+          "bytes": 1402,
+          "words": 222,
+          "sha256_16": "5fa69f4ad4fc0571"
+        },
+        "fi": {
+          "chars": 1168,
+          "bytes": 1202,
+          "words": 140,
+          "sha256_16": "f12b921353572a6b"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 227,
+          "de": 313,
+          "pl": 416,
+          "uk": 365,
+          "bg": 457,
+          "fr": 339,
+          "cs": 317,
+          "hu": 444,
+          "el": 479,
+          "es": 365,
+          "fi": 441
+        },
+        "eurollm": {
+          "en": 258,
+          "de": 277,
+          "pl": 294,
+          "uk": 355,
+          "bg": 339,
+          "fr": 331,
+          "cs": 313,
+          "hu": 351,
+          "el": 419,
+          "es": 319,
+          "fi": 329
+        }
+      }
+    },
+    {
+      "wid": 4,
+      "sent_start": 248,
+      "sent_end": 259,
+      "n_sents": 11,
+      "langs": {
+        "en": {
+          "chars": 1302,
+          "bytes": 1302,
+          "words": 208,
+          "sha256_16": "8c69887c958c4384"
+        },
+        "de": {
+          "chars": 1528,
+          "bytes": 1548,
+          "words": 206,
+          "sha256_16": "ba219458d38ff06c"
+        },
+        "pl": {
+          "chars": 1347,
+          "bytes": 1422,
+          "words": 181,
+          "sha256_16": "9c5963eef4f05bfa"
+        },
+        "uk": {
+          "chars": 1358,
+          "bytes": 2475,
+          "words": 190,
+          "sha256_16": "720480eed14c961e"
+        },
+        "bg": {
+          "chars": 1249,
+          "bytes": 2255,
+          "words": 181,
+          "sha256_16": "c8c0b0b98c04e6ad"
+        },
+        "fr": {
+          "chars": 1676,
+          "bytes": 1754,
+          "words": 276,
+          "sha256_16": "af4b97120c9a009d"
+        },
+        "cs": {
+          "chars": 1255,
+          "bytes": 1385,
+          "words": 179,
+          "sha256_16": "b26440c1befd3e90"
+        },
+        "hu": {
+          "chars": 1370,
+          "bytes": 1509,
+          "words": 187,
+          "sha256_16": "ee4fd819416793e9"
+        },
+        "el": {
+          "chars": 1556,
+          "bytes": 2833,
+          "words": 226,
+          "sha256_16": "30b905f548d4fe15"
+        },
+        "es": {
+          "chars": 1551,
+          "bytes": 1575,
+          "words": 248,
+          "sha256_16": "5af139172aaa785c"
+        },
+        "fi": {
+          "chars": 1353,
+          "bytes": 1403,
+          "words": 155,
+          "sha256_16": "258a55884447c2aa"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 267,
+          "de": 427,
+          "pl": 495,
+          "uk": 464,
+          "bg": 485,
+          "fr": 478,
+          "cs": 416,
+          "hu": 560,
+          "el": 605,
+          "es": 423,
+          "fi": 525
+        },
+        "eurollm": {
+          "en": 284,
+          "de": 360,
+          "pl": 371,
+          "uk": 430,
+          "bg": 401,
+          "fr": 449,
+          "cs": 396,
+          "hu": 420,
+          "el": 523,
+          "es": 385,
+          "fi": 388
+        }
+      }
+    },
+    {
+      "wid": 5,
+      "sent_start": 259,
+      "sent_end": 268,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1075,
+          "bytes": 1075,
+          "words": 193,
+          "sha256_16": "93c2272e2d152de7"
+        },
+        "de": {
+          "chars": 1339,
+          "bytes": 1355,
+          "words": 188,
+          "sha256_16": "2d279d4a80e90c5a"
+        },
+        "pl": {
+          "chars": 1207,
+          "bytes": 1274,
+          "words": 166,
+          "sha256_16": "e67101b9a316cbcc"
+        },
+        "uk": {
+          "chars": 1168,
+          "bytes": 2119,
+          "words": 171,
+          "sha256_16": "5ea007333e38e100"
+        },
+        "bg": {
+          "chars": 1171,
+          "bytes": 2116,
+          "words": 178,
+          "sha256_16": "255b23d53143ae20"
+        },
+        "fr": {
+          "chars": 1293,
+          "bytes": 1334,
+          "words": 217,
+          "sha256_16": "a4d026f6ca17a6fc"
+        },
+        "cs": {
+          "chars": 1049,
+          "bytes": 1154,
+          "words": 158,
+          "sha256_16": "0575697131976911"
+        },
+        "hu": {
+          "chars": 1168,
+          "bytes": 1286,
+          "words": 157,
+          "sha256_16": "9bd0c07963a3d77e"
+        },
+        "el": {
+          "chars": 1319,
+          "bytes": 2384,
+          "words": 192,
+          "sha256_16": "70a1e250987e55cb"
+        },
+        "es": {
+          "chars": 1365,
+          "bytes": 1385,
+          "words": 231,
+          "sha256_16": "9e45058b9ca3ec60"
+        },
+        "fi": {
+          "chars": 1169,
+          "bytes": 1207,
+          "words": 135,
+          "sha256_16": "f5072fcee74549a0"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 232,
+          "de": 387,
+          "pl": 432,
+          "uk": 415,
+          "bg": 485,
+          "fr": 354,
+          "cs": 329,
+          "hu": 481,
+          "el": 519,
+          "es": 354,
+          "fi": 432
+        },
+        "eurollm": {
+          "en": 256,
+          "de": 316,
+          "pl": 315,
+          "uk": 386,
+          "bg": 358,
+          "fr": 330,
+          "cs": 333,
+          "hu": 361,
+          "el": 462,
+          "es": 326,
+          "fi": 337
+        }
+      }
+    },
+    {
+      "wid": 6,
+      "sent_start": 268,
+      "sent_end": 276,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1061,
+          "bytes": 1062,
+          "words": 170,
+          "sha256_16": "31636537b19f43d0"
+        },
+        "de": {
+          "chars": 1269,
+          "bytes": 1283,
+          "words": 183,
+          "sha256_16": "ae89db3cc2d85e46"
+        },
+        "pl": {
+          "chars": 1058,
+          "bytes": 1122,
+          "words": 142,
+          "sha256_16": "e1e21252b5ffa7e7"
+        },
+        "uk": {
+          "chars": 1118,
+          "bytes": 2001,
+          "words": 164,
+          "sha256_16": "a01fa7baa0cf5331"
+        },
+        "bg": {
+          "chars": 1111,
+          "bytes": 1987,
+          "words": 173,
+          "sha256_16": "f9fdcf83c05b129f"
+        },
+        "fr": {
+          "chars": 1245,
+          "bytes": 1293,
+          "words": 208,
+          "sha256_16": "d2eab34aaf8316e4"
+        },
+        "cs": {
+          "chars": 995,
+          "bytes": 1080,
+          "words": 147,
+          "sha256_16": "71c476406e510783"
+        },
+        "hu": {
+          "chars": 1109,
+          "bytes": 1210,
+          "words": 145,
+          "sha256_16": "433a82871f21b6c8"
+        },
+        "el": {
+          "chars": 1203,
+          "bytes": 2126,
+          "words": 182,
+          "sha256_16": "078f40c7f37986a8"
+        },
+        "es": {
+          "chars": 1293,
+          "bytes": 1317,
+          "words": 211,
+          "sha256_16": "14434fc0ed240d6d"
+        },
+        "fi": {
+          "chars": 1189,
+          "bytes": 1225,
+          "words": 130,
+          "sha256_16": "af2ee15f5a6503ed"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 251,
+          "de": 377,
+          "pl": 416,
+          "uk": 416,
+          "bg": 490,
+          "fr": 371,
+          "cs": 325,
+          "hu": 457,
+          "el": 487,
+          "es": 362,
+          "fi": 460
+        },
+        "eurollm": {
+          "en": 286,
+          "de": 336,
+          "pl": 309,
+          "uk": 416,
+          "bg": 387,
+          "fr": 366,
+          "cs": 337,
+          "hu": 372,
+          "el": 439,
+          "es": 342,
+          "fi": 366
+        }
+      }
+    },
+    {
+      "wid": 7,
+      "sent_start": 276,
+      "sent_end": 288,
+      "n_sents": 12,
+      "langs": {
+        "en": {
+          "chars": 1195,
+          "bytes": 1195,
+          "words": 195,
+          "sha256_16": "d5211ec210bf3f59"
+        },
+        "de": {
+          "chars": 1420,
+          "bytes": 1436,
+          "words": 199,
+          "sha256_16": "aa439a5acea34ae4"
+        },
+        "pl": {
+          "chars": 1314,
+          "bytes": 1382,
+          "words": 179,
+          "sha256_16": "c3a7c76d9d6d321d"
+        },
+        "uk": {
+          "chars": 1252,
+          "bytes": 2287,
+          "words": 178,
+          "sha256_16": "9ecc85aeed9c045e"
+        },
+        "bg": {
+          "chars": 1199,
+          "bytes": 2164,
+          "words": 196,
+          "sha256_16": "383fd60a80d142b0"
+        },
+        "fr": {
+          "chars": 1521,
+          "bytes": 1601,
+          "words": 256,
+          "sha256_16": "8a2b46efd8202282"
+        },
+        "cs": {
+          "chars": 1209,
+          "bytes": 1336,
+          "words": 181,
+          "sha256_16": "02f6dc42b8ceb790"
+        },
+        "hu": {
+          "chars": 1205,
+          "bytes": 1328,
+          "words": 167,
+          "sha256_16": "24540f8c526bf69b"
+        },
+        "el": {
+          "chars": 1361,
+          "bytes": 2484,
+          "words": 197,
+          "sha256_16": "11f48fa52e976318"
+        },
+        "es": {
+          "chars": 1498,
+          "bytes": 1519,
+          "words": 239,
+          "sha256_16": "59678260ae1b7b78"
+        },
+        "fi": {
+          "chars": 1279,
+          "bytes": 1330,
+          "words": 146,
+          "sha256_16": "d82a4713229f399c"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 248,
+          "de": 409,
+          "pl": 498,
+          "uk": 454,
+          "bg": 510,
+          "fr": 432,
+          "cs": 392,
+          "hu": 500,
+          "el": 568,
+          "es": 390,
+          "fi": 496
+        },
+        "eurollm": {
+          "en": 280,
+          "de": 355,
+          "pl": 371,
+          "uk": 425,
+          "bg": 414,
+          "fr": 428,
+          "cs": 397,
+          "hu": 423,
+          "el": 508,
+          "es": 355,
+          "fi": 392
+        }
+      }
+    },
+    {
+      "wid": 8,
+      "sent_start": 288,
+      "sent_end": 295,
+      "n_sents": 7,
+      "langs": {
+        "en": {
+          "chars": 1047,
+          "bytes": 1047,
+          "words": 167,
+          "sha256_16": "f718913ff4331d87"
+        },
+        "de": {
+          "chars": 1252,
+          "bytes": 1278,
+          "words": 170,
+          "sha256_16": "074d1e3e31fda076"
+        },
+        "pl": {
+          "chars": 1276,
+          "bytes": 1348,
+          "words": 163,
+          "sha256_16": "185ad5c62a6b3d78"
+        },
+        "uk": {
+          "chars": 1160,
+          "bytes": 2138,
+          "words": 151,
+          "sha256_16": "b46b3c52c64a573f"
+        },
+        "bg": {
+          "chars": 1188,
+          "bytes": 2179,
+          "words": 172,
+          "sha256_16": "602bcaa822a91285"
+        },
+        "fr": {
+          "chars": 1274,
+          "bytes": 1333,
+          "words": 211,
+          "sha256_16": "3ad733b863c383ce"
+        },
+        "cs": {
+          "chars": 1060,
+          "bytes": 1164,
+          "words": 150,
+          "sha256_16": "d8a353fc30248fc6"
+        },
+        "hu": {
+          "chars": 1099,
+          "bytes": 1237,
+          "words": 144,
+          "sha256_16": "d4ee13e960c122fa"
+        },
+        "el": {
+          "chars": 1366,
+          "bytes": 2486,
+          "words": 200,
+          "sha256_16": "33feef83a2351b53"
+        },
+        "es": {
+          "chars": 1282,
+          "bytes": 1308,
+          "words": 200,
+          "sha256_16": "1acb0ec9aec4331f"
+        },
+        "fi": {
+          "chars": 1226,
+          "bytes": 1268,
+          "words": 130,
+          "sha256_16": "66bb16216bd1fcb3"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 192,
+          "de": 351,
+          "pl": 442,
+          "uk": 361,
+          "bg": 482,
+          "fr": 344,
+          "cs": 318,
+          "hu": 460,
+          "el": 503,
+          "es": 322,
+          "fi": 470
+        },
+        "eurollm": {
+          "en": 209,
+          "de": 289,
+          "pl": 301,
+          "uk": 341,
+          "bg": 333,
+          "fr": 311,
+          "cs": 303,
+          "hu": 338,
+          "el": 421,
+          "es": 283,
+          "fi": 339
+        }
+      }
+    },
+    {
+      "wid": 9,
+      "sent_start": 295,
+      "sent_end": 304,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1135,
+          "bytes": 1135,
+          "words": 175,
+          "sha256_16": "3afe9e0452134e27"
+        },
+        "de": {
+          "chars": 1299,
+          "bytes": 1322,
+          "words": 172,
+          "sha256_16": "40972f38eb476260"
+        },
+        "pl": {
+          "chars": 1295,
+          "bytes": 1355,
+          "words": 161,
+          "sha256_16": "7fc1b5c013cd05fa"
+        },
+        "uk": {
+          "chars": 1193,
+          "bytes": 2183,
+          "words": 164,
+          "sha256_16": "63b767fbfd603b26"
+        },
+        "bg": {
+          "chars": 1312,
+          "bytes": 2379,
+          "words": 189,
+          "sha256_16": "6235003b030d3221"
+        },
+        "fr": {
+          "chars": 1333,
+          "bytes": 1396,
+          "words": 214,
+          "sha256_16": "b6b787f4e21b1632"
+        },
+        "cs": {
+          "chars": 1120,
+          "bytes": 1251,
+          "words": 152,
+          "sha256_16": "8eabf9d8f07a2ebc"
+        },
+        "hu": {
+          "chars": 1131,
+          "bytes": 1254,
+          "words": 147,
+          "sha256_16": "695d543e0ef16d81"
+        },
+        "el": {
+          "chars": 1457,
+          "bytes": 2658,
+          "words": 203,
+          "sha256_16": "c0a69d88d3f45118"
+        },
+        "es": {
+          "chars": 1398,
+          "bytes": 1424,
+          "words": 218,
+          "sha256_16": "e87e6a0b8fd4fceb"
+        },
+        "fi": {
+          "chars": 1280,
+          "bytes": 1322,
+          "words": 135,
+          "sha256_16": "5f6e8ea83689e68c"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 224,
+          "de": 353,
+          "pl": 474,
+          "uk": 397,
+          "bg": 503,
+          "fr": 356,
+          "cs": 355,
+          "hu": 482,
+          "el": 552,
+          "es": 369,
+          "fi": 491
+        },
+        "eurollm": {
+          "en": 253,
+          "de": 310,
+          "pl": 316,
+          "uk": 383,
+          "bg": 373,
+          "fr": 329,
+          "cs": 345,
+          "hu": 352,
+          "el": 479,
+          "es": 328,
+          "fi": 368
+        }
+      }
+    },
+    {
+      "wid": 10,
+      "sent_start": 304,
+      "sent_end": 316,
+      "n_sents": 12,
+      "langs": {
+        "en": {
+          "chars": 1148,
+          "bytes": 1150,
+          "words": 183,
+          "sha256_16": "be9ea251c01269b1"
+        },
+        "de": {
+          "chars": 1333,
+          "bytes": 1353,
+          "words": 188,
+          "sha256_16": "293ddf503d868ed1"
+        },
+        "pl": {
+          "chars": 1290,
+          "bytes": 1375,
+          "words": 172,
+          "sha256_16": "f3b5b0ad081bce1c"
+        },
+        "uk": {
+          "chars": 1193,
+          "bytes": 2173,
+          "words": 156,
+          "sha256_16": "55c2c9364704347a"
+        },
+        "bg": {
+          "chars": 1181,
+          "bytes": 2131,
+          "words": 171,
+          "sha256_16": "1588a2a3beb5c6fc"
+        },
+        "fr": {
+          "chars": 1324,
+          "bytes": 1399,
+          "words": 231,
+          "sha256_16": "10ee6c309761f9db"
+        },
+        "cs": {
+          "chars": 1142,
+          "bytes": 1270,
+          "words": 161,
+          "sha256_16": "61f7da29a8ec6f1f"
+        },
+        "hu": {
+          "chars": 1181,
+          "bytes": 1291,
+          "words": 153,
+          "sha256_16": "29e9aaec6193d384"
+        },
+        "el": {
+          "chars": 1444,
+          "bytes": 2601,
+          "words": 204,
+          "sha256_16": "20d92da5dda23b65"
+        },
+        "es": {
+          "chars": 1338,
+          "bytes": 1369,
+          "words": 215,
+          "sha256_16": "2ffcf6d93ecc1e55"
+        },
+        "fi": {
+          "chars": 1282,
+          "bytes": 1332,
+          "words": 134,
+          "sha256_16": "93a5d437b6c5ecad"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 241,
+          "de": 368,
+          "pl": 474,
+          "uk": 425,
+          "bg": 498,
+          "fr": 379,
+          "cs": 358,
+          "hu": 493,
+          "el": 585,
+          "es": 368,
+          "fi": 477
+        },
+        "eurollm": {
+          "en": 292,
+          "de": 331,
+          "pl": 352,
+          "uk": 420,
+          "bg": 382,
+          "fr": 386,
+          "cs": 357,
+          "hu": 395,
+          "el": 521,
+          "es": 335,
+          "fi": 392
+        }
+      }
+    },
+    {
+      "wid": 11,
+      "sent_start": 316,
+      "sent_end": 324,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1005,
+          "bytes": 1005,
+          "words": 163,
+          "sha256_16": "b05ca3171b48fb98"
+        },
+        "de": {
+          "chars": 1189,
+          "bytes": 1211,
+          "words": 164,
+          "sha256_16": "33861a00a944820e"
+        },
+        "pl": {
+          "chars": 1044,
+          "bytes": 1132,
+          "words": 148,
+          "sha256_16": "b3f1c9547d7bb5d5"
+        },
+        "uk": {
+          "chars": 993,
+          "bytes": 1782,
+          "words": 144,
+          "sha256_16": "f67051a670cc81a5"
+        },
+        "bg": {
+          "chars": 1093,
+          "bytes": 1964,
+          "words": 169,
+          "sha256_16": "2d4d1d1d02e3708c"
+        },
+        "fr": {
+          "chars": 1224,
+          "bytes": 1305,
+          "words": 196,
+          "sha256_16": "ea0e02e078ab49d1"
+        },
+        "cs": {
+          "chars": 1043,
+          "bytes": 1169,
+          "words": 160,
+          "sha256_16": "f719d72282d74e89"
+        },
+        "hu": {
+          "chars": 1031,
+          "bytes": 1133,
+          "words": 139,
+          "sha256_16": "81c47a10f3a76f99"
+        },
+        "el": {
+          "chars": 1172,
+          "bytes": 2106,
+          "words": 180,
+          "sha256_16": "916dbcc73fb14f3d"
+        },
+        "es": {
+          "chars": 1138,
+          "bytes": 1164,
+          "words": 179,
+          "sha256_16": "f04328f29bf4b07c"
+        },
+        "fi": {
+          "chars": 1146,
+          "bytes": 1193,
+          "words": 121,
+          "sha256_16": "d61529b418b498b5"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 218,
+          "de": 335,
+          "pl": 390,
+          "uk": 356,
+          "bg": 470,
+          "fr": 360,
+          "cs": 346,
+          "hu": 411,
+          "el": 481,
+          "es": 310,
+          "fi": 412
+        },
+        "eurollm": {
+          "en": 243,
+          "de": 290,
+          "pl": 298,
+          "uk": 347,
+          "bg": 356,
+          "fr": 343,
+          "cs": 344,
+          "hu": 326,
+          "el": 427,
+          "es": 277,
+          "fi": 319
+        }
+      }
+    },
+    {
+      "wid": 12,
+      "sent_start": 324,
+      "sent_end": 332,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1149,
+          "bytes": 1149,
+          "words": 194,
+          "sha256_16": "5972750ab53d0199"
+        },
+        "de": {
+          "chars": 1301,
+          "bytes": 1311,
+          "words": 175,
+          "sha256_16": "d8f859ec29c7df3b"
+        },
+        "pl": {
+          "chars": 1158,
+          "bytes": 1235,
+          "words": 163,
+          "sha256_16": "8a499210a98d57f9"
+        },
+        "uk": {
+          "chars": 1164,
+          "bytes": 2109,
+          "words": 165,
+          "sha256_16": "0001b01d86ea75fa"
+        },
+        "bg": {
+          "chars": 1173,
+          "bytes": 2117,
+          "words": 184,
+          "sha256_16": "803cafccefc0b946"
+        },
+        "fr": {
+          "chars": 1367,
+          "bytes": 1411,
+          "words": 224,
+          "sha256_16": "5e7d37f9d2568ff8"
+        },
+        "cs": {
+          "chars": 1109,
+          "bytes": 1226,
+          "words": 167,
+          "sha256_16": "b03578b81b8cc5eb"
+        },
+        "hu": {
+          "chars": 1245,
+          "bytes": 1380,
+          "words": 163,
+          "sha256_16": "28fa13ca049eb2f6"
+        },
+        "el": {
+          "chars": 1406,
+          "bytes": 2561,
+          "words": 210,
+          "sha256_16": "49b57ac1364ea0a5"
+        },
+        "es": {
+          "chars": 1325,
+          "bytes": 1347,
+          "words": 226,
+          "sha256_16": "5c773e50ac577ea0"
+        },
+        "fi": {
+          "chars": 1200,
+          "bytes": 1249,
+          "words": 139,
+          "sha256_16": "abee6d6fcb59c997"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 229,
+          "de": 334,
+          "pl": 410,
+          "uk": 373,
+          "bg": 451,
+          "fr": 361,
+          "cs": 344,
+          "hu": 537,
+          "el": 529,
+          "es": 347,
+          "fi": 448
+        },
+        "eurollm": {
+          "en": 252,
+          "de": 283,
+          "pl": 285,
+          "uk": 358,
+          "bg": 346,
+          "fr": 333,
+          "cs": 338,
+          "hu": 381,
+          "el": 453,
+          "es": 310,
+          "fi": 323
+        }
+      }
+    },
+    {
+      "wid": 13,
+      "sent_start": 332,
+      "sent_end": 340,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1021,
+          "bytes": 1022,
+          "words": 168,
+          "sha256_16": "f7f88969f2da82c8"
+        },
+        "de": {
+          "chars": 1331,
+          "bytes": 1356,
+          "words": 179,
+          "sha256_16": "f536706b025163e3"
+        },
+        "pl": {
+          "chars": 1133,
+          "bytes": 1196,
+          "words": 148,
+          "sha256_16": "c8edf0f473480929"
+        },
+        "uk": {
+          "chars": 1147,
+          "bytes": 2117,
+          "words": 141,
+          "sha256_16": "566edbe9f4bc425c"
+        },
+        "bg": {
+          "chars": 1163,
+          "bytes": 2116,
+          "words": 172,
+          "sha256_16": "8562c8c52b839eb6"
+        },
+        "fr": {
+          "chars": 1196,
+          "bytes": 1244,
+          "words": 203,
+          "sha256_16": "a225bd9044bccabb"
+        },
+        "cs": {
+          "chars": 1028,
+          "bytes": 1134,
+          "words": 146,
+          "sha256_16": "f55ca05511da423a"
+        },
+        "hu": {
+          "chars": 1153,
+          "bytes": 1288,
+          "words": 151,
+          "sha256_16": "8948b33d3757bea5"
+        },
+        "el": {
+          "chars": 1320,
+          "bytes": 2427,
+          "words": 187,
+          "sha256_16": "860a0c2c8680cf7d"
+        },
+        "es": {
+          "chars": 1254,
+          "bytes": 1289,
+          "words": 197,
+          "sha256_16": "4c9a47f977ff01dc"
+        },
+        "fi": {
+          "chars": 1198,
+          "bytes": 1254,
+          "words": 125,
+          "sha256_16": "bed6331d1c5eb0c5"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 202,
+          "de": 360,
+          "pl": 395,
+          "uk": 357,
+          "bg": 454,
+          "fr": 322,
+          "cs": 321,
+          "hu": 469,
+          "el": 508,
+          "es": 329,
+          "fi": 457
+        },
+        "eurollm": {
+          "en": 226,
+          "de": 301,
+          "pl": 285,
+          "uk": 346,
+          "bg": 344,
+          "fr": 286,
+          "cs": 305,
+          "hu": 336,
+          "el": 439,
+          "es": 289,
+          "fi": 343
+        }
+      }
+    },
+    {
+      "wid": 14,
+      "sent_start": 340,
+      "sent_end": 349,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1198,
+          "bytes": 1198,
+          "words": 207,
+          "sha256_16": "3057e77b4ef04db9"
+        },
+        "de": {
+          "chars": 1440,
+          "bytes": 1449,
+          "words": 207,
+          "sha256_16": "57245f7166a8be07"
+        },
+        "pl": {
+          "chars": 1212,
+          "bytes": 1286,
+          "words": 175,
+          "sha256_16": "5b644d3271922a21"
+        },
+        "uk": {
+          "chars": 1270,
+          "bytes": 2321,
+          "words": 180,
+          "sha256_16": "d1e27dbf8d2cc9d4"
+        },
+        "bg": {
+          "chars": 1272,
+          "bytes": 2273,
+          "words": 203,
+          "sha256_16": "d5437eef251958a2"
+        },
+        "fr": {
+          "chars": 1381,
+          "bytes": 1446,
+          "words": 249,
+          "sha256_16": "139d99c1ba97184d"
+        },
+        "cs": {
+          "chars": 1265,
+          "bytes": 1401,
+          "words": 189,
+          "sha256_16": "dbb90e58ae7c1024"
+        },
+        "hu": {
+          "chars": 1186,
+          "bytes": 1296,
+          "words": 168,
+          "sha256_16": "c0c814a475b608e6"
+        },
+        "el": {
+          "chars": 1447,
+          "bytes": 2606,
+          "words": 223,
+          "sha256_16": "bb55b9f6ccae3aaa"
+        },
+        "es": {
+          "chars": 1407,
+          "bytes": 1440,
+          "words": 241,
+          "sha256_16": "f9c4573852db2e7d"
+        },
+        "fi": {
+          "chars": 1211,
+          "bytes": 1262,
+          "words": 151,
+          "sha256_16": "43d4ac9b7eacd2fe"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 262,
+          "de": 402,
+          "pl": 462,
+          "uk": 414,
+          "bg": 497,
+          "fr": 398,
+          "cs": 428,
+          "hu": 484,
+          "el": 563,
+          "es": 404,
+          "fi": 452
+        },
+        "eurollm": {
+          "en": 277,
+          "de": 353,
+          "pl": 334,
+          "uk": 395,
+          "bg": 392,
+          "fr": 371,
+          "cs": 385,
+          "hu": 375,
+          "el": 487,
+          "es": 366,
+          "fi": 346
+        }
+      }
+    },
+    {
+      "wid": 15,
+      "sent_start": 349,
+      "sent_end": 359,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1162,
+          "bytes": 1164,
+          "words": 205,
+          "sha256_16": "fcf9f63a0dadeb8f"
+        },
+        "de": {
+          "chars": 1345,
+          "bytes": 1371,
+          "words": 201,
+          "sha256_16": "5278cba30db58140"
+        },
+        "pl": {
+          "chars": 1248,
+          "bytes": 1302,
+          "words": 172,
+          "sha256_16": "4e949e09d77aab83"
+        },
+        "uk": {
+          "chars": 1181,
+          "bytes": 2166,
+          "words": 170,
+          "sha256_16": "faa4b4a83541ac32"
+        },
+        "bg": {
+          "chars": 1152,
+          "bytes": 2094,
+          "words": 181,
+          "sha256_16": "84d1416c16d0be55"
+        },
+        "fr": {
+          "chars": 1382,
+          "bytes": 1436,
+          "words": 238,
+          "sha256_16": "2ddd561b91507e85"
+        },
+        "cs": {
+          "chars": 1089,
+          "bytes": 1220,
+          "words": 162,
+          "sha256_16": "96fb74f98625a5ba"
+        },
+        "hu": {
+          "chars": 1172,
+          "bytes": 1295,
+          "words": 167,
+          "sha256_16": "5bc9d502d549b5ad"
+        },
+        "el": {
+          "chars": 1305,
+          "bytes": 2390,
+          "words": 194,
+          "sha256_16": "0db8c740ff669551"
+        },
+        "es": {
+          "chars": 1424,
+          "bytes": 1451,
+          "words": 241,
+          "sha256_16": "68feef5c2bad2dc2"
+        },
+        "fi": {
+          "chars": 1210,
+          "bytes": 1265,
+          "words": 140,
+          "sha256_16": "4c1d1223ba18ddc2"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 241,
+          "de": 379,
+          "pl": 468,
+          "uk": 385,
+          "bg": 460,
+          "fr": 378,
+          "cs": 363,
+          "hu": 485,
+          "el": 497,
+          "es": 385,
+          "fi": 462
+        },
+        "eurollm": {
+          "en": 259,
+          "de": 321,
+          "pl": 313,
+          "uk": 357,
+          "bg": 343,
+          "fr": 353,
+          "cs": 351,
+          "hu": 361,
+          "el": 441,
+          "es": 338,
+          "fi": 349
+        }
+      }
+    },
+    {
+      "wid": 16,
+      "sent_start": 359,
+      "sent_end": 368,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1094,
+          "bytes": 1094,
+          "words": 195,
+          "sha256_16": "9c1936a78c99223f"
+        },
+        "de": {
+          "chars": 1316,
+          "bytes": 1343,
+          "words": 190,
+          "sha256_16": "76d312acc67d40a8"
+        },
+        "pl": {
+          "chars": 1194,
+          "bytes": 1276,
+          "words": 175,
+          "sha256_16": "2d9939633b548869"
+        },
+        "uk": {
+          "chars": 1157,
+          "bytes": 2096,
+          "words": 182,
+          "sha256_16": "b87908291e08a5e1"
+        },
+        "bg": {
+          "chars": 1181,
+          "bytes": 2126,
+          "words": 193,
+          "sha256_16": "84066412a8773b98"
+        },
+        "fr": {
+          "chars": 1387,
+          "bytes": 1423,
+          "words": 231,
+          "sha256_16": "4be070f393a307a9"
+        },
+        "cs": {
+          "chars": 1093,
+          "bytes": 1235,
+          "words": 171,
+          "sha256_16": "c1a32b699e0ef008"
+        },
+        "hu": {
+          "chars": 1273,
+          "bytes": 1394,
+          "words": 172,
+          "sha256_16": "2c8856edfcb7f817"
+        },
+        "el": {
+          "chars": 1429,
+          "bytes": 2599,
+          "words": 224,
+          "sha256_16": "213c8c4fe0564038"
+        },
+        "es": {
+          "chars": 1398,
+          "bytes": 1415,
+          "words": 229,
+          "sha256_16": "c2819409bee66938"
+        },
+        "fi": {
+          "chars": 1380,
+          "bytes": 1449,
+          "words": 167,
+          "sha256_16": "ebf7bbec635551ff"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 241,
+          "de": 380,
+          "pl": 454,
+          "uk": 415,
+          "bg": 491,
+          "fr": 375,
+          "cs": 357,
+          "hu": 542,
+          "el": 553,
+          "es": 367,
+          "fi": 545
+        },
+        "eurollm": {
+          "en": 264,
+          "de": 321,
+          "pl": 324,
+          "uk": 388,
+          "bg": 377,
+          "fr": 352,
+          "cs": 353,
+          "hu": 413,
+          "el": 464,
+          "es": 339,
+          "fi": 402
+        }
+      }
+    },
+    {
+      "wid": 17,
+      "sent_start": 368,
+      "sent_end": 375,
+      "n_sents": 7,
+      "langs": {
+        "en": {
+          "chars": 1205,
+          "bytes": 1205,
+          "words": 215,
+          "sha256_16": "0b4b45b059aab1b3"
+        },
+        "de": {
+          "chars": 1369,
+          "bytes": 1387,
+          "words": 210,
+          "sha256_16": "a57c342dc7b258e6"
+        },
+        "pl": {
+          "chars": 1146,
+          "bytes": 1231,
+          "words": 172,
+          "sha256_16": "79052ce63f8647b7"
+        },
+        "uk": {
+          "chars": 1172,
+          "bytes": 2133,
+          "words": 176,
+          "sha256_16": "8dee93a7e6d554ae"
+        },
+        "bg": {
+          "chars": 1140,
+          "bytes": 2054,
+          "words": 191,
+          "sha256_16": "7c958fb47684e5ae"
+        },
+        "fr": {
+          "chars": 1448,
+          "bytes": 1490,
+          "words": 247,
+          "sha256_16": "8f90ddc2c3eeee04"
+        },
+        "cs": {
+          "chars": 1087,
+          "bytes": 1213,
+          "words": 175,
+          "sha256_16": "858d3ee338936f61"
+        },
+        "hu": {
+          "chars": 1294,
+          "bytes": 1420,
+          "words": 177,
+          "sha256_16": "7c963cc728aec047"
+        },
+        "el": {
+          "chars": 1368,
+          "bytes": 2505,
+          "words": 205,
+          "sha256_16": "f597ed06ad30fd47"
+        },
+        "es": {
+          "chars": 1335,
+          "bytes": 1359,
+          "words": 221,
+          "sha256_16": "203dff98c86ce30f"
+        },
+        "fi": {
+          "chars": 1224,
+          "bytes": 1288,
+          "words": 154,
+          "sha256_16": "85da66ae737d6b93"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 257,
+          "de": 385,
+          "pl": 421,
+          "uk": 374,
+          "bg": 465,
+          "fr": 377,
+          "cs": 340,
+          "hu": 552,
+          "el": 517,
+          "es": 361,
+          "fi": 491
+        },
+        "eurollm": {
+          "en": 279,
+          "de": 335,
+          "pl": 298,
+          "uk": 351,
+          "bg": 345,
+          "fr": 346,
+          "cs": 335,
+          "hu": 382,
+          "el": 443,
+          "es": 323,
+          "fi": 349
+        }
+      }
+    },
+    {
+      "wid": 18,
+      "sent_start": 375,
+      "sent_end": 384,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1203,
+          "bytes": 1203,
+          "words": 208,
+          "sha256_16": "dcd8aada6143a438"
+        },
+        "de": {
+          "chars": 1397,
+          "bytes": 1419,
+          "words": 200,
+          "sha256_16": "2f924af2873556cb"
+        },
+        "pl": {
+          "chars": 1234,
+          "bytes": 1324,
+          "words": 173,
+          "sha256_16": "c5bea96dfcbae97f"
+        },
+        "uk": {
+          "chars": 1216,
+          "bytes": 2207,
+          "words": 183,
+          "sha256_16": "b147465fc3beb555"
+        },
+        "bg": {
+          "chars": 1265,
+          "bytes": 2286,
+          "words": 206,
+          "sha256_16": "6c2ff51d4faff044"
+        },
+        "fr": {
+          "chars": 1521,
+          "bytes": 1582,
+          "words": 253,
+          "sha256_16": "214b56c16a9cd5fa"
+        },
+        "cs": {
+          "chars": 1138,
+          "bytes": 1256,
+          "words": 170,
+          "sha256_16": "d2cb81c4698770c5"
+        },
+        "hu": {
+          "chars": 1211,
+          "bytes": 1339,
+          "words": 175,
+          "sha256_16": "0e7e719d0630900c"
+        },
+        "el": {
+          "chars": 1396,
+          "bytes": 2541,
+          "words": 217,
+          "sha256_16": "5b3bc800469ee8c5"
+        },
+        "es": {
+          "chars": 1406,
+          "bytes": 1433,
+          "words": 227,
+          "sha256_16": "34236afd94449bbe"
+        },
+        "fi": {
+          "chars": 1222,
+          "bytes": 1289,
+          "words": 157,
+          "sha256_16": "ded3e30a35030f17"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 258,
+          "de": 378,
+          "pl": 458,
+          "uk": 396,
+          "bg": 504,
+          "fr": 423,
+          "cs": 345,
+          "hu": 507,
+          "el": 555,
+          "es": 369,
+          "fi": 481
+        },
+        "eurollm": {
+          "en": 278,
+          "de": 318,
+          "pl": 318,
+          "uk": 384,
+          "bg": 384,
+          "fr": 385,
+          "cs": 341,
+          "hu": 371,
+          "el": 466,
+          "es": 330,
+          "fi": 345
+        }
+      }
+    },
+    {
+      "wid": 19,
+      "sent_start": 384,
+      "sent_end": 394,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1247,
+          "bytes": 1247,
+          "words": 222,
+          "sha256_16": "b10525753165c810"
+        },
+        "de": {
+          "chars": 1372,
+          "bytes": 1392,
+          "words": 205,
+          "sha256_16": "2c96e5d821db41b4"
+        },
+        "pl": {
+          "chars": 1226,
+          "bytes": 1325,
+          "words": 178,
+          "sha256_16": "1f94b8a37d4ad600"
+        },
+        "uk": {
+          "chars": 1208,
+          "bytes": 2195,
+          "words": 184,
+          "sha256_16": "e01d7ce3c18a9316"
+        },
+        "bg": {
+          "chars": 1214,
+          "bytes": 2200,
+          "words": 195,
+          "sha256_16": "b6160e5489c548df"
+        },
+        "fr": {
+          "chars": 1456,
+          "bytes": 1499,
+          "words": 243,
+          "sha256_16": "91895ea6e3f47267"
+        },
+        "cs": {
+          "chars": 1143,
+          "bytes": 1296,
+          "words": 173,
+          "sha256_16": "9430c01f75a04b84"
+        },
+        "hu": {
+          "chars": 1292,
+          "bytes": 1399,
+          "words": 182,
+          "sha256_16": "bda691dc44b4346a"
+        },
+        "el": {
+          "chars": 1445,
+          "bytes": 2641,
+          "words": 219,
+          "sha256_16": "0c7ca01f1b760a40"
+        },
+        "es": {
+          "chars": 1393,
+          "bytes": 1414,
+          "words": 222,
+          "sha256_16": "734820b4ff57cb02"
+        },
+        "fi": {
+          "chars": 1247,
+          "bytes": 1293,
+          "words": 149,
+          "sha256_16": "2dc542cef528304f"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 258,
+          "de": 381,
+          "pl": 467,
+          "uk": 414,
+          "bg": 499,
+          "fr": 405,
+          "cs": 388,
+          "hu": 517,
+          "el": 573,
+          "es": 359,
+          "fi": 477
+        },
+        "eurollm": {
+          "en": 282,
+          "de": 314,
+          "pl": 335,
+          "uk": 389,
+          "bg": 370,
+          "fr": 357,
+          "cs": 375,
+          "hu": 396,
+          "el": 496,
+          "es": 320,
+          "fi": 369
+        }
+      }
+    },
+    {
+      "wid": 20,
+      "sent_start": 394,
+      "sent_end": 404,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1222,
+          "bytes": 1222,
+          "words": 207,
+          "sha256_16": "705f46067c2005d4"
+        },
+        "de": {
+          "chars": 1377,
+          "bytes": 1422,
+          "words": 200,
+          "sha256_16": "fd56c09828be5b5b"
+        },
+        "pl": {
+          "chars": 1293,
+          "bytes": 1390,
+          "words": 184,
+          "sha256_16": "715ce0fe3a6d8ff6"
+        },
+        "uk": {
+          "chars": 1189,
+          "bytes": 2166,
+          "words": 171,
+          "sha256_16": "cfa6ddab0d9f78c8"
+        },
+        "bg": {
+          "chars": 1190,
+          "bytes": 2163,
+          "words": 187,
+          "sha256_16": "98f18fcd228d706e"
+        },
+        "fr": {
+          "chars": 1345,
+          "bytes": 1411,
+          "words": 245,
+          "sha256_16": "bf7d9af9629bf4a4"
+        },
+        "cs": {
+          "chars": 1099,
+          "bytes": 1214,
+          "words": 169,
+          "sha256_16": "6e92c483f0aba11a"
+        },
+        "hu": {
+          "chars": 1147,
+          "bytes": 1264,
+          "words": 165,
+          "sha256_16": "f553accb206225c6"
+        },
+        "el": {
+          "chars": 1331,
+          "bytes": 2423,
+          "words": 202,
+          "sha256_16": "392e1688bfee9aa6"
+        },
+        "es": {
+          "chars": 1352,
+          "bytes": 1375,
+          "words": 229,
+          "sha256_16": "cac482bb0873f9f6"
+        },
+        "fi": {
+          "chars": 1169,
+          "bytes": 1219,
+          "words": 135,
+          "sha256_16": "48b2a31ee0ca8502"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 252,
+          "de": 381,
+          "pl": 474,
+          "uk": 398,
+          "bg": 487,
+          "fr": 403,
+          "cs": 362,
+          "hu": 488,
+          "el": 525,
+          "es": 371,
+          "fi": 459
+        },
+        "eurollm": {
+          "en": 272,
+          "de": 321,
+          "pl": 353,
+          "uk": 381,
+          "bg": 352,
+          "fr": 372,
+          "cs": 357,
+          "hu": 367,
+          "el": 461,
+          "es": 325,
+          "fi": 342
+        }
+      }
+    },
+    {
+      "wid": 21,
+      "sent_start": 404,
+      "sent_end": 413,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1250,
+          "bytes": 1252,
+          "words": 209,
+          "sha256_16": "95a58c3389365def"
+        },
+        "de": {
+          "chars": 1532,
+          "bytes": 1557,
+          "words": 211,
+          "sha256_16": "46179d3b4655388d"
+        },
+        "pl": {
+          "chars": 1298,
+          "bytes": 1407,
+          "words": 176,
+          "sha256_16": "0efe69ae6f87271b"
+        },
+        "uk": {
+          "chars": 1275,
+          "bytes": 2281,
+          "words": 182,
+          "sha256_16": "6e4867abc6f37c41"
+        },
+        "bg": {
+          "chars": 1275,
+          "bytes": 2305,
+          "words": 197,
+          "sha256_16": "b42211d544326e7b"
+        },
+        "fr": {
+          "chars": 1489,
+          "bytes": 1559,
+          "words": 243,
+          "sha256_16": "3906addb61c97c4a"
+        },
+        "cs": {
+          "chars": 1257,
+          "bytes": 1417,
+          "words": 182,
+          "sha256_16": "a5e2c0c7e1a8fb48"
+        },
+        "hu": {
+          "chars": 1370,
+          "bytes": 1506,
+          "words": 184,
+          "sha256_16": "6cea4288bafafc0c"
+        },
+        "el": {
+          "chars": 1417,
+          "bytes": 2537,
+          "words": 214,
+          "sha256_16": "045eb2fc14f9688b"
+        },
+        "es": {
+          "chars": 1608,
+          "bytes": 1643,
+          "words": 263,
+          "sha256_16": "1e0967b8c0f25b4e"
+        },
+        "fi": {
+          "chars": 1425,
+          "bytes": 1478,
+          "words": 170,
+          "sha256_16": "d9dd31a4ffe7472b"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 261,
+          "de": 414,
+          "pl": 489,
+          "uk": 416,
+          "bg": 508,
+          "fr": 409,
+          "cs": 388,
+          "hu": 553,
+          "el": 526,
+          "es": 427,
+          "fi": 551
+        },
+        "eurollm": {
+          "en": 290,
+          "de": 360,
+          "pl": 350,
+          "uk": 390,
+          "bg": 387,
+          "fr": 389,
+          "cs": 395,
+          "hu": 403,
+          "el": 442,
+          "es": 386,
+          "fi": 404
+        }
+      }
+    },
+    {
+      "wid": 22,
+      "sent_start": 413,
+      "sent_end": 420,
+      "n_sents": 7,
+      "langs": {
+        "en": {
+          "chars": 1042,
+          "bytes": 1046,
+          "words": 159,
+          "sha256_16": "e923e181a10c895f"
+        },
+        "de": {
+          "chars": 1198,
+          "bytes": 1211,
+          "words": 153,
+          "sha256_16": "d4a7cbc36cd1e864"
+        },
+        "pl": {
+          "chars": 1223,
+          "bytes": 1290,
+          "words": 159,
+          "sha256_16": "8b8aa0435125d0c4"
+        },
+        "uk": {
+          "chars": 1081,
+          "bytes": 1983,
+          "words": 148,
+          "sha256_16": "da3c4aa20df1ffbb"
+        },
+        "bg": {
+          "chars": 1216,
+          "bytes": 2229,
+          "words": 169,
+          "sha256_16": "26a9eb912f439d66"
+        },
+        "fr": {
+          "chars": 1273,
+          "bytes": 1323,
+          "words": 210,
+          "sha256_16": "bb3cfe6ab01835ec"
+        },
+        "cs": {
+          "chars": 1007,
+          "bytes": 1124,
+          "words": 145,
+          "sha256_16": "877736e8dc40ccf8"
+        },
+        "hu": {
+          "chars": 1173,
+          "bytes": 1296,
+          "words": 157,
+          "sha256_16": "b0e9982cdbb2932c"
+        },
+        "el": {
+          "chars": 1271,
+          "bytes": 2321,
+          "words": 184,
+          "sha256_16": "5880daa58831f9b8"
+        },
+        "es": {
+          "chars": 1261,
+          "bytes": 1280,
+          "words": 199,
+          "sha256_16": "5cf510a5b0eb4ce3"
+        },
+        "fi": {
+          "chars": 1108,
+          "bytes": 1145,
+          "words": 114,
+          "sha256_16": "66f0ba40d461e9fc"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 190,
+          "de": 333,
+          "pl": 430,
+          "uk": 334,
+          "bg": 504,
+          "fr": 339,
+          "cs": 343,
+          "hu": 496,
+          "el": 487,
+          "es": 330,
+          "fi": 432
+        },
+        "eurollm": {
+          "en": 216,
+          "de": 260,
+          "pl": 301,
+          "uk": 324,
+          "bg": 355,
+          "fr": 296,
+          "cs": 312,
+          "hu": 345,
+          "el": 417,
+          "es": 284,
+          "fi": 318
+        }
+      }
+    },
+    {
+      "wid": 23,
+      "sent_start": 420,
+      "sent_end": 428,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1213,
+          "bytes": 1217,
+          "words": 188,
+          "sha256_16": "f31f78db955df29c"
+        },
+        "de": {
+          "chars": 1368,
+          "bytes": 1394,
+          "words": 181,
+          "sha256_16": "8e5484aeea60bdba"
+        },
+        "pl": {
+          "chars": 1276,
+          "bytes": 1357,
+          "words": 170,
+          "sha256_16": "26bfbabc2af8652b"
+        },
+        "uk": {
+          "chars": 1250,
+          "bytes": 2246,
+          "words": 168,
+          "sha256_16": "72b26b60eaed781a"
+        },
+        "bg": {
+          "chars": 1267,
+          "bytes": 2263,
+          "words": 180,
+          "sha256_16": "18576b1409d0bd73"
+        },
+        "fr": {
+          "chars": 1387,
+          "bytes": 1446,
+          "words": 225,
+          "sha256_16": "f90386b843db186e"
+        },
+        "cs": {
+          "chars": 1229,
+          "bytes": 1372,
+          "words": 170,
+          "sha256_16": "6aec85ab577c9288"
+        },
+        "hu": {
+          "chars": 1202,
+          "bytes": 1299,
+          "words": 153,
+          "sha256_16": "18a394c486863f88"
+        },
+        "el": {
+          "chars": 1298,
+          "bytes": 2308,
+          "words": 190,
+          "sha256_16": "6e854a83914b85f7"
+        },
+        "es": {
+          "chars": 1451,
+          "bytes": 1483,
+          "words": 237,
+          "sha256_16": "45f6951104c2b425"
+        },
+        "fi": {
+          "chars": 1295,
+          "bytes": 1334,
+          "words": 141,
+          "sha256_16": "40ba660aa66cb2a2"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 273,
+          "de": 413,
+          "pl": 490,
+          "uk": 426,
+          "bg": 499,
+          "fr": 407,
+          "cs": 418,
+          "hu": 502,
+          "el": 534,
+          "es": 419,
+          "fi": 492
+        },
+        "eurollm": {
+          "en": 308,
+          "de": 353,
+          "pl": 371,
+          "uk": 422,
+          "bg": 413,
+          "fr": 391,
+          "cs": 415,
+          "hu": 388,
+          "el": 471,
+          "es": 382,
+          "fi": 402
+        }
+      }
+    },
+    {
+      "wid": 24,
+      "sent_start": 428,
+      "sent_end": 437,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1137,
+          "bytes": 1137,
+          "words": 192,
+          "sha256_16": "55aa357cae3295cd"
+        },
+        "de": {
+          "chars": 1272,
+          "bytes": 1290,
+          "words": 176,
+          "sha256_16": "5adca4d46cef6d51"
+        },
+        "pl": {
+          "chars": 1179,
+          "bytes": 1240,
+          "words": 158,
+          "sha256_16": "1ffb488534e34f20"
+        },
+        "uk": {
+          "chars": 1171,
+          "bytes": 2131,
+          "words": 160,
+          "sha256_16": "77b8b47c83ea00ae"
+        },
+        "bg": {
+          "chars": 1208,
+          "bytes": 2174,
+          "words": 186,
+          "sha256_16": "3a720961f6ede1ab"
+        },
+        "fr": {
+          "chars": 1287,
+          "bytes": 1324,
+          "words": 223,
+          "sha256_16": "d7e638b3db1e2470"
+        },
+        "cs": {
+          "chars": 1035,
+          "bytes": 1176,
+          "words": 148,
+          "sha256_16": "b16c37dfa9ecebc8"
+        },
+        "hu": {
+          "chars": 1127,
+          "bytes": 1247,
+          "words": 156,
+          "sha256_16": "588790cb46013516"
+        },
+        "el": {
+          "chars": 1407,
+          "bytes": 2553,
+          "words": 208,
+          "sha256_16": "4db55a0b7995dbf1"
+        },
+        "es": {
+          "chars": 1400,
+          "bytes": 1427,
+          "words": 242,
+          "sha256_16": "55cdf6ffccb95e97"
+        },
+        "fi": {
+          "chars": 1152,
+          "bytes": 1193,
+          "words": 132,
+          "sha256_16": "62c1ae5eef8fdc07"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 237,
+          "de": 365,
+          "pl": 418,
+          "uk": 387,
+          "bg": 471,
+          "fr": 344,
+          "cs": 334,
+          "hu": 465,
+          "el": 507,
+          "es": 365,
+          "fi": 447
+        },
+        "eurollm": {
+          "en": 263,
+          "de": 307,
+          "pl": 301,
+          "uk": 365,
+          "bg": 364,
+          "fr": 339,
+          "cs": 338,
+          "hu": 355,
+          "el": 439,
+          "es": 335,
+          "fi": 326
+        }
+      }
+    },
+    {
+      "wid": 25,
+      "sent_start": 437,
+      "sent_end": 445,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1112,
+          "bytes": 1112,
+          "words": 173,
+          "sha256_16": "aa6532c74b0a9cfa"
+        },
+        "de": {
+          "chars": 1295,
+          "bytes": 1312,
+          "words": 172,
+          "sha256_16": "b441153cd0fdb864"
+        },
+        "pl": {
+          "chars": 1247,
+          "bytes": 1340,
+          "words": 168,
+          "sha256_16": "45460da3f39a346b"
+        },
+        "uk": {
+          "chars": 1133,
+          "bytes": 2096,
+          "words": 150,
+          "sha256_16": "d1f4a605ed4a51dd"
+        },
+        "bg": {
+          "chars": 1142,
+          "bytes": 2105,
+          "words": 161,
+          "sha256_16": "6f8bb0f651454a63"
+        },
+        "fr": {
+          "chars": 1279,
+          "bytes": 1327,
+          "words": 207,
+          "sha256_16": "ff0b504abf57a3d4"
+        },
+        "cs": {
+          "chars": 1069,
+          "bytes": 1209,
+          "words": 156,
+          "sha256_16": "ddba847576971de2"
+        },
+        "hu": {
+          "chars": 1152,
+          "bytes": 1273,
+          "words": 159,
+          "sha256_16": "7cdd222a222ce243"
+        },
+        "el": {
+          "chars": 1385,
+          "bytes": 2545,
+          "words": 206,
+          "sha256_16": "b4b73bddba5fd833"
+        },
+        "es": {
+          "chars": 1254,
+          "bytes": 1273,
+          "words": 195,
+          "sha256_16": "5f7964bae2248e80"
+        },
+        "fi": {
+          "chars": 1160,
+          "bytes": 1199,
+          "words": 131,
+          "sha256_16": "afc7072bf76a41c0"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 196,
+          "de": 345,
+          "pl": 466,
+          "uk": 345,
+          "bg": 416,
+          "fr": 340,
+          "cs": 352,
+          "hu": 473,
+          "el": 507,
+          "es": 323,
+          "fi": 433
+        },
+        "eurollm": {
+          "en": 210,
+          "de": 265,
+          "pl": 297,
+          "uk": 317,
+          "bg": 283,
+          "fr": 289,
+          "cs": 306,
+          "hu": 319,
+          "el": 411,
+          "es": 262,
+          "fi": 295
+        }
+      }
+    },
+    {
+      "wid": 26,
+      "sent_start": 445,
+      "sent_end": 454,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1240,
+          "bytes": 1244,
+          "words": 215,
+          "sha256_16": "bcd793c4ca293bd0"
+        },
+        "de": {
+          "chars": 1406,
+          "bytes": 1418,
+          "words": 209,
+          "sha256_16": "53004d59d5d8b9f3"
+        },
+        "pl": {
+          "chars": 1306,
+          "bytes": 1371,
+          "words": 186,
+          "sha256_16": "b9e0d6e6a76fb4cb"
+        },
+        "uk": {
+          "chars": 1198,
+          "bytes": 2184,
+          "words": 176,
+          "sha256_16": "2f136cfd2c40c826"
+        },
+        "bg": {
+          "chars": 1301,
+          "bytes": 2356,
+          "words": 206,
+          "sha256_16": "1ddda5ec49fe9cc7"
+        },
+        "fr": {
+          "chars": 1486,
+          "bytes": 1543,
+          "words": 262,
+          "sha256_16": "a68fa9626d7334e5"
+        },
+        "cs": {
+          "chars": 1162,
+          "bytes": 1297,
+          "words": 174,
+          "sha256_16": "d9be81d802c71e63"
+        },
+        "hu": {
+          "chars": 1302,
+          "bytes": 1423,
+          "words": 184,
+          "sha256_16": "fb64d462e9813bb8"
+        },
+        "el": {
+          "chars": 1444,
+          "bytes": 2626,
+          "words": 224,
+          "sha256_16": "cadcec00426ce35f"
+        },
+        "es": {
+          "chars": 1384,
+          "bytes": 1411,
+          "words": 240,
+          "sha256_16": "1f71fdf9e8c2ef9f"
+        },
+        "fi": {
+          "chars": 1221,
+          "bytes": 1257,
+          "words": 135,
+          "sha256_16": "9314adb7ba62f4cb"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 253,
+          "de": 386,
+          "pl": 464,
+          "uk": 401,
+          "bg": 503,
+          "fr": 412,
+          "cs": 375,
+          "hu": 518,
+          "el": 546,
+          "es": 370,
+          "fi": 451
+        },
+        "eurollm": {
+          "en": 280,
+          "de": 336,
+          "pl": 334,
+          "uk": 390,
+          "bg": 377,
+          "fr": 369,
+          "cs": 368,
+          "hu": 381,
+          "el": 477,
+          "es": 338,
+          "fi": 342
+        }
+      }
+    },
+    {
+      "wid": 27,
+      "sent_start": 454,
+      "sent_end": 463,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1259,
+          "bytes": 1271,
+          "words": 220,
+          "sha256_16": "70e9e9acfbfd76d2"
+        },
+        "de": {
+          "chars": 1445,
+          "bytes": 1477,
+          "words": 219,
+          "sha256_16": "9eb3c1526a7e1fa0"
+        },
+        "pl": {
+          "chars": 1282,
+          "bytes": 1355,
+          "words": 182,
+          "sha256_16": "0d129c164f2a6b46"
+        },
+        "uk": {
+          "chars": 1278,
+          "bytes": 2339,
+          "words": 181,
+          "sha256_16": "2e32d71f7462afa7"
+        },
+        "bg": {
+          "chars": 1284,
+          "bytes": 2334,
+          "words": 204,
+          "sha256_16": "7cdfd53618e0dfa5"
+        },
+        "fr": {
+          "chars": 1494,
+          "bytes": 1559,
+          "words": 258,
+          "sha256_16": "c4969b2b4411d03d"
+        },
+        "cs": {
+          "chars": 1214,
+          "bytes": 1355,
+          "words": 181,
+          "sha256_16": "65c0fc8af870cce0"
+        },
+        "hu": {
+          "chars": 1333,
+          "bytes": 1452,
+          "words": 186,
+          "sha256_16": "48c77296546f4f41"
+        },
+        "el": {
+          "chars": 1430,
+          "bytes": 2606,
+          "words": 228,
+          "sha256_16": "45268f4f47725011"
+        },
+        "es": {
+          "chars": 1442,
+          "bytes": 1472,
+          "words": 242,
+          "sha256_16": "2b38a36b15773c5b"
+        },
+        "fi": {
+          "chars": 1292,
+          "bytes": 1349,
+          "words": 149,
+          "sha256_16": "0da6863c1ba6c4f8"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 259,
+          "de": 378,
+          "pl": 464,
+          "uk": 383,
+          "bg": 504,
+          "fr": 413,
+          "cs": 383,
+          "hu": 528,
+          "el": 529,
+          "es": 392,
+          "fi": 496
+        },
+        "eurollm": {
+          "en": 280,
+          "de": 334,
+          "pl": 324,
+          "uk": 374,
+          "bg": 366,
+          "fr": 377,
+          "cs": 363,
+          "hu": 399,
+          "el": 452,
+          "es": 343,
+          "fi": 359
+        }
+      }
+    },
+    {
+      "wid": 28,
+      "sent_start": 463,
+      "sent_end": 471,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1108,
+          "bytes": 1108,
+          "words": 204,
+          "sha256_16": "e33c831211222e77"
+        },
+        "de": {
+          "chars": 1355,
+          "bytes": 1386,
+          "words": 195,
+          "sha256_16": "1eb078c8cf7b29fe"
+        },
+        "pl": {
+          "chars": 1140,
+          "bytes": 1225,
+          "words": 179,
+          "sha256_16": "dcf2b2395b6c6e9d"
+        },
+        "uk": {
+          "chars": 1138,
+          "bytes": 2061,
+          "words": 173,
+          "sha256_16": "d64c9c70e5002b69"
+        },
+        "bg": {
+          "chars": 1144,
+          "bytes": 2068,
+          "words": 185,
+          "sha256_16": "04baff12ef137fa7"
+        },
+        "fr": {
+          "chars": 1338,
+          "bytes": 1394,
+          "words": 237,
+          "sha256_16": "c2a8054237c13fbe"
+        },
+        "cs": {
+          "chars": 1080,
+          "bytes": 1211,
+          "words": 166,
+          "sha256_16": "efdd0890a94472e3"
+        },
+        "hu": {
+          "chars": 1152,
+          "bytes": 1253,
+          "words": 177,
+          "sha256_16": "8f4c10cad2e5e230"
+        },
+        "el": {
+          "chars": 1510,
+          "bytes": 2740,
+          "words": 251,
+          "sha256_16": "9fb539b72937066d"
+        },
+        "es": {
+          "chars": 1292,
+          "bytes": 1318,
+          "words": 236,
+          "sha256_16": "dee119b0c9c484c8"
+        },
+        "fi": {
+          "chars": 1349,
+          "bytes": 1397,
+          "words": 164,
+          "sha256_16": "a62ec0f5b9398625"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 252,
+          "de": 395,
+          "pl": 451,
+          "uk": 426,
+          "bg": 487,
+          "fr": 379,
+          "cs": 375,
+          "hu": 477,
+          "el": 574,
+          "es": 376,
+          "fi": 497
+        },
+        "eurollm": {
+          "en": 275,
+          "de": 330,
+          "pl": 341,
+          "uk": 381,
+          "bg": 363,
+          "fr": 358,
+          "cs": 354,
+          "hu": 362,
+          "el": 486,
+          "es": 332,
+          "fi": 397
+        }
+      }
+    },
+    {
+      "wid": 29,
+      "sent_start": 471,
+      "sent_end": 479,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1196,
+          "bytes": 1196,
+          "words": 207,
+          "sha256_16": "e6c8c610a5e75c88"
+        },
+        "de": {
+          "chars": 1310,
+          "bytes": 1328,
+          "words": 194,
+          "sha256_16": "de69bf9efdcfb032"
+        },
+        "pl": {
+          "chars": 1113,
+          "bytes": 1183,
+          "words": 149,
+          "sha256_16": "44ed08a106f78d8e"
+        },
+        "uk": {
+          "chars": 1055,
+          "bytes": 1935,
+          "words": 141,
+          "sha256_16": "6ab8d7746161b941"
+        },
+        "bg": {
+          "chars": 1137,
+          "bytes": 2057,
+          "words": 170,
+          "sha256_16": "f3b6842693ae4127"
+        },
+        "fr": {
+          "chars": 1266,
+          "bytes": 1316,
+          "words": 211,
+          "sha256_16": "25c88791bfe316f5"
+        },
+        "cs": {
+          "chars": 1043,
+          "bytes": 1171,
+          "words": 144,
+          "sha256_16": "36443e319d376041"
+        },
+        "hu": {
+          "chars": 1184,
+          "bytes": 1312,
+          "words": 163,
+          "sha256_16": "ccb19234c12c864e"
+        },
+        "el": {
+          "chars": 1415,
+          "bytes": 2595,
+          "words": 207,
+          "sha256_16": "354de3b3b53bdd2b"
+        },
+        "es": {
+          "chars": 1261,
+          "bytes": 1277,
+          "words": 213,
+          "sha256_16": "11e36b12dfa45b1d"
+        },
+        "fi": {
+          "chars": 1236,
+          "bytes": 1272,
+          "words": 119,
+          "sha256_16": "6119c3301f48b204"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 242,
+          "de": 370,
+          "pl": 430,
+          "uk": 355,
+          "bg": 467,
+          "fr": 367,
+          "cs": 349,
+          "hu": 482,
+          "el": 562,
+          "es": 343,
+          "fi": 452
+        },
+        "eurollm": {
+          "en": 271,
+          "de": 319,
+          "pl": 300,
+          "uk": 355,
+          "bg": 353,
+          "fr": 330,
+          "cs": 334,
+          "hu": 369,
+          "el": 488,
+          "es": 316,
+          "fi": 344
+        }
+      }
+    },
+    {
+      "wid": 30,
+      "sent_start": 479,
+      "sent_end": 485,
+      "n_sents": 6,
+      "langs": {
+        "en": {
+          "chars": 1134,
+          "bytes": 1136,
+          "words": 179,
+          "sha256_16": "e09d02bb2218f4d7"
+        },
+        "de": {
+          "chars": 1400,
+          "bytes": 1418,
+          "words": 177,
+          "sha256_16": "897864f0ddf91598"
+        },
+        "pl": {
+          "chars": 1182,
+          "bytes": 1243,
+          "words": 151,
+          "sha256_16": "4c5d017deebe961a"
+        },
+        "uk": {
+          "chars": 1160,
+          "bytes": 2121,
+          "words": 146,
+          "sha256_16": "abe906479e7e7295"
+        },
+        "bg": {
+          "chars": 1134,
+          "bytes": 2061,
+          "words": 157,
+          "sha256_16": "d891f8a4245fa88e"
+        },
+        "fr": {
+          "chars": 1288,
+          "bytes": 1346,
+          "words": 200,
+          "sha256_16": "6bd033270ff319b9"
+        },
+        "cs": {
+          "chars": 1123,
+          "bytes": 1256,
+          "words": 152,
+          "sha256_16": "827762ddcfe919d1"
+        },
+        "hu": {
+          "chars": 1156,
+          "bytes": 1276,
+          "words": 145,
+          "sha256_16": "516a9460a0e9e398"
+        },
+        "el": {
+          "chars": 1284,
+          "bytes": 2340,
+          "words": 184,
+          "sha256_16": "534994b33b443349"
+        },
+        "es": {
+          "chars": 1381,
+          "bytes": 1411,
+          "words": 220,
+          "sha256_16": "4c5f42ca6d7c6781"
+        },
+        "fi": {
+          "chars": 1165,
+          "bytes": 1207,
+          "words": 120,
+          "sha256_16": "6d19e36ff75cca09"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 216,
+          "de": 372,
+          "pl": 422,
+          "uk": 362,
+          "bg": 441,
+          "fr": 326,
+          "cs": 332,
+          "hu": 475,
+          "el": 501,
+          "es": 359,
+          "fi": 442
+        },
+        "eurollm": {
+          "en": 239,
+          "de": 314,
+          "pl": 272,
+          "uk": 355,
+          "bg": 325,
+          "fr": 285,
+          "cs": 334,
+          "hu": 326,
+          "el": 422,
+          "es": 308,
+          "fi": 316
+        }
+      }
+    },
+    {
+      "wid": 31,
+      "sent_start": 485,
+      "sent_end": 494,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1253,
+          "bytes": 1253,
+          "words": 208,
+          "sha256_16": "3b286cc839275086"
+        },
+        "de": {
+          "chars": 1380,
+          "bytes": 1400,
+          "words": 203,
+          "sha256_16": "fb9fe8bb2971112d"
+        },
+        "pl": {
+          "chars": 1237,
+          "bytes": 1301,
+          "words": 180,
+          "sha256_16": "f521cf9b9e3992d9"
+        },
+        "uk": {
+          "chars": 1210,
+          "bytes": 2193,
+          "words": 177,
+          "sha256_16": "77f81bf159704e94"
+        },
+        "bg": {
+          "chars": 1218,
+          "bytes": 2211,
+          "words": 188,
+          "sha256_16": "a909dcc1f7ec2e9d"
+        },
+        "fr": {
+          "chars": 1408,
+          "bytes": 1477,
+          "words": 233,
+          "sha256_16": "8c4098891f788acc"
+        },
+        "cs": {
+          "chars": 1184,
+          "bytes": 1315,
+          "words": 175,
+          "sha256_16": "707b5373c3af31ea"
+        },
+        "hu": {
+          "chars": 1235,
+          "bytes": 1357,
+          "words": 164,
+          "sha256_16": "48e1fae8fc08c121"
+        },
+        "el": {
+          "chars": 1385,
+          "bytes": 2517,
+          "words": 216,
+          "sha256_16": "c591356a9d4333dc"
+        },
+        "es": {
+          "chars": 1384,
+          "bytes": 1408,
+          "words": 234,
+          "sha256_16": "50ea0bc4d96cd0ac"
+        },
+        "fi": {
+          "chars": 1285,
+          "bytes": 1312,
+          "words": 133,
+          "sha256_16": "861675097b26779c"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 258,
+          "de": 403,
+          "pl": 444,
+          "uk": 391,
+          "bg": 486,
+          "fr": 381,
+          "cs": 370,
+          "hu": 516,
+          "el": 538,
+          "es": 368,
+          "fi": 488
+        },
+        "eurollm": {
+          "en": 278,
+          "de": 329,
+          "pl": 318,
+          "uk": 370,
+          "bg": 353,
+          "fr": 342,
+          "cs": 363,
+          "hu": 387,
+          "el": 452,
+          "es": 331,
+          "fi": 372
+        }
+      }
+    },
+    {
+      "wid": 32,
+      "sent_start": 494,
+      "sent_end": 502,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1168,
+          "bytes": 1168,
+          "words": 182,
+          "sha256_16": "e4b61c884226ccba"
+        },
+        "de": {
+          "chars": 1471,
+          "bytes": 1487,
+          "words": 189,
+          "sha256_16": "1fcc856e0062dd96"
+        },
+        "pl": {
+          "chars": 1274,
+          "bytes": 1366,
+          "words": 162,
+          "sha256_16": "47401f6dda277c79"
+        },
+        "uk": {
+          "chars": 1280,
+          "bytes": 2372,
+          "words": 156,
+          "sha256_16": "664a8f48d085b782"
+        },
+        "bg": {
+          "chars": 1331,
+          "bytes": 2445,
+          "words": 184,
+          "sha256_16": "5979d8a4d72bca4f"
+        },
+        "fr": {
+          "chars": 1412,
+          "bytes": 1443,
+          "words": 215,
+          "sha256_16": "3143ec9162d259a2"
+        },
+        "cs": {
+          "chars": 1134,
+          "bytes": 1276,
+          "words": 148,
+          "sha256_16": "a7edd50d5159041e"
+        },
+        "hu": {
+          "chars": 1248,
+          "bytes": 1376,
+          "words": 157,
+          "sha256_16": "4c631664a98baba8"
+        },
+        "el": {
+          "chars": 1443,
+          "bytes": 2643,
+          "words": 208,
+          "sha256_16": "6134c0c96a524e0d"
+        },
+        "es": {
+          "chars": 1471,
+          "bytes": 1497,
+          "words": 220,
+          "sha256_16": "01a221e91fb82deb"
+        },
+        "fi": {
+          "chars": 1271,
+          "bytes": 1330,
+          "words": 129,
+          "sha256_16": "13879762c4ebb99f"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 227,
+          "de": 398,
+          "pl": 464,
+          "uk": 390,
+          "bg": 490,
+          "fr": 367,
+          "cs": 352,
+          "hu": 526,
+          "el": 533,
+          "es": 357,
+          "fi": 508
+        },
+        "eurollm": {
+          "en": 243,
+          "de": 328,
+          "pl": 304,
+          "uk": 357,
+          "bg": 355,
+          "fr": 319,
+          "cs": 322,
+          "hu": 365,
+          "el": 448,
+          "es": 302,
+          "fi": 355
+        }
+      }
+    },
+    {
+      "wid": 33,
+      "sent_start": 502,
+      "sent_end": 509,
+      "n_sents": 7,
+      "langs": {
+        "en": {
+          "chars": 1182,
+          "bytes": 1182,
+          "words": 190,
+          "sha256_16": "48f5e217fa2c3824"
+        },
+        "de": {
+          "chars": 1489,
+          "bytes": 1519,
+          "words": 187,
+          "sha256_16": "6a2e9e38db8ea393"
+        },
+        "pl": {
+          "chars": 1195,
+          "bytes": 1276,
+          "words": 156,
+          "sha256_16": "910dde8f1afc7029"
+        },
+        "uk": {
+          "chars": 1105,
+          "bytes": 2029,
+          "words": 152,
+          "sha256_16": "d727346e11c1c7b5"
+        },
+        "bg": {
+          "chars": 1258,
+          "bytes": 2307,
+          "words": 186,
+          "sha256_16": "90019f40581350c7"
+        },
+        "fr": {
+          "chars": 1344,
+          "bytes": 1385,
+          "words": 214,
+          "sha256_16": "831b7c66ed8b2c7b"
+        },
+        "cs": {
+          "chars": 1130,
+          "bytes": 1314,
+          "words": 160,
+          "sha256_16": "7e6ba07be844e4ae"
+        },
+        "hu": {
+          "chars": 1301,
+          "bytes": 1428,
+          "words": 161,
+          "sha256_16": "587a335816eb305a"
+        },
+        "el": {
+          "chars": 1348,
+          "bytes": 2472,
+          "words": 202,
+          "sha256_16": "876e0f89d263910a"
+        },
+        "es": {
+          "chars": 1339,
+          "bytes": 1361,
+          "words": 218,
+          "sha256_16": "b5a9e79e4277bde8"
+        },
+        "fi": {
+          "chars": 1324,
+          "bytes": 1389,
+          "words": 145,
+          "sha256_16": "7dc41a4e2f938811"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 231,
+          "de": 402,
+          "pl": 437,
+          "uk": 357,
+          "bg": 488,
+          "fr": 363,
+          "cs": 342,
+          "hu": 521,
+          "el": 512,
+          "es": 350,
+          "fi": 510
+        },
+        "eurollm": {
+          "en": 243,
+          "de": 316,
+          "pl": 298,
+          "uk": 339,
+          "bg": 360,
+          "fr": 314,
+          "cs": 341,
+          "hu": 372,
+          "el": 416,
+          "es": 297,
+          "fi": 364
+        }
+      }
+    },
+    {
+      "wid": 34,
+      "sent_start": 509,
+      "sent_end": 519,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1280,
+          "bytes": 1280,
+          "words": 213,
+          "sha256_16": "b03d6a9ae4e6c237"
+        },
+        "de": {
+          "chars": 1555,
+          "bytes": 1577,
+          "words": 198,
+          "sha256_16": "4f387bb6778219f6"
+        },
+        "pl": {
+          "chars": 1312,
+          "bytes": 1368,
+          "words": 172,
+          "sha256_16": "1c929b0fed938766"
+        },
+        "uk": {
+          "chars": 1272,
+          "bytes": 2339,
+          "words": 174,
+          "sha256_16": "a9fa982125cb3c6c"
+        },
+        "bg": {
+          "chars": 1336,
+          "bytes": 2419,
+          "words": 206,
+          "sha256_16": "fc76af1f78662900"
+        },
+        "fr": {
+          "chars": 1501,
+          "bytes": 1558,
+          "words": 246,
+          "sha256_16": "e3180637f668fce8"
+        },
+        "cs": {
+          "chars": 1209,
+          "bytes": 1389,
+          "words": 173,
+          "sha256_16": "dcf2f3ca3f041abb"
+        },
+        "hu": {
+          "chars": 1409,
+          "bytes": 1552,
+          "words": 186,
+          "sha256_16": "3d1e1b780e8ffd5a"
+        },
+        "el": {
+          "chars": 1491,
+          "bytes": 2727,
+          "words": 219,
+          "sha256_16": "2fc4117c56737eb8"
+        },
+        "es": {
+          "chars": 1487,
+          "bytes": 1506,
+          "words": 234,
+          "sha256_16": "1d2c9519801dea78"
+        },
+        "fi": {
+          "chars": 1327,
+          "bytes": 1385,
+          "words": 143,
+          "sha256_16": "bbeebecc2a34d811"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 245,
+          "de": 405,
+          "pl": 437,
+          "uk": 389,
+          "bg": 490,
+          "fr": 380,
+          "cs": 356,
+          "hu": 576,
+          "el": 543,
+          "es": 368,
+          "fi": 502
+        },
+        "eurollm": {
+          "en": 271,
+          "de": 337,
+          "pl": 318,
+          "uk": 375,
+          "bg": 368,
+          "fr": 348,
+          "cs": 353,
+          "hu": 395,
+          "el": 461,
+          "es": 319,
+          "fi": 371
+        }
+      }
+    },
+    {
+      "wid": 35,
+      "sent_start": 519,
+      "sent_end": 528,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1193,
+          "bytes": 1209,
+          "words": 175,
+          "sha256_16": "ad31ef7642e8e581"
+        },
+        "de": {
+          "chars": 1345,
+          "bytes": 1374,
+          "words": 167,
+          "sha256_16": "f8815ba8cbdb4329"
+        },
+        "pl": {
+          "chars": 1271,
+          "bytes": 1355,
+          "words": 167,
+          "sha256_16": "b869e840d780f256"
+        },
+        "uk": {
+          "chars": 1120,
+          "bytes": 2045,
+          "words": 147,
+          "sha256_16": "4743b3ed2c744376"
+        },
+        "bg": {
+          "chars": 1220,
+          "bytes": 2224,
+          "words": 170,
+          "sha256_16": "d0a7ae488ade5e2a"
+        },
+        "fr": {
+          "chars": 1411,
+          "bytes": 1497,
+          "words": 212,
+          "sha256_16": "138c6d469401d274"
+        },
+        "cs": {
+          "chars": 1126,
+          "bytes": 1266,
+          "words": 150,
+          "sha256_16": "db09a82140200d48"
+        },
+        "hu": {
+          "chars": 1286,
+          "bytes": 1424,
+          "words": 164,
+          "sha256_16": "1390ebfab153b254"
+        },
+        "el": {
+          "chars": 1320,
+          "bytes": 2384,
+          "words": 186,
+          "sha256_16": "fa4838d2265424ac"
+        },
+        "es": {
+          "chars": 1405,
+          "bytes": 1440,
+          "words": 214,
+          "sha256_16": "69a626320876ca90"
+        },
+        "fi": {
+          "chars": 1219,
+          "bytes": 1270,
+          "words": 131,
+          "sha256_16": "108158789a4a0b58"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 220,
+          "de": 358,
+          "pl": 461,
+          "uk": 372,
+          "bg": 466,
+          "fr": 369,
+          "cs": 347,
+          "hu": 514,
+          "el": 506,
+          "es": 348,
+          "fi": 466
+        },
+        "eurollm": {
+          "en": 250,
+          "de": 301,
+          "pl": 330,
+          "uk": 368,
+          "bg": 363,
+          "fr": 353,
+          "cs": 347,
+          "hu": 388,
+          "el": 447,
+          "es": 323,
+          "fi": 351
+        }
+      }
+    },
+    {
+      "wid": 36,
+      "sent_start": 528,
+      "sent_end": 536,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1194,
+          "bytes": 1196,
+          "words": 199,
+          "sha256_16": "f5b11bd4af3a7bd6"
+        },
+        "de": {
+          "chars": 1388,
+          "bytes": 1414,
+          "words": 194,
+          "sha256_16": "db9ca2233a0c8ab9"
+        },
+        "pl": {
+          "chars": 1144,
+          "bytes": 1212,
+          "words": 160,
+          "sha256_16": "ee039afdc31b57ff"
+        },
+        "uk": {
+          "chars": 1207,
+          "bytes": 2195,
+          "words": 177,
+          "sha256_16": "a4057f4bcbd261ee"
+        },
+        "bg": {
+          "chars": 1216,
+          "bytes": 2203,
+          "words": 195,
+          "sha256_16": "b5f2c7f226c7ce2a"
+        },
+        "fr": {
+          "chars": 1429,
+          "bytes": 1491,
+          "words": 231,
+          "sha256_16": "ff32f9ff95b969b6"
+        },
+        "cs": {
+          "chars": 1118,
+          "bytes": 1242,
+          "words": 163,
+          "sha256_16": "76304175a121bef3"
+        },
+        "hu": {
+          "chars": 1253,
+          "bytes": 1385,
+          "words": 162,
+          "sha256_16": "5bf6fd86ca3f3703"
+        },
+        "el": {
+          "chars": 1370,
+          "bytes": 2495,
+          "words": 209,
+          "sha256_16": "fc33c2b9baf98507"
+        },
+        "es": {
+          "chars": 1398,
+          "bytes": 1427,
+          "words": 214,
+          "sha256_16": "10cb72ed07616246"
+        },
+        "fi": {
+          "chars": 1216,
+          "bytes": 1261,
+          "words": 136,
+          "sha256_16": "405adbe5c6801357"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 240,
+          "de": 389,
+          "pl": 428,
+          "uk": 377,
+          "bg": 477,
+          "fr": 394,
+          "cs": 353,
+          "hu": 544,
+          "el": 523,
+          "es": 363,
+          "fi": 458
+        },
+        "eurollm": {
+          "en": 257,
+          "de": 333,
+          "pl": 315,
+          "uk": 367,
+          "bg": 365,
+          "fr": 351,
+          "cs": 350,
+          "hu": 384,
+          "el": 445,
+          "es": 313,
+          "fi": 341
+        }
+      }
+    },
+    {
+      "wid": 37,
+      "sent_start": 536,
+      "sent_end": 544,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1159,
+          "bytes": 1161,
+          "words": 186,
+          "sha256_16": "d1732616a477fbd4"
+        },
+        "de": {
+          "chars": 1296,
+          "bytes": 1308,
+          "words": 183,
+          "sha256_16": "62cefd7f5437c4e5"
+        },
+        "pl": {
+          "chars": 1134,
+          "bytes": 1202,
+          "words": 151,
+          "sha256_16": "969e71b878a5a0a8"
+        },
+        "uk": {
+          "chars": 1076,
+          "bytes": 1978,
+          "words": 143,
+          "sha256_16": "28a88e2f1ea212e6"
+        },
+        "bg": {
+          "chars": 1191,
+          "bytes": 2176,
+          "words": 176,
+          "sha256_16": "069fec477b1d9d2a"
+        },
+        "fr": {
+          "chars": 1311,
+          "bytes": 1358,
+          "words": 224,
+          "sha256_16": "60d38889916b67fe"
+        },
+        "cs": {
+          "chars": 1042,
+          "bytes": 1171,
+          "words": 150,
+          "sha256_16": "d59879a8eb9b5c92"
+        },
+        "hu": {
+          "chars": 1151,
+          "bytes": 1275,
+          "words": 152,
+          "sha256_16": "8bda5adf182c4ba1"
+        },
+        "el": {
+          "chars": 1338,
+          "bytes": 2444,
+          "words": 200,
+          "sha256_16": "19b5511a962d11af"
+        },
+        "es": {
+          "chars": 1266,
+          "bytes": 1293,
+          "words": 213,
+          "sha256_16": "2155ab89130e1063"
+        },
+        "fi": {
+          "chars": 1199,
+          "bytes": 1240,
+          "words": 124,
+          "sha256_16": "2566fee414ca931c"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 237,
+          "de": 370,
+          "pl": 434,
+          "uk": 358,
+          "bg": 455,
+          "fr": 359,
+          "cs": 344,
+          "hu": 462,
+          "el": 517,
+          "es": 355,
+          "fi": 448
+        },
+        "eurollm": {
+          "en": 256,
+          "de": 323,
+          "pl": 293,
+          "uk": 351,
+          "bg": 348,
+          "fr": 333,
+          "cs": 326,
+          "hu": 347,
+          "el": 468,
+          "es": 302,
+          "fi": 337
+        }
+      }
+    },
+    {
+      "wid": 38,
+      "sent_start": 544,
+      "sent_end": 550,
+      "n_sents": 6,
+      "langs": {
+        "en": {
+          "chars": 1085,
+          "bytes": 1085,
+          "words": 182,
+          "sha256_16": "a0005ceb603d9ec0"
+        },
+        "de": {
+          "chars": 1304,
+          "bytes": 1324,
+          "words": 178,
+          "sha256_16": "c9311e188e79b962"
+        },
+        "pl": {
+          "chars": 1091,
+          "bytes": 1150,
+          "words": 148,
+          "sha256_16": "19baccfa68465929"
+        },
+        "uk": {
+          "chars": 1108,
+          "bytes": 2014,
+          "words": 160,
+          "sha256_16": "80233f8c205a1181"
+        },
+        "bg": {
+          "chars": 1123,
+          "bytes": 2033,
+          "words": 172,
+          "sha256_16": "fd281b5bfbe63911"
+        },
+        "fr": {
+          "chars": 1394,
+          "bytes": 1449,
+          "words": 242,
+          "sha256_16": "1e9e85e029cc7661"
+        },
+        "cs": {
+          "chars": 1002,
+          "bytes": 1119,
+          "words": 152,
+          "sha256_16": "db7eb6469bd42a21"
+        },
+        "hu": {
+          "chars": 1171,
+          "bytes": 1308,
+          "words": 155,
+          "sha256_16": "7d69f4df8b711f18"
+        },
+        "el": {
+          "chars": 1314,
+          "bytes": 2387,
+          "words": 201,
+          "sha256_16": "a9739ecd43a9977c"
+        },
+        "es": {
+          "chars": 1259,
+          "bytes": 1283,
+          "words": 206,
+          "sha256_16": "3ae246b5b79724df"
+        },
+        "fi": {
+          "chars": 1172,
+          "bytes": 1232,
+          "words": 133,
+          "sha256_16": "412a8748767318ff"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 229,
+          "de": 357,
+          "pl": 391,
+          "uk": 345,
+          "bg": 437,
+          "fr": 402,
+          "cs": 328,
+          "hu": 508,
+          "el": 495,
+          "es": 344,
+          "fi": 463
+        },
+        "eurollm": {
+          "en": 253,
+          "de": 292,
+          "pl": 278,
+          "uk": 331,
+          "bg": 331,
+          "fr": 359,
+          "cs": 317,
+          "hu": 348,
+          "el": 426,
+          "es": 299,
+          "fi": 330
+        }
+      }
+    },
+    {
+      "wid": 39,
+      "sent_start": 550,
+      "sent_end": 558,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1110,
+          "bytes": 1110,
+          "words": 191,
+          "sha256_16": "39f976edc9ede255"
+        },
+        "de": {
+          "chars": 1257,
+          "bytes": 1277,
+          "words": 170,
+          "sha256_16": "5326e2425035601f"
+        },
+        "pl": {
+          "chars": 1154,
+          "bytes": 1215,
+          "words": 153,
+          "sha256_16": "87f1543d11264925"
+        },
+        "uk": {
+          "chars": 1114,
+          "bytes": 2034,
+          "words": 158,
+          "sha256_16": "18c851cdff529634"
+        },
+        "bg": {
+          "chars": 1201,
+          "bytes": 2186,
+          "words": 183,
+          "sha256_16": "8399ec63f0cdf4c3"
+        },
+        "fr": {
+          "chars": 1416,
+          "bytes": 1468,
+          "words": 234,
+          "sha256_16": "26feb2ebf563bc1a"
+        },
+        "cs": {
+          "chars": 1063,
+          "bytes": 1195,
+          "words": 154,
+          "sha256_16": "113a9dc7c8fd264b"
+        },
+        "hu": {
+          "chars": 1245,
+          "bytes": 1373,
+          "words": 156,
+          "sha256_16": "10f6bdc5061249c5"
+        },
+        "el": {
+          "chars": 1262,
+          "bytes": 2305,
+          "words": 190,
+          "sha256_16": "83ed89310a7b3cd7"
+        },
+        "es": {
+          "chars": 1318,
+          "bytes": 1347,
+          "words": 218,
+          "sha256_16": "d0dbf3b23685e8b6"
+        },
+        "fi": {
+          "chars": 1163,
+          "bytes": 1210,
+          "words": 132,
+          "sha256_16": "b787861aadb08197"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 231,
+          "de": 354,
+          "pl": 424,
+          "uk": 364,
+          "bg": 457,
+          "fr": 380,
+          "cs": 343,
+          "hu": 513,
+          "el": 488,
+          "es": 357,
+          "fi": 443
+        },
+        "eurollm": {
+          "en": 253,
+          "de": 296,
+          "pl": 289,
+          "uk": 336,
+          "bg": 340,
+          "fr": 337,
+          "cs": 327,
+          "hu": 363,
+          "el": 409,
+          "es": 304,
+          "fi": 321
+        }
+      }
+    },
+    {
+      "wid": 40,
+      "sent_start": 558,
+      "sent_end": 566,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1171,
+          "bytes": 1171,
+          "words": 188,
+          "sha256_16": "ec64b872cdba6164"
+        },
+        "de": {
+          "chars": 1287,
+          "bytes": 1319,
+          "words": 179,
+          "sha256_16": "7c492b32c434688c"
+        },
+        "pl": {
+          "chars": 1317,
+          "bytes": 1412,
+          "words": 180,
+          "sha256_16": "2d950fb005f387fe"
+        },
+        "uk": {
+          "chars": 1221,
+          "bytes": 2225,
+          "words": 172,
+          "sha256_16": "edc7ba135569d636"
+        },
+        "bg": {
+          "chars": 1233,
+          "bytes": 2248,
+          "words": 181,
+          "sha256_16": "d74587a1a2d00cb5"
+        },
+        "fr": {
+          "chars": 1416,
+          "bytes": 1465,
+          "words": 238,
+          "sha256_16": "e872ac9234c31a30"
+        },
+        "cs": {
+          "chars": 1115,
+          "bytes": 1257,
+          "words": 159,
+          "sha256_16": "2d56eb234185afa0"
+        },
+        "hu": {
+          "chars": 1163,
+          "bytes": 1275,
+          "words": 152,
+          "sha256_16": "a409a102dfde5bf0"
+        },
+        "el": {
+          "chars": 1450,
+          "bytes": 2652,
+          "words": 212,
+          "sha256_16": "d8969990fadbd794"
+        },
+        "es": {
+          "chars": 1483,
+          "bytes": 1507,
+          "words": 234,
+          "sha256_16": "25d5dc6b0fa22e97"
+        },
+        "fi": {
+          "chars": 1220,
+          "bytes": 1287,
+          "words": 129,
+          "sha256_16": "6207e903f921aa97"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 246,
+          "de": 371,
+          "pl": 479,
+          "uk": 394,
+          "bg": 506,
+          "fr": 401,
+          "cs": 353,
+          "hu": 477,
+          "el": 566,
+          "es": 406,
+          "fi": 476
+        },
+        "eurollm": {
+          "en": 259,
+          "de": 302,
+          "pl": 336,
+          "uk": 380,
+          "bg": 368,
+          "fr": 369,
+          "cs": 353,
+          "hu": 364,
+          "el": 477,
+          "es": 364,
+          "fi": 338
+        }
+      }
+    },
+    {
+      "wid": 41,
+      "sent_start": 566,
+      "sent_end": 574,
+      "n_sents": 8,
+      "langs": {
+        "en": {
+          "chars": 1196,
+          "bytes": 1196,
+          "words": 199,
+          "sha256_16": "125cf21b74077256"
+        },
+        "de": {
+          "chars": 1389,
+          "bytes": 1409,
+          "words": 196,
+          "sha256_16": "108e3811dab32db3"
+        },
+        "pl": {
+          "chars": 1175,
+          "bytes": 1234,
+          "words": 159,
+          "sha256_16": "97e136677f6ff0e8"
+        },
+        "uk": {
+          "chars": 1114,
+          "bytes": 2026,
+          "words": 153,
+          "sha256_16": "176726f8b4fc6d44"
+        },
+        "bg": {
+          "chars": 1190,
+          "bytes": 2126,
+          "words": 192,
+          "sha256_16": "ce82d1ff93c231b4"
+        },
+        "fr": {
+          "chars": 1349,
+          "bytes": 1414,
+          "words": 231,
+          "sha256_16": "d032458535fa4224"
+        },
+        "cs": {
+          "chars": 1124,
+          "bytes": 1241,
+          "words": 161,
+          "sha256_16": "ee779f2a3a5d99aa"
+        },
+        "hu": {
+          "chars": 1207,
+          "bytes": 1329,
+          "words": 168,
+          "sha256_16": "90bddefd2efe7800"
+        },
+        "el": {
+          "chars": 1357,
+          "bytes": 2475,
+          "words": 200,
+          "sha256_16": "2f322a17d0a5e7b8"
+        },
+        "es": {
+          "chars": 1352,
+          "bytes": 1375,
+          "words": 229,
+          "sha256_16": "d2e1a1867ac9cede"
+        },
+        "fi": {
+          "chars": 1250,
+          "bytes": 1297,
+          "words": 146,
+          "sha256_16": "22bbf869fcf9aff1"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 248,
+          "de": 355,
+          "pl": 418,
+          "uk": 372,
+          "bg": 486,
+          "fr": 371,
+          "cs": 336,
+          "hu": 478,
+          "el": 527,
+          "es": 365,
+          "fi": 479
+        },
+        "eurollm": {
+          "en": 271,
+          "de": 318,
+          "pl": 301,
+          "uk": 364,
+          "bg": 381,
+          "fr": 352,
+          "cs": 333,
+          "hu": 362,
+          "el": 451,
+          "es": 332,
+          "fi": 350
+        }
+      }
+    },
+    {
+      "wid": 42,
+      "sent_start": 574,
+      "sent_end": 585,
+      "n_sents": 11,
+      "langs": {
+        "en": {
+          "chars": 1191,
+          "bytes": 1191,
+          "words": 207,
+          "sha256_16": "434fc005c758998f"
+        },
+        "de": {
+          "chars": 1408,
+          "bytes": 1428,
+          "words": 205,
+          "sha256_16": "98b7c35fdf859188"
+        },
+        "pl": {
+          "chars": 1248,
+          "bytes": 1304,
+          "words": 179,
+          "sha256_16": "abd5027503dbff97"
+        },
+        "uk": {
+          "chars": 1239,
+          "bytes": 2263,
+          "words": 180,
+          "sha256_16": "c267e59fe14ffe42"
+        },
+        "bg": {
+          "chars": 1211,
+          "bytes": 2199,
+          "words": 190,
+          "sha256_16": "51d6d2f7a801092d"
+        },
+        "fr": {
+          "chars": 1463,
+          "bytes": 1509,
+          "words": 239,
+          "sha256_16": "25d297c95377bf2f"
+        },
+        "cs": {
+          "chars": 1153,
+          "bytes": 1300,
+          "words": 172,
+          "sha256_16": "b5e5e50c78ef3335"
+        },
+        "hu": {
+          "chars": 1228,
+          "bytes": 1344,
+          "words": 161,
+          "sha256_16": "9711dbafbc27121b"
+        },
+        "el": {
+          "chars": 1323,
+          "bytes": 2418,
+          "words": 204,
+          "sha256_16": "39ab2671e52e48af"
+        },
+        "es": {
+          "chars": 1404,
+          "bytes": 1429,
+          "words": 221,
+          "sha256_16": "c8704cd954f79dd1"
+        },
+        "fi": {
+          "chars": 1212,
+          "bytes": 1293,
+          "words": 145,
+          "sha256_16": "6748eafe91a78d0c"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 245,
+          "de": 393,
+          "pl": 444,
+          "uk": 401,
+          "bg": 497,
+          "fr": 388,
+          "cs": 380,
+          "hu": 516,
+          "el": 500,
+          "es": 372,
+          "fi": 489
+        },
+        "eurollm": {
+          "en": 271,
+          "de": 353,
+          "pl": 336,
+          "uk": 389,
+          "bg": 372,
+          "fr": 365,
+          "cs": 351,
+          "hu": 378,
+          "el": 434,
+          "es": 333,
+          "fi": 363
+        }
+      }
+    },
+    {
+      "wid": 43,
+      "sent_start": 585,
+      "sent_end": 595,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1212,
+          "bytes": 1216,
+          "words": 204,
+          "sha256_16": "cbc77595544a3356"
+        },
+        "de": {
+          "chars": 1543,
+          "bytes": 1558,
+          "words": 214,
+          "sha256_16": "d5e3e56f2e1b4ed3"
+        },
+        "pl": {
+          "chars": 1337,
+          "bytes": 1411,
+          "words": 180,
+          "sha256_16": "e05a0bb6bc57b9a6"
+        },
+        "uk": {
+          "chars": 1197,
+          "bytes": 2191,
+          "words": 160,
+          "sha256_16": "f472ffef4274aa79"
+        },
+        "bg": {
+          "chars": 1251,
+          "bytes": 2281,
+          "words": 187,
+          "sha256_16": "6ad25a0880dec619"
+        },
+        "fr": {
+          "chars": 1446,
+          "bytes": 1490,
+          "words": 247,
+          "sha256_16": "4772c96999e5f18e"
+        },
+        "cs": {
+          "chars": 1145,
+          "bytes": 1291,
+          "words": 176,
+          "sha256_16": "3681a42a73f2f862"
+        },
+        "hu": {
+          "chars": 1295,
+          "bytes": 1426,
+          "words": 176,
+          "sha256_16": "b451cfd329c2e13b"
+        },
+        "el": {
+          "chars": 1477,
+          "bytes": 2702,
+          "words": 218,
+          "sha256_16": "7dd0fa2b67da3261"
+        },
+        "es": {
+          "chars": 1387,
+          "bytes": 1425,
+          "words": 227,
+          "sha256_16": "6abef7620ea69c21"
+        },
+        "fi": {
+          "chars": 1243,
+          "bytes": 1275,
+          "words": 139,
+          "sha256_16": "f79e329baf5d1018"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 236,
+          "de": 400,
+          "pl": 467,
+          "uk": 369,
+          "bg": 476,
+          "fr": 372,
+          "cs": 329,
+          "hu": 531,
+          "el": 544,
+          "es": 360,
+          "fi": 458
+        },
+        "eurollm": {
+          "en": 261,
+          "de": 326,
+          "pl": 308,
+          "uk": 353,
+          "bg": 351,
+          "fr": 344,
+          "cs": 327,
+          "hu": 379,
+          "el": 469,
+          "es": 315,
+          "fi": 339
+        }
+      }
+    },
+    {
+      "wid": 44,
+      "sent_start": 595,
+      "sent_end": 604,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1228,
+          "bytes": 1228,
+          "words": 195,
+          "sha256_16": "0aa034aafd652866"
+        },
+        "de": {
+          "chars": 1430,
+          "bytes": 1441,
+          "words": 195,
+          "sha256_16": "35d794ed77facb95"
+        },
+        "pl": {
+          "chars": 1308,
+          "bytes": 1376,
+          "words": 175,
+          "sha256_16": "b525f2175dc0c8ee"
+        },
+        "uk": {
+          "chars": 1263,
+          "bytes": 2323,
+          "words": 175,
+          "sha256_16": "7372330daadbeacb"
+        },
+        "bg": {
+          "chars": 1220,
+          "bytes": 2233,
+          "words": 183,
+          "sha256_16": "9eda9d15901f64a9"
+        },
+        "fr": {
+          "chars": 1460,
+          "bytes": 1501,
+          "words": 227,
+          "sha256_16": "cf4eb774ee98dc51"
+        },
+        "cs": {
+          "chars": 1158,
+          "bytes": 1287,
+          "words": 163,
+          "sha256_16": "e3e954107de3f3b4"
+        },
+        "hu": {
+          "chars": 1246,
+          "bytes": 1379,
+          "words": 169,
+          "sha256_16": "ef17da07010b9a2d"
+        },
+        "el": {
+          "chars": 1514,
+          "bytes": 2764,
+          "words": 224,
+          "sha256_16": "0f3ec14841d8060e"
+        },
+        "es": {
+          "chars": 1343,
+          "bytes": 1370,
+          "words": 213,
+          "sha256_16": "146ffe0bb383fb4b"
+        },
+        "fi": {
+          "chars": 1324,
+          "bytes": 1369,
+          "words": 156,
+          "sha256_16": "d800cabcf6ee3821"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 229,
+          "de": 389,
+          "pl": 466,
+          "uk": 410,
+          "bg": 492,
+          "fr": 371,
+          "cs": 354,
+          "hu": 505,
+          "el": 566,
+          "es": 351,
+          "fi": 502
+        },
+        "eurollm": {
+          "en": 252,
+          "de": 332,
+          "pl": 325,
+          "uk": 393,
+          "bg": 344,
+          "fr": 326,
+          "cs": 339,
+          "hu": 369,
+          "el": 482,
+          "es": 300,
+          "fi": 364
+        }
+      }
+    },
+    {
+      "wid": 45,
+      "sent_start": 604,
+      "sent_end": 613,
+      "n_sents": 9,
+      "langs": {
+        "en": {
+          "chars": 1268,
+          "bytes": 1268,
+          "words": 187,
+          "sha256_16": "99d9b74eb29b6ba5"
+        },
+        "de": {
+          "chars": 1437,
+          "bytes": 1459,
+          "words": 200,
+          "sha256_16": "cdf0a9445adb9f25"
+        },
+        "pl": {
+          "chars": 1297,
+          "bytes": 1358,
+          "words": 176,
+          "sha256_16": "189badc446f56d71"
+        },
+        "uk": {
+          "chars": 1327,
+          "bytes": 2447,
+          "words": 180,
+          "sha256_16": "9eb7f0f467245155"
+        },
+        "bg": {
+          "chars": 1346,
+          "bytes": 2463,
+          "words": 202,
+          "sha256_16": "045caaa2edd7f4aa"
+        },
+        "fr": {
+          "chars": 1470,
+          "bytes": 1520,
+          "words": 244,
+          "sha256_16": "c751587aba11772b"
+        },
+        "cs": {
+          "chars": 1176,
+          "bytes": 1325,
+          "words": 169,
+          "sha256_16": "e94436064ba5319c"
+        },
+        "hu": {
+          "chars": 1340,
+          "bytes": 1460,
+          "words": 165,
+          "sha256_16": "f9a42a735730e745"
+        },
+        "el": {
+          "chars": 1489,
+          "bytes": 2717,
+          "words": 221,
+          "sha256_16": "7fd1dcbd34b39268"
+        },
+        "es": {
+          "chars": 1480,
+          "bytes": 1505,
+          "words": 243,
+          "sha256_16": "414b9c5efe12b147"
+        },
+        "fi": {
+          "chars": 1337,
+          "bytes": 1392,
+          "words": 143,
+          "sha256_16": "b88cfac825c4fd91"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 220,
+          "de": 369,
+          "pl": 446,
+          "uk": 399,
+          "bg": 509,
+          "fr": 376,
+          "cs": 369,
+          "hu": 532,
+          "el": 543,
+          "es": 379,
+          "fi": 517
+        },
+        "eurollm": {
+          "en": 239,
+          "de": 301,
+          "pl": 314,
+          "uk": 375,
+          "bg": 359,
+          "fr": 340,
+          "cs": 359,
+          "hu": 383,
+          "el": 448,
+          "es": 326,
+          "fi": 376
+        }
+      }
+    },
+    {
+      "wid": 46,
+      "sent_start": 613,
+      "sent_end": 623,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1189,
+          "bytes": 1189,
+          "words": 183,
+          "sha256_16": "b95a547061f6b04c"
+        },
+        "de": {
+          "chars": 1375,
+          "bytes": 1393,
+          "words": 177,
+          "sha256_16": "dc61041765414b10"
+        },
+        "pl": {
+          "chars": 1265,
+          "bytes": 1374,
+          "words": 156,
+          "sha256_16": "c2f99343809795cb"
+        },
+        "uk": {
+          "chars": 1155,
+          "bytes": 2118,
+          "words": 156,
+          "sha256_16": "669467abf9f7fbb1"
+        },
+        "bg": {
+          "chars": 1272,
+          "bytes": 2320,
+          "words": 192,
+          "sha256_16": "48334f3da3856415"
+        },
+        "fr": {
+          "chars": 1452,
+          "bytes": 1497,
+          "words": 229,
+          "sha256_16": "c733ca2b684e91bd"
+        },
+        "cs": {
+          "chars": 1082,
+          "bytes": 1205,
+          "words": 156,
+          "sha256_16": "939d1b5249318e37"
+        },
+        "hu": {
+          "chars": 1217,
+          "bytes": 1360,
+          "words": 158,
+          "sha256_16": "7cf761aaccd22cc1"
+        },
+        "el": {
+          "chars": 1380,
+          "bytes": 2522,
+          "words": 204,
+          "sha256_16": "af6655f068dfb5b9"
+        },
+        "es": {
+          "chars": 1426,
+          "bytes": 1451,
+          "words": 219,
+          "sha256_16": "5474bef60b03dace"
+        },
+        "fi": {
+          "chars": 1270,
+          "bytes": 1333,
+          "words": 140,
+          "sha256_16": "ce45668f0a9b2168"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 222,
+          "de": 374,
+          "pl": 469,
+          "uk": 348,
+          "bg": 484,
+          "fr": 368,
+          "cs": 342,
+          "hu": 512,
+          "el": 526,
+          "es": 357,
+          "fi": 492
+        },
+        "eurollm": {
+          "en": 243,
+          "de": 293,
+          "pl": 307,
+          "uk": 345,
+          "bg": 366,
+          "fr": 332,
+          "cs": 338,
+          "hu": 363,
+          "el": 453,
+          "es": 303,
+          "fi": 364
+        }
+      }
+    },
+    {
+      "wid": 47,
+      "sent_start": 623,
+      "sent_end": 633,
+      "n_sents": 10,
+      "langs": {
+        "en": {
+          "chars": 1184,
+          "bytes": 1184,
+          "words": 200,
+          "sha256_16": "07173f6d8b4e66c0"
+        },
+        "de": {
+          "chars": 1271,
+          "bytes": 1288,
+          "words": 195,
+          "sha256_16": "2c381e211b7e9dd9"
+        },
+        "pl": {
+          "chars": 1185,
+          "bytes": 1258,
+          "words": 176,
+          "sha256_16": "0f1828ecac81a5e2"
+        },
+        "uk": {
+          "chars": 1133,
+          "bytes": 2045,
+          "words": 164,
+          "sha256_16": "272041d0a031b3f1"
+        },
+        "bg": {
+          "chars": 1155,
+          "bytes": 2077,
+          "words": 181,
+          "sha256_16": "749dcd40aed143e5"
+        },
+        "fr": {
+          "chars": 1306,
+          "bytes": 1342,
+          "words": 226,
+          "sha256_16": "231278ab7046836a"
+        },
+        "cs": {
+          "chars": 1063,
+          "bytes": 1203,
+          "words": 170,
+          "sha256_16": "15c72aab8daac11f"
+        },
+        "hu": {
+          "chars": 1086,
+          "bytes": 1199,
+          "words": 155,
+          "sha256_16": "aa49004a0887806e"
+        },
+        "el": {
+          "chars": 1330,
+          "bytes": 2410,
+          "words": 202,
+          "sha256_16": "9c0f89dc9061a0be"
+        },
+        "es": {
+          "chars": 1310,
+          "bytes": 1341,
+          "words": 225,
+          "sha256_16": "5fb48f11896d6ed7"
+        },
+        "fi": {
+          "chars": 1116,
+          "bytes": 1164,
+          "words": 136,
+          "sha256_16": "1cb874b944d4ae19"
+        }
+      },
+      "tokens": {
+        "bitnet": {
+          "en": 240,
+          "de": 373,
+          "pl": 433,
+          "uk": 374,
+          "bg": 466,
+          "fr": 366,
+          "cs": 338,
+          "hu": 469,
+          "el": 506,
+          "es": 358,
+          "fi": 427
+        },
+        "eurollm": {
+          "en": 273,
+          "de": 301,
+          "pl": 316,
+          "uk": 372,
+          "bg": 348,
+          "fr": 352,
+          "cs": 331,
+          "hu": 354,
+          "el": 429,
+          "es": 317,
+          "fi": 326
+        }
+      }
+    }
+  ]
+}

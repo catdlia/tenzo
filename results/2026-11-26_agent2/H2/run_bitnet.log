@@ -1,0 +1,53 @@
+Running as unit: run-p139372-i142139.scope; invocation ID: 3d959160fe70471ab685daadc98174bc
+[bitnet parity fp32 on fr w0] max_abs_lp_diff=0.000e+00
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[bitnet parity S3+s4r32 on fr w0] max_abs_lp_diff=0.000e+00
+[run] bitnet fp32 fr: 48 windows (chunk=24)
+  bitnet fp32       fr 24/48 t=396s rss=1.87GB
+  bitnet fp32       fr 48/48 t=778s rss=1.86GB
+[done] bitnet fp32       fr nll=56156.754 tok=18115 t=778.4s rss=1.86GB peak=2.54GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 fr: 48 windows (chunk=24)
+  bitnet S3+s4r32   fr 24/48 t=1193s rss=1.89GB
+  bitnet S3+s4r32   fr 48/48 t=1598s rss=1.86GB
+[done] bitnet S3+s4r32   fr nll=56790.439 tok=18115 t=1597.6s rss=1.86GB peak=2.57GB
+[run] bitnet fp32 cs: 48 windows (chunk=24)
+  bitnet fp32       cs 24/48 t=372s rss=1.85GB
+  bitnet fp32       cs 48/48 t=720s rss=1.87GB
+[done] bitnet fp32       cs nll=95794.680 tok=17047 t=720.5s rss=1.87GB peak=2.57GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 cs: 48 windows (chunk=24)
+  bitnet S3+s4r32   cs 24/48 t=1112s rss=1.95GB
+  bitnet S3+s4r32   cs 48/48 t=1479s rss=1.93GB
+[done] bitnet S3+s4r32   cs nll=96940.192 tok=17047 t=1479.1s rss=1.93GB peak=2.57GB
+[run] bitnet fp32 hu: 48 windows (chunk=24)
+  bitnet fp32       hu 24/48 t=561s rss=1.85GB
+  bitnet fp32       hu 48/48 t=1134s rss=1.94GB
+[done] bitnet fp32       hu nll=107876.654 tok=24013 t=1133.5s rss=1.94GB peak=2.57GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 hu: 48 windows (chunk=24)
+  bitnet S3+s4r32   hu 24/48 t=1729s rss=1.85GB
+  bitnet S3+s4r32   hu 48/48 t=2338s rss=1.85GB
+[done] bitnet S3+s4r32   hu nll=109520.030 tok=24013 t=2337.9s rss=1.85GB peak=2.58GB
+[run] bitnet fp32 el: 48 windows (chunk=24)
+  bitnet fp32       el 24/48 t=605s rss=1.85GB
+  bitnet fp32       el 48/48 t=1208s rss=1.88GB
+[done] bitnet fp32       el nll=92696.583 tok=25430 t=1208.0s rss=1.88GB peak=2.59GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 el: 48 windows (chunk=24)
+  bitnet S3+s4r32   el 24/48 t=1853s rss=1.96GB
+  bitnet S3+s4r32   el 48/48 t=2493s rss=1.91GB
+[done] bitnet S3+s4r32   el nll=94490.622 tok=25430 t=2493.2s rss=1.91GB peak=2.71GB
+Running as unit: run-p161994-i163474.scope; invocation ID: 9746451f4b5147bd92ae4a929ef6fdc9
+[bitnet parity fp32 on es w0] max_abs_lp_diff=0.000e+00
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[bitnet parity S3+s4r32 on es w0] max_abs_lp_diff=0.000e+00
+[run] bitnet fp32 es: 48 windows (chunk=24)
+  bitnet fp32       es 24/48 t=399s rss=1.79GB
+  bitnet fp32       es 48/48 t=779s rss=1.75GB
+[done] bitnet fp32       es nll=61267.961 tok=17525 t=778.6s rss=1.75GB peak=2.55GB
+[kv_ptq] installed S3+s4r32: S2 + randomized Hadamard (D=128) + sinks 4 + recent 32 INT8
+[run] bitnet S3+s4r32 es: 48 windows (chunk=24)
+  bitnet S3+s4r32   es 24/48 t=1197s rss=1.73GB
+  bitnet S3+s4r32   es 48/48 t=1593s rss=1.83GB
+[done] bitnet S3+s4r32   es nll=61935.182 tok=17525 t=1593.4s rss=1.83GB peak=2.55GB

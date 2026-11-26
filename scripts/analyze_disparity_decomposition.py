@@ -34,6 +34,8 @@ SETS = [
      {"bitnet": "fp32", "eurollm": "fp"}, ["en", "de", "pl", "uk", "bg"], ["S3_s4r32"]),
     ("flores5", "results/2026-11-24-b_agent2/H3/scores", "results/2026-11-24-b_agent2/H3b/scores",
      {"bitnet": "fp32", "eurollm": "fp"}, ["en", "de", "pl", "uk", "bg"], ["S3_s4c120"]),
+    ("flores11", "results/2026-11-26_agent2/H2/scores", "results/2026-11-26_agent2/H2/scores",
+     {"bitnet": "fp32", "eurollm": "fp"}, ["en", "de", "pl", "uk", "bg", "fr", "cs", "hu", "el", "es"], ["S3_s4r32"]),
     ("ntrex", "results/2026-11-24-b_agent2/H4/scores", "results/2026-11-24-b_agent2/H4/scores",
      {"bitnet": "fp32", "eurollm": "fp"}, ["en", "uk"], ["S3_s4r32", "S3_s4r128"]),
 ]

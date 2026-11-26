@@ -1,0 +1,48 @@
+Running as unit: run-p152104-i143310.scope; invocation ID: fc679e5f53df42369307f759cc5ecc36
+Loading /home/illia/tenzo-refs/hf/eurollm-1.7b (bfloat16 + per-layer fp32 linear cache, threads=6)... rss=0.45GB
+[eurollm parity fp on fr w0] max_abs_lp_diff=4.053e-06
+[eurollm parity S3+s4r32 on fr w0] max_abs_lp_diff=5.007e-06
+[run] eurollm fp fr: 48 windows (chunk=24)
+  eurollm fp         fr 24/48 t=283s rss=3.45GB
+  eurollm fp         fr 48/48 t=549s rss=3.52GB
+[done] eurollm fp         fr nll=35456.347 tok=16719 t=548.7s rss=3.52GB peak=4.74GB
+[run] eurollm S3+s4r32 fr: 48 windows (chunk=24)
+  eurollm S3+s4r32   fr 24/48 t=953s rss=3.54GB
+  eurollm S3+s4r32   fr 48/48 t=1331s rss=3.52GB
+[done] eurollm S3+s4r32   fr nll=35789.343 tok=16719 t=1331.1s rss=3.52GB peak=4.76GB
+[run] eurollm fp cs: 48 windows (chunk=24)
+  eurollm fp         cs 24/48 t=277s rss=3.57GB
+  eurollm fp         cs 48/48 t=543s rss=3.60GB
+[done] eurollm fp         cs nll=38562.088 tok=16589 t=543.4s rss=3.60GB peak=4.82GB
+[run] eurollm S3+s4r32 cs: 48 windows (chunk=24)
+  eurollm S3+s4r32   cs 24/48 t=939s rss=3.62GB
+  eurollm S3+s4r32   cs 48/48 t=1316s rss=3.63GB
+[done] eurollm S3+s4r32   cs nll=38875.971 tok=16589 t=1316.2s rss=3.63GB peak=4.85GB
+[run] eurollm fp hu: 48 windows (chunk=24)
+  eurollm fp         hu 24/48 t=302s rss=3.66GB
+  eurollm fp         hu 48/48 t=596s rss=3.68GB
+[done] eurollm fp         hu nll=42010.523 tok=17777 t=596.5s rss=3.68GB peak=4.90GB
+[run] eurollm S3+s4r32 hu: 48 windows (chunk=24)
+  eurollm S3+s4r32   hu 24/48 t=1033s rss=3.66GB
+  eurollm S3+s4r32   hu 48/48 t=1460s rss=3.66GB
+[done] eurollm S3+s4r32   hu nll=42530.546 tok=17777 t=1459.8s rss=3.66GB peak=4.90GB
+[run] eurollm fp el: 48 windows (chunk=24)
+  eurollm fp         el 24/48 t=411s rss=3.73GB
+  eurollm fp         el 48/48 t=806s rss=3.74GB
+[done] eurollm fp         el nll=43272.347 tok=21859 t=806.3s rss=3.74GB peak=4.96GB
+[run] eurollm S3+s4r32 el: 48 windows (chunk=24)
+  eurollm S3+s4r32   el 24/48 t=1418s rss=3.79GB
+  eurollm S3+s4r32   el 48/48 t=2001s rss=3.76GB
+[done] eurollm S3+s4r32   el nll=43777.744 tok=21859 t=2001.4s rss=3.76GB peak=5.12GB
+Running as unit: run-p164776-i176560.scope; invocation ID: 21fdbbffb1e8430294094e77c5a24ef3
+Loading /home/illia/tenzo-refs/hf/eurollm-1.7b (bfloat16 + per-layer fp32 linear cache, threads=6)... rss=0.45GB
+[eurollm parity fp on es w0] max_abs_lp_diff=3.338e-06
+[eurollm parity S3+s4r32 on es w0] max_abs_lp_diff=4.053e-06
+[run] eurollm fp es: 48 windows (chunk=24)
+  eurollm fp         es 24/48 t=261s rss=3.46GB
+  eurollm fp         es 48/48 t=507s rss=3.49GB
+[done] eurollm fp         es nll=38648.806 tok=15543 t=506.6s rss=3.49GB peak=4.71GB
+[run] eurollm S3+s4r32 es: 48 windows (chunk=24)
+  eurollm S3+s4r32   es 24/48 t=875s rss=3.46GB
+  eurollm S3+s4r32   es 48/48 t=1220s rss=3.49GB
+[done] eurollm S3+s4r32   es nll=38896.492 tok=15543 t=1220.3s rss=3.49GB peak=4.74GB
